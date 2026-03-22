@@ -1,0 +1,5 @@
+<mujocoinclude model="nescafe_mocha">
+    <body name="nescafe_mocha" euler="1.57 0 0">
+      <geom material="material_0.006" mesh="nescafe_mocha" class="visual"/>
+    </body>
+</mujocoinclude>

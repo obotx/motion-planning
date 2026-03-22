@@ -1,0 +1,19 @@
+<mujocoinclude>
+<body name="chair" pos="-1.4667 -1.8 0" euler="0 0 -3.14">
+    <geom rgba="0.95 0.95 0.95 1" mesh="chair_bar" class="visual" euler="1.57 0 0"/>
+    <geom rgba="0.95 0.95 0.95 0.5" type="box" class="collision" pos="0 0 0.42" size="0.24 0.24 0.42"/>
+    <geom rgba="0.95 0.95 0.95 0.5" type="box" class="collision" pos="0 -0.06 0.876" size="0.24 0.18 0.018"/>
+    <geom rgba="0.95 0.95 0.95 0.5" type="box" class="collision" pos="0 0.18 0.936" size="0.144 0.096 0.012" euler="0.785398 0 0"/>
+    <geom rgba="0.95 0.95 0.95 0.5" type="box" class="collision" pos="0.192 0 0.936" size="0.24 0.06 0.012" euler="0.610865 -0.959931 -0.959931"/>
+    <geom rgba="0.95 0.95 0.95 0.5" type="box" class="collision" pos="-0.192 0 0.936" size="0.24 0.06 0.012" euler="-2.61799 -0.785398 -0.959931"/>
+</body>
+
+<body name="chair2" pos="0.4 -1.8 0" euler="0 0 -3.14">
+    <geom rgba="0.95 0.95 0.95 1" mesh="chair_bar" class="visual" euler="1.57 0 0"/>
+    <geom rgba="0.95 0.95 0.95 0.5" type="box" class="collision" pos="0 0 0.42" size="0.24 0.24 0.42"/>
+    <geom rgba="0.95 0.95 0.95 0.5" type="box" class="collision" pos="0 -0.06 0.876" size="0.24 0.18 0.018"/>
+    <geom rgba="0.95 0.95 0.95 0.5" type="box" class="collision" pos="0 0.18 0.936" size="0.144 0.096 0.012" euler="0.785398 0 0"/>
+    <geom rgba="0.95 0.95 0.95 0.5" type="box" class="collision" pos="0.192 0 0.936" size="0.24 0.06 0.012" euler="0.610865 -0.959931 -0.959931"/>
+    <geom rgba="0.95 0.95 0.95 0.5" type="box" class="collision" pos="-0.192 0 0.936" size="0.24 0.06 0.012" euler="-2.61799 -0.785398 -0.959931"/>
+</body>
+</mujocoinclude>

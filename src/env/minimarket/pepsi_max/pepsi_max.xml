@@ -1,0 +1,5 @@
+<mujocoinclude model="pepsi_max">
+    <body name="pepsi_max" euler="1.57 0 0">
+      <geom material="material_0.009" mesh="pepsi_max" class="visual"/>
+    </body>
+</mujocoinclude>

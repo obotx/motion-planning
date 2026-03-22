@@ -1,0 +1,131 @@
+<mujocoinclude>
+    <asset>        
+        <material name="Material1" specular="0.0" shininess="0.01" rgba="1.0000 1.0000 1.0000 1.0000"/>
+        <material name="Metal_Rough" specular="0.0" shininess="0.01" rgba="1.0000 1.0000 1.0000 1.0000"/>
+        <material name="Material6" specular="0.0" shininess="0.01" rgba="1.0000 1.0000 1.0000 1.0000"/>
+        <material name="Material2" specular="0.0" shininess="0.01" rgba="1.0000 1.0000 1.0000 0.2800"/>
+        <material name="Material5" specular="0.0" shininess="0.01" rgba="1.0000 1.0000 1.0000 1.0000"/>
+        <material name="led_" specular="0.0" shininess="0.01" rgba="1.0000 1.0000 1.0000 1.0000"/>
+        <material name="Material3" specular="0.0" shininess="0.01" rgba="0.3569 0.3569 0.3569 1.0000"/>
+        <material name="Material4" specular="0.0" shininess="0.01" rgba="0.4549 0.5451 0.7020 0.3400"/>
+        <material name="Color_B24" specular="0.0" shininess="0.01" rgba="0.2000 0.1373 0.1176 1.0000"/>
+        <material name="Metal_Corrogated_Shiny" specular="0.0" shininess="0.01" rgba="1.0000 1.0000 1.0000 1.0000"/>
+        <material name="Material8" specular="0.0" shininess="0.01" rgba="0.9294 0.9294 0.9294 1.0000"/>
+        <material name="vitre_" specular="0.0" shininess="0.01" rgba="0.7765 0.7765 0.7765 0.3800"/>
+        <material name="skp_front_default" specular="0.0" shininess="0.01" rgba="1.0000 1.0000 1.0000 1.0000"/>
+        <material name="Material7" specular="0.0" shininess="0.01" rgba="0.1569 0.1569 0.1569 1.0000"/>
+        <mesh file="fridge/fridge_neg1/fridge_neg1_0.obj"   scale="0.0266667 0.03 0.0266667"/>
+        <mesh file="fridge/fridge_neg1/fridge_neg1_1.obj"   scale="0.0266667 0.03 0.0266667"/>
+        <mesh file="fridge/fridge_neg1/fridge_neg1_2.obj"   scale="0.0266667 0.03 0.0266667"/>
+        <mesh file="fridge/fridge_neg1/fridge_neg1_3.obj"   scale="0.0266667 0.03 0.0266667"/>
+        <mesh file="fridge/fridge_neg1/fridge_neg1_4.obj"   scale="0.0266667 0.03 0.0266667"/>
+        <mesh file="fridge/fridge_neg1/fridge_neg1_5.obj"   scale="0.0266667 0.03 0.0266667"/>
+        <mesh file="fridge/fridge_neg1/fridge_neg1_6.obj"   scale="0.0266667 0.03 0.0266667"/>
+        <mesh file="fridge/fridge_neg1/fridge_neg1_7.obj"   scale="0.0266667 0.03 0.0266667"/>
+        <mesh file="fridge/fridge_neg1/fridge_neg1_8.obj"   scale="0.0266667 0.03 0.0266667"/>
+        <mesh file="fridge/fridge_neg1/fridge_neg1_9.obj"   scale="0.0266667 0.03 0.0266667"/>
+        <mesh file="fridge/fridge_neg1/fridge_neg1_10.obj"  scale="0.0266667 0.03 0.0266667"/>
+        <mesh file="fridge/fridge_neg1/fridge_neg1_11.obj"  scale="0.0266667 0.03 0.0266667"/>
+        <mesh file="fridge/fridge_neg1/fridge_neg1_12.obj"  scale="0.0266667 0.03 0.0266667"/>
+        <mesh file="fridge/fridge_neg1/fridge_neg1_13.obj"  scale="0.0266667 0.03 0.0266667"/>
+
+        <mesh file="chair_bar/chair_bar/chair_bar.obj"      scale="0.012 0.012 0.012"/>
+        <mesh file="couch/couch/couch.obj" scale="0.0366667 0.0366667 0.0366667"/>
+        <material name="std_mtl" specular="0.0" shininess="0.01" rgba="0.5880 0.5880 0.5880 1.0000"/>
+
+        <material name="0.301961_0.301961_0.301961_0.000000_0.021" specular="0.0" shininess="0.0" rgba="0.302000 0.302000 0.302000 1.000000"/>
+        <material name="0.301961_0.301961_0.301961_0.000000_0.022" specular="0.0" shininess="0.0" rgba="0.302000 0.302000 0.302000 1.000000"/>
+        <material name="0.301961_0.301961_0.301961_0.000000_0.023" specular="0.0" shininess="0.0" rgba="0.302000 0.302000 0.302000 1.000000"/>
+        <material name="0.301961_0.301961_0.301961_0.000000_0.024" specular="0.0" shininess="0.0" rgba="0.302000 0.302000 0.302000 1.000000"/>
+        <material name="0.901961_0.901961_0.901961_0.000000_0.013" specular="0.0" shininess="0.0" rgba="0.902000 0.902000 0.902000 1.000000"/>
+        <material name="0.901961_0.901961_0.901961_0.000000_0.014" specular="0.0" shininess="0.0" rgba="0.902000 0.902000 0.902000 1.000000"/>
+        <mesh file="robot/assets/meshes/arm_obotx/ObotXArm/VerticalArm/VerticalArm_0.obj"/>
+        <mesh file="robot/assets/meshes/arm_obotx/ObotXArm/VerticalArm/VerticalArm_1.obj"/>
+        <mesh file="robot/assets/meshes/arm_obotx/ObotXArm/VerticalArm/VerticalArm_2.obj"/>
+        <mesh file="robot/assets/meshes/arm_obotx/ObotXArm/VerticalArm/VerticalArm_3.obj"/>
+        <mesh file="robot/assets/meshes/arm_obotx/ObotXArm/VerticalArm/VerticalArm_4.obj"/>
+        <mesh file="robot/assets/meshes/arm_obotx/ObotXArm/VerticalArm/VerticalArm_5.obj"/>
+        
+        <material name="0.301961_0.301961_0.301961_0.000000_0.030" specular="0.0" shininess="0.0" rgba="0.302000 0.302000 0.302000 1.000000"/>
+        <material name="0.501961_0.501961_0.501961_0.000000_0.007" specular="0.0" shininess="0.0" rgba="0.502000 0.502000 0.502000 1.000000"/>
+        <material name="0.901961_0.901961_0.901961_0.000000_0.019" shininess="0.9" specular="0.9" reflectance="0.7" rgba="0.1 0.1 0.1 1"/>
+        <mesh file="robot/assets/meshes/arm_obotx/ObotXArm/LeftVerticalRotationSlider/LeftVerticalRotationSlider_0.obj"/>
+        <mesh file="robot/assets/meshes/arm_obotx/ObotXArm/LeftVerticalRotationSlider/LeftVerticalRotationSlider_1.obj"/>
+        <mesh file="robot/assets/meshes/arm_obotx/ObotXArm/LeftVerticalRotationSlider/LeftVerticalRotationSlider_2.obj"/>
+        
+        <material name="0.301961_0.301961_0.301961_0.000000_0.026" specular="0.0" shininess="0.0" rgba="0.302000 0.302000 0.302000 1.000000"/>
+        <material name="0.501961_0.501961_0.501961_0.000000_0.008" specular="0.0" shininess="0.0" rgba="0.502000 0.502000 0.502000 1.000000"/>
+        <material name="0.901961_0.901961_0.901961_0.000000_0.016" shininess="0.9" specular="0.9" reflectance="0.7" rgba="0.1 0.1 0.1 1"/>
+        <mesh file="robot/assets/meshes/arm_obotx/ObotXArm/RightVerticalRotationSlider/RightVerticalRotationSlider_0.obj"/>
+        <mesh file="robot/assets/meshes/arm_obotx/ObotXArm/RightVerticalRotationSlider/RightVerticalRotationSlider_1.obj"/>
+        <mesh file="robot/assets/meshes/arm_obotx/ObotXArm/RightVerticalRotationSlider/RightVerticalRotationSlider_2.obj"/>
+            
+
+        <material name="0.301961_0.301961_0.301961_0.000000_0.028" specular="0.0" shininess="0.0" rgba="0.302000 0.302000 0.302000 1.000000"/>
+        <material name="0.901961_0.901961_0.901961_0.000000_0.018" shininess="0.9" specular="0.9" reflectance="0.7" rgba="0.1 0.1 0.1 1"/>
+        <mesh file="robot/assets/meshes/arm_obotx/ObotXArm/LeftHorizontalSlider/LeftHorizontalSlider_0.obj"/>
+        <mesh file="robot/assets/meshes/arm_obotx/ObotXArm/LeftHorizontalSlider/LeftHorizontalSlider_1.obj"/>
+
+        <material name="0.000000_1.000000_0.000000_0.000000_0.001" specular="0.95" shininess="0.95" rgba="0.000000 1.000000 0.000000 1.000000"/>
+        <material name="0.780392_0.760784_0.741176_0.000000_0.001" specular="0.92" shininess="0.90" rgba="0.780400 0.760800 0.741200 1.000000"/>
+        <material name="0.898039_0.898039_0.898039_0.000000_0.001" specular="0.98" shininess="0.98" rgba="0.898000 0.898000 0.898000 1.000000"/> 
+        <material name="0.792157_0.819608_0.933333_0.000000_0.001" specular="0.0" shininess="0.0" rgba="0.792200 0.819600 0.933300 1.000000"/>
+        <material name="0.250980_0.250980_0.250980_0.000000_0.001" specular="0.0" shininess="0.0" rgba="0.251000 0.251000 0.251000 1.000000"/>
+        <material name="0.301961_0.301961_0.301961_0.000000_0.029" specular="0.0" shininess="0.0" rgba="0.302000 0.302000 0.302000 1.000000"/>
+        <material name="0.666667_0.666667_0.666667_0.000000_0.001" specular="0.0" shininess="0.0" rgba="0.666700 0.666700 0.666700 1.000000"/>
+        <material name="0.666667_0.698039_0.768627_0.000000_0.001" specular="0.0" shininess="0.0" rgba="0.666700 0.698000 0.768600 1.000000"/>
+        <mesh file="robot/assets/meshes/arm_obotx/ObotXArm/RightHorizontalSlider/RightHorizontalSlider_1.obj"/>
+        <mesh file="robot/assets/meshes/arm_obotx/ObotXArm/RightHorizontalSlider/RightHorizontalSlider_2.obj"/>
+        <mesh file="robot/assets/meshes/arm_obotx/ObotXArm/RightHorizontalSlider/RightHorizontalSlider_3.obj"/>
+        <mesh file="robot/assets/meshes/arm_obotx/ObotXArm/RightHorizontalSlider/RightHorizontalSlider_4.obj"/>
+        <mesh file="robot/assets/meshes/arm_obotx/ObotXArm/RightHorizontalSlider/RightHorizontalSlider_5.obj"/>
+        <mesh file="robot/assets/meshes/arm_obotx/ObotXArm/RightHorizontalSlider/RightHorizontalSlider_6.obj"/>
+        <mesh file="robot/assets/meshes/arm_obotx/ObotXArm/RightHorizontalSlider/RightHorizontalSlider_7.obj"/>
+
+        <material name="0.301961_0.301961_0.301961_0.000000_0.027" specular="0.0" shininess="0.0" rgba="0.302000 0.302000 0.302000 1.000000"/>
+        <material name="0.901961_0.901961_0.901961_0.000000_0.017" specular="0.7" shininess="0.4" rgba="0.85 0.85 0.85 1.0"/>
+        <mesh file="robot/assets/meshes/arm_obotx/ObotXArm/HorizontalArm/HorizontalArm_0.obj"/>
+        <mesh file="robot/assets/meshes/arm_obotx/ObotXArm/HorizontalArm/HorizontalArm_1.obj"/>
+
+        <material name="0.301961_0.301961_0.301961_0.000000_0.000000" specular="0.0" shininess="0.0" rgba="0.302000 0.302000 0.302000 1.000000"/>
+        <material name="0.792157_0.819608_0.933333_0.000000_0.000000" specular="0.0" shininess="0.0" rgba="0.792200 0.819600 0.933300 1.000000"/>
+        <material name="1.000000_0.000000_0.000000_0.000000_0.000000" specular="0.0" shininess="0.0" rgba="1.000000 0.000000 0.000000 1.000000"/>
+        <material name="1.000000_1.000000_1.000000_0.000000_0.000000" specular="0.0" shininess="0.0" rgba="1.000000 1.000000 1.000000 1.000000"/>
+        <mesh file="robot/assets/meshes/arm_obotx/ObotXArm/LifePo4_12V50Ah/LifePo4_12V50Ah_0.obj"/>
+        <mesh file="robot/assets/meshes/arm_obotx/ObotXArm/LifePo4_12V50Ah/LifePo4_12V50Ah_1.obj"/>
+        <mesh file="robot/assets/meshes/arm_obotx/ObotXArm/LifePo4_12V50Ah/LifePo4_12V50Ah_2.obj"/>
+        <mesh file="robot/assets/meshes/arm_obotx/ObotXArm/LifePo4_12V50Ah/LifePo4_12V50Ah_3.obj"/>
+
+    </asset>
+
+    <default>
+        <default class="visual">
+            <geom group="2" type="mesh" contype="0" conaffinity="0"/>
+        </default>
+        <default class="collision">
+            <geom group="3" type="mesh"/>
+        </default>
+        <default class="primitive_collision">
+            <geom group="3" condim="6" solmix="3"/>
+        </default>
+        <default class="pad_box1">
+            <geom mass="0" type="box" friction="15 15 15"  solimp="0.9 0.95 0.001 0.5 2" solref="0.0001 1" solmix="3" priority="1" condim="6" rgba="1 0 0 0"/>
+        </default>
+        <default class="pad_box2">
+            <geom mass="0" type="box" friction="15 15 15" solimp="0.9 0.95 0.001 0.5 2" solref="0.0001 1" solmix="3" priority="1" condim="6" rgba="1 0 0 0"/>
+        </default>
+    </default>
+
+    <asset>
+        <texture name="texplane" type="2d" height="1" width="1" file="furniture_sim/objects/textures/white_marble_tile2.png"/>
+        <material name='MatPlane' shininess="1" texture="texplane" texrepeat="4 4" texuniform="true"/>
+        <material name="robotiq_black" shininess="0.9" specular="0.9" reflectance="0.7" rgba="0.1 0.1 0.1 1" />
+
+        <material name="robotiq_chrome" 
+                shininess="0.95" 
+                specular="1.0" 
+                reflectance="0.9"
+                rgba="0.8 0.8 0.85 1"/>
+    </asset>
+
+</mujocoinclude>

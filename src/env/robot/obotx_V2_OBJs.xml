@@ -1,0 +1,701 @@
+<mujocoinclude>
+        <!-- Summit XL Steel Mobile Base -->
+        <body name="base_footprint" pos="0 0 0">
+            <!-- <site name="base_footprint" size="0.007" rgba="1 0 0 1" group="1"/> -->
+
+            <!-- BASE_LINK -->
+            <body name="base" pos="0 0 0.127">
+                <inertial pos="0 0 0" quat="1 0 0 0" mass="125.0" diaginertia="1.391 6.853 6.125" />
+                <geom type="mesh" rgba="0 0 0 1" mesh="summit_xls_chassis" contype="0" conaffinity="0" group="1"/>
+                <geom type="box" size="0.35 0.3 0.01" pos="0.0 0 0.148566" quat="1 0 0 0" rgba="0 1 0 0" contype="1" conaffinity="1"/>
+
+                <!-- CHAPAS INOX TAPAS -->
+                <!-- 0.266434 -->
+                <geom type="mesh" pos="0.0 0 0.155" quat="1 0 0 0" rgba="0.5 0.5 0.5 1" mesh="summit_xls_chapas_inox_tapas" contype="0" conaffinity="0" group="2"/>
+                
+                <!-- Battery -->
+                <body name="LifePo4_12V50Ah" pos="0.0 -0.01 0.155">
+                    <geom mesh="LifePo4_12V50Ah_0" material="1.000000_0.000000_0.000000_0.000000_0.000000" class="visual"/>
+                    <geom mesh="LifePo4_12V50Ah_1" material="0.301961_0.301961_0.301961_0.000000_0.000000" class="visual"/>
+                    <geom mesh="LifePo4_12V50Ah_2" material="0.792157_0.819608_0.933333_0.000000_0.000000" class="visual"/>
+                    <geom mesh="LifePo4_12V50Ah_3" material="1.000000_1.000000_1.000000_0.000000_0.000000" class="visual"/>
+                    <geom type="box" size="0.14 0.28 0.07" pos="-0.17 0 0.08" quat="1 0 0 0" rgba="0 1 0 1" class="collision"/>
+                </body>
+                <!-- LOGO ROBOTNIK IZQUIERDO -->
+                <!-- <geom type="mesh" pos="0.0 0.28931 0.203434" quat="1 0 0 0" rgba="0.5 0.5 0.5 1" mesh="robotnik_logo_chasis" contype="0" conaffinity="0" group="2"/> -->
+
+                <!-- LOGO ROBOTNIK DERECHO -->
+                <!-- <geom type="mesh" pos="0.0 -0.28931 0.203434" quat="0 0 0 1" rgba="0.5 0.5 0.5 1" mesh="robotnik_logo_chasis" contype="0" conaffinity="0" group="2"/> -->
+
+                <!-- LOGO ROBOTNIK FRONTAL -->
+                <!-- <geom type="mesh" pos="0.345 0.0 0.0" quat="-0.7071068 0 0 0.7071068" rgba="0.5 0.5 0.5 1" mesh="robotnik_logo_chasis" contype="0" conaffinity="0" group="2"/> -->
+
+                <!-- LOGO ROBOTNIK TRASERO -->
+                <!-- <geom type="mesh" pos="-0.345 0.0 0.0" quat="0.7071068 0 0 0.7071068" rgba="0.5 0.5 0.5 1" mesh="robotnik_logo_chasis" contype="0" conaffinity="0" group="2"/> -->
+
+                <!-- Wheels -->
+                <body name="front_right_wheel_intermediate_link" pos="0.2225 -0.2045 0">
+                    <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="6.5" diaginertia="0.0524193 0.0303095 0.0303095" />
+                    <joint name="front_right_wheel_rolling_joint" pos="0 0 0" axis="0 1 0" />
+                    <geom size="0.120 0.0435" quat="0.707107 0.707107 0 0" type="cylinder" rgba="0.2 0.2 0.2 0.5" contype="1" conaffinity="0" group="3" />
+                    <geom type="mesh" mesh="summit_xls_omni_wheel_2" contype="0" conaffinity="0" group="2" rgba="0.2 0.2 0.2 1"/>
+
+
+                    <body name="front_right_roller_0_link" pos="0.04385159698893431 0.0 0.011749999999999998">
+                        <joint name="front_right_slipping_0_joint" type="hinge" pos="0 0 0" axis="-0.006296806022131382 0.0435 0.023499999999999997" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="front_right_roller_1_link" pos="0.03210159698893431 0.0 0.032101596988934306">
+                        <joint name="front_right_slipping_1_joint" type="hinge" pos="0 0 0" axis="-0.01720319397786861 0.0435 0.017203193977868615" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="front_right_roller_2_link" pos="0.011750000000000005 0.0 0.0438515969889343">
+                        <joint name="front_right_slipping_2_joint" type="hinge" pos="0 0 0" axis="-0.023500000000000004 0.0435 0.006296806022131389" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="front_right_roller_3_link" pos="-0.011749999999999993 0.0 0.04385159698893431">
+                        <joint name="front_right_slipping_3_joint" type="hinge" pos="0 0 0" axis="-0.023499999999999993 0.0435 -0.006296806022131382" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="front_right_roller_4_link" pos="-0.0321015969889343 0.0 0.03210159698893432">
+                        <joint name="front_right_slipping_4_joint" type="hinge" pos="0 0 0" axis="-0.01720319397786862 0.0435 -0.0172031939778686" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="front_right_roller_5_link" pos="-0.0438515969889343 0.0 0.011750000000000012">
+                        <joint name="front_right_slipping_5_joint" type="hinge" pos="0 0 0" axis="-0.006296806022131389 0.0435 -0.02350000000000001" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="front_right_roller_6_link" pos="-0.043851596988934316 0.0 -0.011749999999999991">
+                        <joint name="front_right_slipping_6_joint" type="hinge" pos="0 0 0" axis="0.006296806022131375 0.0435 -0.023499999999999993" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="front_right_roller_7_link" pos="-0.03210159698893432 0.0 -0.03210159698893429">
+                        <joint name="front_right_slipping_7_joint" type="hinge" pos="0 0 0" axis="0.017203193977868604 0.0435 -0.017203193977868618" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="front_right_roller_8_link" pos="-0.011750000000000014 0.0 -0.0438515969889343">
+                        <joint name="front_right_slipping_8_joint" type="hinge" pos="0 0 0" axis="0.023500000000000014 0.0435 -0.006296806022131396" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="front_right_roller_9_link" pos="0.01174999999999998 0.0 -0.043851596988934316">
+                        <joint name="front_right_slipping_9_joint" type="hinge" pos="0 0 0" axis="0.023499999999999976 0.0435 0.006296806022131368" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="front_right_roller_10_link" pos="0.032101596988934285 0.0 -0.032101596988934326">
+                        <joint name="front_right_slipping_10_joint" type="hinge" pos="0 0 0" axis="0.017203193977868635 0.0435 0.01720319397786861" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="front_right_roller_11_link" pos="0.0438515969889343 0.0 -0.01175000000000001">
+                        <joint name="front_right_slipping_11_joint" type="hinge" pos="0 0 0" axis="0.006296806022131396 0.0435 0.02350000000000002" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+                </body>
+
+                <body name="front_left_wheel_intermediate_link" pos="0.2225 0.2045 0">
+                    <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="6.5" diaginertia="0.0524193 0.0303095 0.0303095" />
+                    <joint name="front_left_wheel_rolling_joint" pos="0 0 0" axis="0 1 0" />
+                    <geom size="0.120 0.0435" quat="0.707107 0.707107 0 0" type="cylinder" rgba="0.2 0.2 0.2 0.5" contype="1" conaffinity="0" group="3"/>
+                    <geom type="mesh" mesh="summit_xls_omni_wheel_1" contype="0" conaffinity="0" group="2" rgba="0.2 0.2 0.2 1"/>
+
+
+                    <body name="front_left_roller_0_link" pos="0.0438515969889343 0.0 -0.01175000000000001">
+                        <joint name="front_left_slipping_0_joint" type="hinge" pos="0 0 0" axis="-0.006296806022131396 0.0435 -0.02350000000000002" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="front_left_roller_1_link" pos="0.04385159698893431 0.0 0.011749999999999998">
+                        <joint name="front_left_slipping_1_joint" type="hinge" pos="0 0 0" axis="0.006296806022131382 0.0435 -0.023499999999999997" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="front_left_roller_2_link" pos="0.03210159698893431 0.0 0.032101596988934306">
+                        <joint name="front_left_slipping_2_joint" type="hinge" pos="0 0 0" axis="0.01720319397786861 0.0435 -0.017203193977868615" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="front_left_roller_3_link" pos="0.011750000000000005 0.0 0.0438515969889343">
+                        <joint name="front_left_slipping_3_joint" type="hinge" pos="0 0 0" axis="0.023500000000000004 0.0435 -0.006296806022131389" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="front_left_roller_4_link" pos="-0.011749999999999993 0.0 0.04385159698893431">
+                        <joint name="front_left_slipping_4_joint" type="hinge" pos="0 0 0" axis="0.023499999999999993 0.0435 0.006296806022131382" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="front_left_roller_5_link" pos="-0.0321015969889343 0.0 0.03210159698893432">
+                        <joint name="front_left_slipping_5_joint" type="hinge" pos="0 0 0" axis="0.01720319397786862 0.0435 0.0172031939778686" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="front_left_roller_6_link" pos="-0.0438515969889343 0.0 0.01175000000000001">
+                        <joint name="front_left_slipping_6_joint" type="hinge" pos="0 0 0" axis="0.006296806022131389 0.0435 0.02350000000000001" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="front_left_roller_7_link" pos="-0.043851596988934316 0.0 -0.01174999999999999">
+                        <joint name="front_left_slipping_7_joint" type="hinge" pos="0 0 0" axis="-0.006296806022131375 0.0435 0.023499999999999993" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="front_left_roller_8_link" pos="-0.03210159698893432 0.0 -0.03210159698893429">
+                        <joint name="front_left_slipping_8_joint" type="hinge" pos="0 0 0" axis="-0.017203193977868604 0.0435 0.017203193977868618" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="front_left_roller_9_link" pos="-0.011750000000000016 0.0 -0.0438515969889343">
+                        <joint name="front_left_slipping_9_joint" type="hinge" pos="0 0 0" axis="-0.023500000000000014 0.0435 0.006296806022131396" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="front_left_roller_10_link" pos="0.011749999999999981 0.0 -0.043851596988934316">
+                        <joint name="front_left_slipping_10_joint" type="hinge" pos="0 0 0" axis="-0.023499999999999976 0.0435 -0.006296806022131368" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="front_left_roller_11_link" pos="0.032101596988934285 0.0 -0.032101596988934326">
+                        <joint name="front_left_slipping_11_joint" type="hinge" pos="0 0 0" axis="-0.017203193977868635 0.0435 -0.01720319397786861" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+                </body>
+
+                <body name="back_right_wheel_intermediate_link" pos="-0.2225 -0.2045 0">
+                    <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="6.5" diaginertia="0.0524193 0.0303095 0.0303095" />
+                    <joint name="back_right_wheel_rolling_joint" pos="0 0 0" axis="0 1 0" />
+                    <geom size="0.120 0.0435" quat="0.707107 0.707107 0 0" type="cylinder" rgba="0.2 0.2 0.2 0.5" contype="1" conaffinity="0" group="3"/>
+                    <geom type="mesh" mesh="summit_xls_omni_wheel_1" contype="0" conaffinity="0" group="2" rgba="0.2 0.2 0.2 1"/>
+
+
+                    <body name="back_right_roller_0_link" pos="0.0438515969889343 0.0 -0.01175000000000001">
+                        <joint name="back_right_slipping_0_joint" type="hinge" pos="0 0 0" axis="-0.006296806022131396 0.0435 -0.02350000000000002" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="back_right_roller_1_link" pos="0.04385159698893431 0.0 0.011749999999999998">
+                        <joint name="back_right_slipping_1_joint" type="hinge" pos="0 0 0" axis="0.006296806022131382 0.0435 -0.023499999999999997" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="back_right_roller_2_link" pos="0.03210159698893431 0.0 0.032101596988934306">
+                        <joint name="back_right_slipping_2_joint" type="hinge" pos="0 0 0" axis="0.01720319397786861 0.0435 -0.017203193977868615" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="back_right_roller_3_link" pos="0.011750000000000005 0.0 0.0438515969889343">
+                        <joint name="back_right_slipping_3_joint" type="hinge" pos="0 0 0" axis="0.023500000000000004 0.0435 -0.006296806022131389" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="back_right_roller_4_link" pos="-0.011749999999999993 0.0 0.04385159698893431">
+                        <joint name="back_right_slipping_4_joint" type="hinge" pos="0 0 0" axis="0.023499999999999993 0.0435 0.006296806022131382" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="back_right_roller_5_link" pos="-0.0321015969889343 0.0 0.03210159698893432">
+                        <joint name="back_right_slipping_5_joint" type="hinge" pos="0 0 0" axis="0.01720319397786862 0.0435 0.0172031939778686" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="back_right_roller_6_link" pos="-0.0438515969889343 0.0 0.01175000000000001">
+                        <joint name="back_right_slipping_6_joint" type="hinge" pos="0 0 0" axis="0.006296806022131389 0.0435 0.02350000000000001" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="back_right_roller_7_link" pos="-0.043851596988934316 0.0 -0.01174999999999999">
+                        <joint name="back_right_slipping_7_joint" type="hinge" pos="0 0 0" axis="-0.006296806022131375 0.0435 0.023499999999999993" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="back_right_roller_8_link" pos="-0.03210159698893432 0.0 -0.03210159698893429">
+                        <joint name="back_right_slipping_8_joint" type="hinge" pos="0 0 0" axis="-0.017203193977868604 0.0435 0.017203193977868618" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="back_right_roller_9_link" pos="-0.011750000000000016 0.0 -0.0438515969889343">
+                        <joint name="back_right_slipping_9_joint" type="hinge" pos="0 0 0" axis="-0.023500000000000014 0.0435 0.006296806022131396" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="back_right_roller_10_link" pos="0.011749999999999981 0.0 -0.043851596988934316">
+                        <joint name="back_right_slipping_10_joint" type="hinge" pos="0 0 0" axis="-0.023499999999999976 0.0435 -0.006296806022131368" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="back_right_roller_11_link" pos="0.032101596988934285 0.0 -0.032101596988934326">
+                        <joint name="back_right_slipping_11_joint" type="hinge" pos="0 0 0" axis="-0.017203193977868635 0.0435 -0.01720319397786861" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+                </body>
+
+                <body name="back_left_wheel_intermediate_link" pos="-0.2225 0.2045 0">
+                    <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="6.5" diaginertia="0.0524193 0.0303095 0.0303095" />
+                    <joint name="back_left_wheel_rolling_joint" pos="0 0 0" axis="0 1 0" />
+                    <geom size="0.120 0.0435" quat="0.707107 0.707107 0 0" type="cylinder" rgba="0.2 0.2 0.2 0.5" contype="1" conaffinity="0" group="3"/>
+                    <geom type="mesh" mesh="summit_xls_omni_wheel_2" contype="0" conaffinity="0" group="2" rgba="0.2 0.2 0.2 1"/>
+
+
+                    <body name="back_left_roller_0_link" pos="0.04385159698893431 0.0 0.011749999999999998">
+                        <joint name="back_left_slipping_0_joint" type="hinge" pos="0 0 0" axis="-0.006296806022131382 0.0435 0.023499999999999997" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="back_left_roller_1_link" pos="0.03210159698893431 0.0 0.032101596988934306">
+                        <joint name="back_left_slipping_1_joint" type="hinge" pos="0 0 0" axis="-0.01720319397786861 0.0435 0.017203193977868615" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="back_left_roller_2_link" pos="0.011750000000000005 0.0 0.0438515969889343">
+                        <joint name="back_left_slipping_2_joint" type="hinge" pos="0 0 0" axis="-0.023500000000000004 0.0435 0.006296806022131389" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="back_left_roller_3_link" pos="-0.011749999999999993 0.0 0.04385159698893431">
+                        <joint name="back_left_slipping_3_joint" type="hinge" pos="0 0 0" axis="-0.023499999999999993 0.0435 -0.006296806022131382" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="back_left_roller_4_link" pos="-0.0321015969889343 0.0 0.03210159698893432">
+                        <joint name="back_left_slipping_4_joint" type="hinge" pos="0 0 0" axis="-0.01720319397786862 0.0435 -0.0172031939778686" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="back_left_roller_5_link" pos="-0.0438515969889343 0.0 0.011750000000000012">
+                        <joint name="back_left_slipping_5_joint" type="hinge" pos="0 0 0" axis="-0.006296806022131389 0.0435 -0.02350000000000001" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="back_left_roller_6_link" pos="-0.043851596988934316 0.0 -0.011749999999999991">
+                        <joint name="back_left_slipping_6_joint" type="hinge" pos="0 0 0" axis="0.006296806022131375 0.0435 -0.023499999999999993" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="back_left_roller_7_link" pos="-0.03210159698893432 0.0 -0.03210159698893429">
+                        <joint name="back_left_slipping_7_joint" type="hinge" pos="0 0 0" axis="0.017203193977868604 0.0435 -0.017203193977868618" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="back_left_roller_8_link" pos="-0.011750000000000014 0.0 -0.0438515969889343">
+                        <joint name="back_left_slipping_8_joint" type="hinge" pos="0 0 0" axis="0.023500000000000014 0.0435 -0.006296806022131396" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="back_left_roller_9_link" pos="0.01174999999999998 0.0 -0.043851596988934316">
+                        <joint name="back_left_slipping_9_joint" type="hinge" pos="0 0 0" axis="0.023499999999999976 0.0435 0.006296806022131368" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="back_left_roller_10_link" pos="0.032101596988934285 0.0 -0.032101596988934326">
+                        <joint name="back_left_slipping_10_joint" type="hinge" pos="0 0 0" axis="0.017203193977868635 0.0435 0.01720319397786861" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+
+                    <body name="back_left_roller_11_link" pos="0.0438515969889343 0.0 -0.01175000000000001">
+                        <joint name="back_left_slipping_11_joint" type="hinge" pos="0 0 0" axis="0.006296806022131396 0.0435 0.02350000000000002" damping="0.1" limited="false" actuatorfrclimited="false"/>
+                        <inertial pos="0 0 0" quat="0.711549 0.711549 0 0 " mass="0.001" diaginertia="0.00001 0.00001 0.00001" />
+                        <geom size="0.08" quat="1 0 0 0" type="sphere" rgba="0.2 0.2 0.2 1" contype="1" conaffinity="0" group="3"/>
+                    </body>
+                </body>
+
+<!-- ARM MOUNTED ON TOP OF MOBILE BASE -->
+<!-- Position the arm base on top of the robot chassis -->
+<body name="Arm_1" pos="0.15 0.15 0.158566">
+    <!-- <inertial pos="0 0 0.8" euler=" 0 0 1.57" mass="1" diaginertia="0.2559055 0.2359055 0.0385028"/> -->
+    <joint name="BaseJoint_1" pos="0 0 0" axis="0 0 1" range="-3.14159 3.14159"  limited="false" />
+    <geom mesh="VerticalArm_0" material="0.301961_0.301961_0.301961_0.000000_0.024" class="visual"/>
+    <geom mesh="VerticalArm_1" material="0.301961_0.301961_0.301961_0.000000_0.023" class="visual"/>
+    <geom mesh="VerticalArm_2" material="0.301961_0.301961_0.301961_0.000000_0.022" class="visual"/>
+    <geom mesh="VerticalArm_3" material="0.901961_0.901961_0.901961_0.000000_0.014" class="visual"/>
+    <geom mesh="VerticalArm_4" material="0.301961_0.301961_0.301961_0.000000_0.021" class="visual"/>
+    <geom mesh="VerticalArm_5" material="0.901961_0.901961_0.901961_0.000000_0.013" class="visual"/>
+    
+    <body name="camera_pov_1" pos="-1 0 1.8" euler="0 -0.785398 -1.57">
+        <!-- <geom type="cylinder" size="0.01 0.02"/> -->
+        <camera name="pov_1" fovy="100"/>
+    </body>
+    
+    <body name="Bearing_Column_Left_1" pos="0 -0 0">
+        <!-- <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="0.1" diaginertia="6.25e-05 3.291665e-05 3.291665e-05"/> -->
+        <joint name="ColumnLeftBearingJoint_1" pos="0 0 0" axis="0 0 1" type="slide" range="0 1.43" stiffness="58000" damping="2000"/>
+        <geom mesh="LeftVerticalRotationSlider_0" material="0.301961_0.301961_0.301961_0.000000_0.030" class="visual"/>
+        <geom mesh="LeftVerticalRotationSlider_1" material="0.901961_0.901961_0.901961_0.000000_0.019" class="visual"/>
+        <geom mesh="LeftVerticalRotationSlider_2" material="0.501961_0.501961_0.501961_0.000000_0.007" class="visual"/>
+        <body name="Rotation_Link_Left_1" pos="0 0 0">
+            <!-- <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="0.05" diaginertia="4.166665e-06 3.541665e-06 1.041665e-06"/> -->
+            <joint name="RotationLeftJoint_1" pos="0.049998 -0.040458  0.069379" axis="0 1 0" stiffness="0"/>
+            <geom mesh="LeftHorizontalSlider_0" material="0.301961_0.301961_0.301961_0.000000_0.028" class="visual"/>
+            <geom mesh="LeftHorizontalSlider_1" material="0.901961_0.901961_0.901961_0.000000_0.018" class="visual"/>
+            <body name="Arm_Left_1" pos="0 0 0">
+                <!-- <inertial pos="0 0 0" euler="0 1.57 0" mass="0.7" diaginertia="0.02921335 0.02917835 5.83335e-05"/> -->
+                <joint name="ArmLeftJoint_1" pos="0 0 0" axis="1 0 0" type="slide" range="0 0.625" stiffness="50000" damping="2000"/>
+                <geom mesh="HorizontalArm_0" material="0.301961_0.301961_0.301961_0.000000_0.027" class="visual"/>
+                <geom mesh="HorizontalArm_1" material="0.901961_0.901961_0.901961_0.000000_0.017" class="visual"/>
+                <geom type="box" size="0.41 0.02 0.04" pos="-0.041 0 0.07" quat="1 0 0 0" rgba="0 1 0 0" contype="1" conaffinity="1"/>
+                <body name="Arm_Right_1" pos="0 0 0">
+                    <!-- <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="0.05" diaginertia="4.166665e-06 3.541665e-06 1.041665e-06"/> -->
+                    <geom mesh="RightHorizontalSlider_1" material="0.780392_0.760784_0.741176_0.000000_0.001" class="visual"/>
+                    <geom mesh="RightHorizontalSlider_2" material="0.898039_0.898039_0.898039_0.000000_0.001" class="visual"/>
+                    <geom mesh="RightHorizontalSlider_3" material="0.666667_0.698039_0.768627_0.000000_0.001" class="visual"/>
+                    <geom mesh="RightHorizontalSlider_4" material="0.792157_0.819608_0.933333_0.000000_0.001" class="visual"/>
+                    <geom mesh="RightHorizontalSlider_5" material="0.250980_0.250980_0.250980_0.000000_0.001" class="visual"/>
+                    <geom mesh="RightHorizontalSlider_6" material="0.000000_1.000000_0.000000_0.000000_0.001" class="visual"/>
+                    <geom mesh="RightHorizontalSlider_7" material="0.301961_0.301961_0.301961_0.000000_0.029" class="visual"/>
+                    <joint name="ArmRightJoint_1" pos="0 0 0" axis="1 0 0" type="slide" range="-0.525 0.1" limited="true" stiffness="500" damping="10"/>
+                    <body name="Contact_Cylinder_1_1" pos="-0.049998 0.040458  0.069379 ">
+                        <!-- <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="0.001" diaginertia="1.5625e-07 7.81665e-08 7.81665e-08"/> -->
+                        <joint name="ContactCylinderJoint_1_1" pos="0 0 0" axis="0 1 0"  damping="0.0"/>
+                        <geom pos="-0.325 -0.05 -0.5" quat="1 0 0 0" type="mesh" rgba="0.75 0.75 0.75 1" mesh="Contact_Cylinder"/>
+                        <site name="cyl_weld_site_1_1" pos="0 0 0" size="0.005" rgba="1 0 0 0" type="sphere" material="connection_marker_green"/>
+                    </body>
+                </body>
+                <body name="Hand_Bearing_1" pos="0.111 -0.04 0.069">
+                    <!-- <inertial pos="0.00972223 0.035 0" quat="0.5 0.5 -0.5 0.5" mass="0.45" diaginertia="5.3776e-05 4.14063e-05 3.34635e-05"/> -->
+                    <joint name="HandBearingJoint_1" pos="0 0 0" axis="0 1 0" damping="10" stiffness="10" range="-1.57 1.57"/>
+                    <geom pos="-0.2275 0.035 -0.35" quat="1 0 0 0" type="mesh" rgba="0.75 0.75 0.75 1" mesh="Hand_Bearing_V2"/>
+                    <geom size="0.0175 0.0175" pos="0.0175 0.035 0" quat="0.707107 0 0.707107 0" type="cylinder" rgba="0.75 0.75 0.75 1"/>
+                    <body name="Gripper_Link1_1" pos="0.035 0.035 0" quat="0.707107 0 0.707107 0">
+                        <site name="attachment_site_1" pos="0 0 -0.05" size="0.007" rgba="1 0 0 0" group="1"/>
+                        <!-- <inertial pos="0 0 0" quat="0.5 0.5 -0.5 0.5" mass="0.05" diaginertia="3.375e-06 2.25e-06 2.25e-06"/> -->
+                        <joint name="gripper_z_rotation_1" pos="0 0 0" axis="0 0 1" range="-3.14159 3.14159" stiffness="10" damping="10"/>
+                        <geom size="0.021 0.0105" type="cylinder" material="robotiq_chrome"/>
+                        <body name="Gripper_Link2_1" pos="0 0 0.0105">
+                            <!-- <inertial pos="0 0 0" mass="0.05" diaginertia="8e-06 8e-06 8e-06"/> -->
+                            <joint name="gripper_y_rotation_1" pos="0 0 0" axis="0 1 0" range="-1.5708 1.5708" stiffness="10" damping="10"/>
+                            <geom size="0.028" material="robotiq_black"/>
+                            <body name="Gripper_Link3_1">
+                                <!-- <inertial pos="0 0 0" mass="0.05" diaginertia="8e-06 8e-06 8e-06"/> -->
+                                <joint name="gripper_x_rotation_1" pos="0 0 0" axis="1 0 0" range="-1.5708 1.5708"  stiffness="10" damping="10"/>
+                                <geom pos="0 0 0.028" quat="0.707107 0.707107 0 0" type="mesh" material="robotiq_black" mesh="palm_real_V2"/>
+                                <geom pos="0 0 0.028" quat="0.707107 0.707107 0 0" type="mesh" material="robotiq_chrome" mesh="palm_atc_V2"/>
+                                <geom pos="0.03186113 0 0.05698" quat="0.500199 0.500199 -0.499801 0.499801" type="mesh" mesh="link_0_real_V2" material="robotiq_black"/>
+                                <body name="finger_c_link_0_1" pos="-0.03185 -0.0252 0.04298" quat="-0.499803 0.499799 0.500197 0.500201">
+                                    <!-- <inertial pos="0 0 0" euler="0 0 0" mass="0.1" diaginertia="2.25e-06 2.25e-06 2.25e-06"/> -->
+                                    <joint name="palm_finger_c_joint_1" pos="0 0 0" axis="0 1 0" range="-0.1784 0.192"  stiffness="1" damping="10"/>
+                                    <geom pos="0.014 0 0" quat="1 0 0 0" type="mesh" mesh="link_0_real_V2" material="robotiq_black" />
+                                    <body name="finger_c_link_1_1" pos="0.014 0 0">
+                                        <!-- <inertial pos="0 0 0" euler="0 0 0" mass="0.1" diaginertia="2.25e-06 2.25e-06 2.25e-06"/> -->
+                                        <joint name="finger_c_joint_1_1" pos="0 0 0" axis="0 0 1" range="0.0495 1.2218"  stiffness="10" damping="10"/>
+                                        <geom pos="0.035 -0.0196 0" quat="0.96639 0 0 -0.257081" type="mesh" mesh="link_1_real_V2" material="robotiq_black"/>
+                                        <geom class="pad_box1" rgba="1 0 0 0.0" size="0.0217 0.0035 0.0091" pos="0.0245 -0.007  0" euler=" 0 -0 -0.55"/>
+                                        <geom class="pad_box2" rgba="1 0 0 0.0" size="0.0217 0.0035 0.0091" pos="0.0245 -0.0084 0" euler=" 0 -0 -0.55"/>
+                                        <body name="finger_c_link_2_1" pos="0.035 -0.0196 0" quat="0.96639 0 0 -0.257081">
+                                            <!-- <inertial pos="0 0 0" euler="0 0 0" mass="0.1" diaginertia="2.25e-06 2.25e-06 2.25e-06"/> -->
+                                            <joint name="finger_c_joint_2_1" pos="0 0 0" axis="0 0 1" range="0 1.5708"  stiffness="1" damping="10"/>
+                                            <geom pos="0.0273 0 0.00525" quat="1 0 0 0" type="mesh" mesh="link_2_real_V2" material="robotiq_black"/>
+                                            <geom class="pad_box1" rgba="1 0 0 0.0" size="0.0154 0.0035 0.0091" pos="0.0175 0.0049  0" euler=" 0 -0 0"/>
+                                            <geom class="pad_box2" rgba="1 0 0 0.0" size="0.0154 0.0035 0.0091" pos="0.0175 0.00504 0" euler=" 0 -0 0"/>
+                                            <body name="finger_c_link_3_1" pos="0.0273 0 0">
+                                                <!-- <inertial pos="0 0 0" quat="0.614353 0.390886 -0.585309 0.35664" mass="0.05" diaginertia="0.0002449725 0.0002041455 0.0001090325"/> -->
+                                                <joint name="finger_c_joint_3_1" pos="0 0 0" axis="0 0 1" range="-1.2217 -0.0523"  stiffness="1" damping="10"/>
+                                                <geom quat="0.96639 0 0 0.257081" type="mesh" material="robotiq_black" mesh="link_3_real_V2"/>
+                                                <geom class="pad_box1" rgba="1 0 0 0.0" size="0.014 0.0035 0.0091" pos="0.007 0.0105  0"  euler=" 0 -0 0.5"/>
+                                                <geom class="pad_box2" rgba="1 0 0 0.0" size="0.014 0.0035 0.0091" pos="0.007 0.01078 0"  euler=" 0 -0 0.5"/>
+                                                <geom class="pad_box2" rgba="1 0 0 0.0" size="0.014 0.0035 0.0091" pos="0.007 0.0112 0"  euler=" 0 -0 0.5"/>
+                                            </body>
+                                        </body>
+                                    </body>
+                                </body>
+                                <body name="finger_b_link_0_1" pos="-0.03185 0.0252 0.04298" quat="-0.499803 0.499799 0.500197 0.500201">
+                                    <!-- <inertial pos="0 0 0" euler="0 0 0" mass="0.1" diaginertia="2.25e-06 2.25e-06 2.25e-06"/> -->
+                                    <joint name="palm_finger_b_joint_1" pos="0 0 0" axis="0 1 0" range="-0.192 0.1784"  stiffness="1" damping="10"/>
+                                    <geom pos="0.014 0 0" quat="1 0 0 0" type="mesh" mesh="link_0_real_V2" material="robotiq_black" friction="5 5 5" solimp="0.9 0.95 0.001 0.5 2" solref="0.004 1" solmix="3" priority="1" condim="6" />
+                                    <body name="finger_b_link_1_1" pos="0.014 0 0">
+                                        <!-- <inertial pos="0 0 0" euler="0 0 0" mass="0.1" diaginertia="2.25e-06 2.25e-06 2.25e-06"/> -->
+                                        <joint name="finger_b_joint_1_1" pos="0 0 0" axis="0 0 1" range="0.0495 1.2218"  stiffness="10" damping="10"/>
+                                        <geom pos="0.035 -0.0196 0" quat="0.96639 0 0 -0.257081" type="mesh" mesh="link_1_real_V2" material="robotiq_black" friction="5 5 5" solimp="0.9 0.95 0.001 0.5 2" solref="0.004 1" solmix="3" priority="1" condim="6"/>
+                                        <geom class="pad_box1" rgba="1 0 0 0.0" size="0.0217 0.0035 0.0091" pos="0.0245 -0.007  0" euler=" 0 -0 -0.55"/>
+                                        <geom class="pad_box2" rgba="1 0 0 0.0" size="0.0217 0.0035 0.0091" pos="0.0245 -0.0084 0" euler=" 0 -0 -0.55"/>
+                                        <body name="finger_b_link_2_1" pos="0.035 -0.0196 0" quat="0.96639 0 0 -0.257081">
+                                            <!-- <inertial pos="0 0 0" euler="0 0 0" mass="0.1" diaginertia="2.25e-06 2.25e-06 2.25e-06"/> -->
+                                            <joint name="finger_b_joint_2_1" pos="0 0 0" axis="0 0 1" range="0 1.5708"  stiffness="1" damping="10"/>
+                                            <geom pos="0.0273 0 0.00525" quat="1 0 0 0" type="mesh" mesh="link_2_real_V2" material="robotiq_black" friction="5 5 5" solimp="0.9 0.95 0.001 0.5 2" solref="0.004 1" solmix="3" priority="1" condim="6"/>
+                                            <geom class="pad_box1" rgba="1 0 0 0.0" size="0.0154 0.0035 0.0091" pos="0.0175 0.0049  0" euler=" 0 -0 0"/>
+                                            <geom class="pad_box2" rgba="1 0 0 0.0" size="0.0154 0.0035 0.0091" pos="0.0175 0.00504 0" euler=" 0 -0 0"/>
+                                            <body name="finger_b_link_3_1" pos="0.0273 0 0">
+                                                <!-- <inertial pos="0 0 0" quat="0.614353 0.390886 -0.585309 0.35664" mass="0.05" diaginertia="0.0002449725 0.0002041455 0.0001090325"/> -->
+                                                <joint name="finger_b_joint_3_1" pos="0 0 0" axis="0 0 1" range="-1.2217 -0.0523"  stiffness="1" damping="10"/>
+                                                <geom quat="0.96639 0 0 0.257081" type="mesh" material="robotiq_black" mesh="link_3_real_V2" friction="5 5 5" solimp="0.9 0.95 0.001 0.5 2" solref="0.004 1" solmix="3" priority="1" condim="6"/>
+                                                <geom class="pad_box1" rgba="1 0 0 0.0" size="0.014 0.0035 0.0091" pos="0.007 0.0105  0"  euler=" 0 -0 0.5"/>
+                                                <geom class="pad_box2" rgba="1 0 0 0.0" size="0.014 0.0035 0.0091" pos="0.007 0.01092 0" euler=" 0 -0 0.5"/>
+                                                <geom class="pad_box2" rgba="1 0 0 0.0" size="0.014 0.0035 0.0091" pos="0.007 0.0112 0" euler=" 0 -0 0.5"/>
+                                            </body>
+                                        </body>
+                                    </body>
+                                </body>
+                                <body name="finger_a_link_1_1" pos="0.03186113 0 0.05698" quat="0.500199 0.500199 -0.499801 0.499801">
+                                    <!-- <inertial pos="0 0 0" euler="0 0 0" mass="0.1" diaginertia="2.25e-06 2.25e-06 2.25e-06"/> -->
+                                    <joint name="finger_a_joint_1_1" pos="0 0 0" axis="0 0 1" range="0.0495 1.2218"  stiffness="10" damping="10"/>
+                                    <geom pos="0.035 -0.0196 0" quat="0.96639 0 0 -0.257081" type="mesh" mesh="link_1_real_V2" material="robotiq_black" friction="5 5 5" solimp="0.9 0.95 0.001 0.5 2" solref="0.004 1" solmix="3" priority="1" condim="6"/>
+                                    <geom class="pad_box1" rgba="1 0 0 0.0" size="0.0217 0.0035 0.0105" pos="0.0245 -0.007  0" euler=" 0 -0 -0.55"/>
+                                    <geom class="pad_box2" rgba="1 0 0 0.0" size="0.0217 0.0035 0.0105" pos="0.0245 -0.0105 0" euler=" 0 -0 -0.55"/>
+                                    <body name="finger_a_link_2_1" pos="0.035 -0.0196 0" quat="0.96639 0 0 -0.257081">
+                                        <!-- <inertial pos="0 0 0" euler="0 0 0" mass="0.1" diaginertia="2.25e-06 2.25e-06 2.25e-06"/> -->
+                                        <joint name="finger_a_joint_2_1" pos="0 0 0" axis="0 0 1" range="0 1.5708"  stiffness="1" damping="10"/>
+                                        <geom pos="0.0273 0 0.00525" quat="1 0 0 0" type="mesh" mesh="link_2_real_V2" material="robotiq_black" friction="5 5 5" solimp="0.9 0.95 0.001 0.5 2" solref="0.004 1" solmix="3" priority="1" condim="6"/>
+                                        <geom class="pad_box1" rgba="1 0 0 0.0" size="0.0154 0.0035 0.0105" pos="0.0175 0.0049  0" euler=" 0 -0 0"/>
+                                        <geom class="pad_box2" rgba="1 0 0 0.0" size="0.0154 0.0035 0.0105" pos="0.0175 0.00504 0" euler=" 0 -0 0"/>
+                                        <body name="finger_a_link_3_1" pos="0.0273 0 0">
+                                            <!-- <inertial pos="0 0 0" quat="0.614353 0.390886 -0.585309 0.35664" mass="0.05" diaginertia="0.0002449725 0.0002041455 0.0001090325"/> -->
+                                            <joint name="finger_a_joint_3_1" pos="0 0 0" axis="0 0 1" range="-1.2217 -0.0523"  stiffness="1" damping="10"/>
+                                            <geom quat="0.96639 0 0 0.257081" type="mesh" material="robotiq_black" mesh="link_3_real_V2"/>
+                                            <geom class="pad_box1" rgba="1 0 0 0.0" size="0.014 0.0035 0.0091" pos="0.007 0.0105  0" euler=" 0 -0 0.5"/>
+                                            <geom class="pad_box2" rgba="1 0 0 0.0" size="0.014 0.0035 0.0091" pos="0.007 0.01092 0" euler=" 0 -0 0.5"/>
+                                            <geom class="pad_box2" rgba="1 0 0 0.0" size="0.014 0.0035 0.0091" pos="0.007 0.0112 0" euler=" 0 -0 0.5"/>
+                                        </body>
+                                    </body>
+                                </body>
+                            </body>
+                        </body>
+                    </body>
+                </body>
+            </body>
+        </body>
+    </body>
+    <body name="Bearing_Column_Right_1" pos="0 0 0">
+        <!-- <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="0.1" diaginertia="6.25e-05 3.291665e-05 3.291665e-05"/> -->
+        <joint name="ColumnRightBearingJoint_1" pos="0 0 0" axis="0 0 1" type="slide" range="0 1.43"  stiffness="58000" damping="2000"/>
+        <geom mesh="RightVerticalRotationSlider_0" material="0.501961_0.501961_0.501961_0.000000_0.008" class="visual"/>
+        <geom mesh="RightVerticalRotationSlider_1" material="0.301961_0.301961_0.301961_0.000000_0.026" class="visual"/>
+        <geom mesh="RightVerticalRotationSlider_2" material="0.901961_0.901961_0.901961_0.000000_0.016" class="visual"/>
+        <body name="Rotation_Link_Right_1">
+            <body name="Contact_Cylinder_1_2" pos="-0.049998 0.040458  0.069379">
+                <!-- <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="0.001" diaginertia="1.5625e-07 7.81665e-08 7.81665e-08"/> -->
+                <joint name="ContactCylinderJoint2_1" pos="0 0 0" axis="0 1 0"  damping="0.0"/>
+                <geom pos="-0.325 -0.05 -0.5" quat="1 0 0 0" type="mesh" rgba="0.75 0.75 0.75 1" mesh="Contact_Cylinder"/>
+                <site name="arm_weld_site_1" pos="0 0 0" size="0.005" rgba="0 0 0 0" type="sphere" material="connection_marker_blue"/>
+            </body>
+        </body>
+    </body>
+</body>
+
+<!-- ARM MOUNTED ON TOP OF MOBILE BASE -->
+<!-- Position the arm base on top of the robot chassis -->
+<body name="Arm_2" pos="0.15 -0.15 0.158566">
+    <!-- <inertial pos="0 0 0.8" euler=" 0 0 1.57" mass="1" diaginertia="0.2559055 0.2359055 0.0385028"/> -->
+    <joint name="BaseJoint_2" pos="0 0 0" axis="0 0 1" range="-3.14159 3.14159"  limited="false" />
+    <geom mesh="VerticalArm_0" material="0.301961_0.301961_0.301961_0.000000_0.024" class="visual"/>
+    <geom mesh="VerticalArm_1" material="0.301961_0.301961_0.301961_0.000000_0.023" class="visual"/>
+    <geom mesh="VerticalArm_2" material="0.301961_0.301961_0.301961_0.000000_0.022" class="visual"/>
+    <geom mesh="VerticalArm_3" material="0.901961_0.901961_0.901961_0.000000_0.014" class="visual"/>
+    <geom mesh="VerticalArm_4" material="0.301961_0.301961_0.301961_0.000000_0.021" class="visual"/>
+    <geom mesh="VerticalArm_5" material="0.901961_0.901961_0.901961_0.000000_0.013" class="visual"/>
+    
+    <body name="camera_pov_2" pos="-1 0 1.8" euler="0 -0.785398 -1.57">
+        <!-- <geom type="cylinder" size="0.01 0.02"/> -->
+        <camera name="pov_2" fovy="60"/>
+    </body>
+    
+    <body name="Bearing_Column_Left_2" pos="0 -0 0">
+        <!-- <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="0.1" diaginertia="6.25e-05 3.291665e-05 3.291665e-05"/> -->
+        <joint name="ColumnLeftBearingJoint_2" pos="0 0 0" axis="0 0 1" type="slide" range="0 1.43" stiffness="58000" damping="2000"/>
+        <geom mesh="LeftVerticalRotationSlider_0" material="0.301961_0.301961_0.301961_0.000000_0.030" class="visual"/>
+        <geom mesh="LeftVerticalRotationSlider_1" material="0.901961_0.901961_0.901961_0.000000_0.019" class="visual"/>
+        <geom mesh="LeftVerticalRotationSlider_2" material="0.501961_0.501961_0.501961_0.000000_0.007" class="visual"/>
+        <body name="Rotation_Link_Left_2" pos="0 0 0">
+            <!-- <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="0.05" diaginertia="4.166665e-06 3.541665e-06 1.041665e-06"/> -->
+            <joint name="RotationLeftJoint_2" pos="0.049998 -0.040458  0.069379" axis="0 1 0" stiffness="0"/>
+            <geom mesh="LeftHorizontalSlider_0" material="0.301961_0.301961_0.301961_0.000000_0.028" class="visual"/>
+            <geom mesh="LeftHorizontalSlider_1" material="0.901961_0.901961_0.901961_0.000000_0.018" class="visual"/>
+            <body name="Arm_Left_2" pos="-0 0 0">
+                <!-- <inertial pos="0 0 0" euler="0 1.57 0" mass="0.7" diaginertia="0.02921335 0.02917835 5.83335e-05"/> -->
+                <joint name="ArmLeftJoint_2" pos="0 0 0" axis="1 0 0" type="slide" range="0 0.625" stiffness="50000" damping="2000"/>
+                <geom mesh="HorizontalArm_0" material="0.301961_0.301961_0.301961_0.000000_0.027" class="visual"/>
+                <geom mesh="HorizontalArm_1" material="0.901961_0.901961_0.901961_0.000000_0.017" class="visual"/>
+                <!-- <geom type="box" size="0.41 0.02 0.04" pos="-0.041 0 0.07" quat="1 0 0 0" rgba="0 1 0 0" contype="1" conaffinity="1"/> -->
+                <body name="Arm_Right_2" pos="0 0 0">
+                    <!-- <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="0.05" diaginertia="4.166665e-06 3.541665e-06 1.041665e-06"/> -->
+                    <geom mesh="RightHorizontalSlider_1" material="0.780392_0.760784_0.741176_0.000000_0.001" class="visual"/>
+                    <geom mesh="RightHorizontalSlider_2" material="0.898039_0.898039_0.898039_0.000000_0.001" class="visual"/>
+                    <geom mesh="RightHorizontalSlider_3" material="0.666667_0.698039_0.768627_0.000000_0.001" class="visual"/>
+                    <geom mesh="RightHorizontalSlider_4" material="0.792157_0.819608_0.933333_0.000000_0.001" class="visual"/>
+                    <geom mesh="RightHorizontalSlider_5" material="0.250980_0.250980_0.250980_0.000000_0.001" class="visual"/>
+                    <geom mesh="RightHorizontalSlider_6" material="0.000000_1.000000_0.000000_0.000000_0.001" class="visual"/>
+                    <geom mesh="RightHorizontalSlider_7" material="0.301961_0.301961_0.301961_0.000000_0.029" class="visual"/>
+                    <joint name="ArmRightJoint_2" pos="0 0 0" axis="1 0 0" type="slide" range="-0.525 0.1" limited="true" stiffness="500" damping="100"/>
+                    <body name="Contact_Cylinder_2_1" pos="-0.049998 0.040458  0.069379 ">
+                        <!-- <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="0.001" diaginertia="1.5625e-07 7.81665e-08 7.81665e-08"/> -->
+                        <joint name="ContactCylinderJoint_2_2" pos="0 0 0" axis="0 1 0"  damping="0.0"/>
+                        <geom pos="-0.325 -0.05 -0.5" quat="1 0 0 0" type="mesh" rgba="0.75 0.75 0.75 1" mesh="Contact_Cylinder"/>
+                        <site name="cyl_weld_site_1_2" pos="0 0 0" size="0.005" rgba="1 0 0 0" type="sphere" material="connection_marker_green"/>
+                    </body>
+                </body>
+                <body name="Hand_Bearing_2" pos="0.111 -0.04 0.069">
+                    <!-- <inertial pos="0.00972223 0.035 0" quat="0.5 0.5 -0.5 0.5" mass="0.45" diaginertia="5.3776e-05 4.14063e-05 3.34635e-05"/> -->
+                    <joint name="HandBearingJoint_2" pos="0 0 0" axis="0 1 0" damping="10" stiffness="10" range="-1.5 1.5"/>
+                    <geom pos="-0.2275 0.035 -0.35" quat="1 0 0 0" type="mesh" rgba="0.75 0.75 0.75 1" mesh="Hand_Bearing_V2"/>
+                    <geom size="0.0175 0.0175" pos="0.0175 0.035 0" quat="0.707107 0 0.707107 0" type="cylinder" rgba="0.75 0.75 0.75 1"/>
+                    <body name="Gripper_Link1_2" pos="0.035 0.035 0" quat="0.707107 0 0.707107 0">
+                        <!-- <inertial pos="0 0 0" quat="0.5 0.5 -0.5 0.5" mass="0.05" diaginertia="3.375e-06 2.25e-06 2.25e-06"/> -->
+                        <site name="attachment_site_2" pos="0 0 -0.05" size="0.007" rgba="1 0 0 0" group="1"/>
+                        <joint name="gripper_z_rotation_2" pos="0 0 0" axis="0 0 1" range="-3.14159 3.14159" stiffness="10" damping="10"/>
+                        <geom size="0.021 0.0105" type="cylinder" material="robotiq_chrome"/>
+                        <body name="Gripper_Link2_2" pos="0 0 0.0105">
+                            <!-- <inertial pos="0 0 0" mass="0.05" diaginertia="8e-06 8e-06 8e-06"/> -->
+                            <joint name="gripper_y_rotation_2" pos="0 0 0" axis="0 1 0" range="-1.5708 1.5708" stiffness="10" damping="10"/>
+                            <geom size="0.028" material="robotiq_black"/>
+                            <body name="Gripper_Link3_2">
+                                <!-- <inertial pos="0 0 0" mass="0.05" diaginertia="8e-06 8e-06 8e-06"/> -->
+                                <joint name="gripper_x_rotation_2" pos="0 0 0" axis="1 0 0" range="-1.5708 1.5708"  stiffness="10" damping="10"/>
+                                <geom pos="0 0 0.028" quat="0.707107 0.707107 0 0" type="mesh" material="robotiq_black" mesh="palm_real_V2"/>
+                                <geom pos="0 0 0.028" quat="0.707107 0.707107 0 0" type="mesh" material="robotiq_chrome" mesh="palm_atc_V2"/>
+                                <geom pos="0.03186113 0 0.05698" quat="0.500199 0.500199 -0.499801 0.499801" type="mesh" mesh="link_0_real_V2" material="robotiq_black"/>
+                                <body name="finger_c_link_0_2" pos="-0.03185 -0.0252 0.04298" quat="-0.499803 0.499799 0.500197 0.500201">
+                                    <!-- <inertial pos="0 0 0" euler="0 0 0" mass="0.1" diaginertia="2.25e-06 2.25e-06 2.25e-06"/> -->
+                                    <joint name="palm_finger_c_joint_2" pos="0 0 0" axis="0 1 0" range="-0.1784 0.192"  stiffness="1" damping="10"/>
+                                    <geom pos="0.014 0 0" quat="1 0 0 0" type="mesh" mesh="link_0_real_V2" material="robotiq_black" />
+                                    <body name="finger_c_link_1_2" pos="0.014 0 0">
+                                        <!-- <inertial pos="0 0 0" euler="0 0 0" mass="0.1" diaginertia="2.25e-06 2.25e-06 2.25e-06"/> -->
+                                        <joint name="finger_c_joint_1_2" pos="0 0 0" axis="0 0 1" range="0.0495 1.2218"  stiffness="10" damping="10"/>
+                                        <geom pos="0.035 -0.0196 0" quat="0.96639 0 0 -0.257081" type="mesh" mesh="link_1_real_V2" material="robotiq_black"/>
+                                        <geom class="pad_box1" rgba="1 0 0 0.0" size="0.0217 0.0035 0.0091" pos="0.0245 -0.007  0" euler=" 0 -0 -0.55"/>
+                                        <geom class="pad_box2" rgba="1 0 0 0.0" size="0.0217 0.0035 0.0091" pos="0.0245 -0.0084 0" euler=" 0 -0 -0.55"/>
+                                        <body name="finger_c_link_2_2" pos="0.035 -0.0196 0" quat="0.96639 0 0 -0.257081">
+                                            <!-- <inertial pos="0 0 0" euler="0 0 0" mass="0.1" diaginertia="2.25e-06 2.25e-06 2.25e-06"/> -->
+                                            <joint name="finger_c_joint_2_2" pos="0 0 0" axis="0 0 1" range="0 1.5708"  stiffness="1" damping="10"/>
+                                            <geom pos="0.0273 0 0.00525" quat="1 0 0 0" type="mesh" mesh="link_2_real_V2" material="robotiq_black"/>
+                                            <geom class="pad_box1" rgba="1 0 0 0.0" size="0.0154 0.0035 0.0091" pos="0.0175 0.0049  0" euler=" 0 -0 0"/>
+                                            <geom class="pad_box2" rgba="1 0 0 0.0" size="0.0154 0.0035 0.0091" pos="0.0175 0.00504 0" euler=" 0 -0 0"/>
+                                            <body name="finger_c_link_3_2" pos="0.0273 0 0">
+                                                <!-- <inertial pos="0 0 0" quat="0.614353 0.390886 -0.585309 0.35664" mass="0.05" diaginertia="0.0002449725 0.0002041455 0.0001090325"/> -->
+                                                <joint name="finger_c_joint_3_2" pos="0 0 0" axis="0 0 1" range="-1.2217 -0.0523"  stiffness="1" damping="10"/>
+                                                <geom quat="0.96639 0 0 0.257081" type="mesh" material="robotiq_black" mesh="link_3_real_V2"/>
+                                                <geom class="pad_box1" rgba="1 0 0 0.0" size="0.014 0.0035 0.0091" pos="0.007 0.0105  0"  euler=" 0 -0 0.5"/>
+                                                <geom class="pad_box2" rgba="1 0 0 0.0" size="0.014 0.0035 0.0091" pos="0.007 0.01078 0"  euler=" 0 -0 0.5"/>
+                                                <geom class="pad_box2" rgba="1 0 0 0.0" size="0.014 0.0035 0.0091" pos="0.007 0.0112 0"  euler=" 0 -0 0.5"/>
+                                            </body>
+                                        </body>
+                                    </body>
+                                </body>
+                                <body name="finger_b_link_0_2" pos="-0.03185 0.0252 0.04298" quat="-0.499803 0.499799 0.500197 0.500201">
+                                    <!-- <inertial pos="0 0 0" euler="0 0 0" mass="0.1" diaginertia="2.25e-06 2.25e-06 2.25e-06"/> -->
+                                    <joint name="palm_finger_b_joint_2" pos="0 0 0" axis="0 1 0" range="-0.192 0.1784"  stiffness="1" damping="10"/>
+                                    <geom pos="0.014 0 0" quat="1 0 0 0" type="mesh" mesh="link_0_real_V2" material="robotiq_black" friction="5 5 5" solimp="0.9 0.95 0.001 0.5 2" solref="0.004 1" solmix="3" priority="1" condim="6" />
+                                    <body name="finger_b_link_1_2" pos="0.014 0 0">
+                                        <!-- <inertial pos="0 0 0" euler="0 0 0" mass="0.1" diaginertia="2.25e-06 2.25e-06 2.25e-06"/> -->
+                                        <joint name="finger_b_joint_1_2" pos="0 0 0" axis="0 0 1" range="0.0495 1.2218"  stiffness="10" damping="10"/>
+                                        <geom pos="0.035 -0.0196 0" quat="0.96639 0 0 -0.257081" type="mesh" mesh="link_1_real_V2" material="robotiq_black" friction="5 5 5" solimp="0.9 0.95 0.001 0.5 2" solref="0.004 1" solmix="3" priority="1" condim="6"/>
+                                        <geom class="pad_box1" rgba="1 0 0 0.0" size="0.0217 0.0035 0.0091" pos="0.0245 -0.007  0" euler=" 0 -0 -0.55"/>
+                                        <geom class="pad_box2" rgba="1 0 0 0.0" size="0.0217 0.0035 0.0091" pos="0.0245 -0.0084 0" euler=" 0 -0 -0.55"/>
+                                        <body name="finger_b_link_2_2" pos="0.035 -0.0196 0" quat="0.96639 0 0 -0.257081">
+                                            <!-- <inertial pos="0 0 0" euler="0 0 0" mass="0.1" diaginertia="2.25e-06 2.25e-06 2.25e-06"/> -->
+                                            <joint name="finger_b_joint_2_2" pos="0 0 0" axis="0 0 1" range="0 1.5708"  stiffness="1" damping="10"/>
+                                            <geom pos="0.0273 0 0.00525" quat="1 0 0 0" type="mesh" mesh="link_2_real_V2" material="robotiq_black" friction="5 5 5" solimp="0.9 0.95 0.001 0.5 2" solref="0.004 1" solmix="3" priority="1" condim="6"/>
+                                            <geom class="pad_box1" rgba="1 0 0 0.0" size="0.0154 0.0035 0.0091" pos="0.0175 0.0049  0" euler=" 0 -0 0"/>
+                                            <geom class="pad_box2" rgba="1 0 0 0.0" size="0.0154 0.0035 0.0091" pos="0.0175 0.00504 0" euler=" 0 -0 0"/>
+                                            <body name="finger_b_link_3_2" pos="0.0273 0 0">
+                                                <!-- <inertial pos="0 0 0" quat="0.614353 0.390886 -0.585309 0.35664" mass="0.05" diaginertia="0.0002449725 0.0002041455 0.0001090325"/> -->
+                                                <joint name="finger_b_joint_3_2" pos="0 0 0" axis="0 0 1" range="-1.2217 -0.0523"  stiffness="1" damping="10"/>
+                                                <geom quat="0.96639 0 0 0.257081" type="mesh" material="robotiq_black" mesh="link_3_real_V2" friction="5 5 5" solimp="0.9 0.95 0.001 0.5 2" solref="0.004 1" solmix="3" priority="1" condim="6"/>
+                                                <geom class="pad_box1" rgba="1 0 0 0.0" size="0.014 0.0035 0.0091" pos="0.007 0.0105  0"  euler=" 0 -0 0.5"/>
+                                                <geom class="pad_box2" rgba="1 0 0 0.0" size="0.014 0.0035 0.0091" pos="0.007 0.01092 0" euler=" 0 -0 0.5"/>
+                                                <geom class="pad_box2" rgba="1 0 0 0.0" size="0.014 0.0035 0.0091" pos="0.007 0.0112 0" euler=" 0 -0 0.5"/>
+                                            </body>
+                                        </body>
+                                    </body>
+                                </body>
+                                <body name="finger_a_link_1_2" pos="0.03186113 0 0.05698" quat="0.500199 0.500199 -0.499801 0.499801">
+                                    <!-- <inertial pos="0 0 0" euler="0 0 0" mass="0.1" diaginertia="2.25e-06 2.25e-06 2.25e-06"/> -->
+                                    <joint name="finger_a_joint_1_2" pos="0 0 0" axis="0 0 1" range="0.0495 1.2218"  stiffness="10" damping="10"/>
+                                    <geom pos="0.035 -0.0196 0" quat="0.96639 0 0 -0.257081" type="mesh" mesh="link_1_real_V2" material="robotiq_black" friction="5 5 5" solimp="0.9 0.95 0.001 0.5 2" solref="0.004 1" solmix="3" priority="1" condim="6"/>
+                                    <geom class="pad_box1" rgba="1 0 0 0.0" size="0.0217 0.0035 0.0105" pos="0.0245 -0.007  0" euler=" 0 -0 -0.55"/>
+                                    <geom class="pad_box2" rgba="1 0 0 0.0" size="0.0217 0.0035 0.0105" pos="0.0245 -0.0105 0" euler=" 0 -0 -0.55"/>
+                                    <body name="finger_a_link_2_2" pos="0.035 -0.0196 0" quat="0.96639 0 0 -0.257081">
+                                        <!-- <inertial pos="0 0 0" euler="0 0 0" mass="0.1" diaginertia="2.25e-06 2.25e-06 2.25e-06"/> -->
+                                        <joint name="finger_a_joint_2_2" pos="0 0 0" axis="0 0 1" range="0 1.5708"  stiffness="1" damping="10"/>
+                                        <geom pos="0.0273 0 0.00525" quat="1 0 0 0" type="mesh" mesh="link_2_real_V2" material="robotiq_black" friction="5 5 5" solimp="0.9 0.95 0.001 0.5 2" solref="0.004 1" solmix="3" priority="1" condim="6"/>
+                                        <geom class="pad_box1" rgba="1 0 0 0.0" size="0.0154 0.0035 0.0105" pos="0.0175 0.0049  0" euler=" 0 -0 0"/>
+                                        <geom class="pad_box2" rgba="1 0 0 0.0" size="0.0154 0.0035 0.0105" pos="0.0175 0.00504 0" euler=" 0 -0 0"/>
+                                        <body name="finger_a_link_3_2" pos="0.0273 0 0">
+                                            <!-- <inertial pos="0 0 0" quat="0.614353 0.390886 -0.585309 0.35664" mass="0.05" diaginertia="0.0002449725 0.0002041455 0.0001090325"/> -->
+                                            <joint name="finger_a_joint_3_2" pos="0 0 0" axis="0 0 1" range="-1.2217 -0.0523"  stiffness="1" damping="10"/>
+                                            <geom quat="0.96639 0 0 0.257081" type="mesh" material="robotiq_black" mesh="link_3_real_V2"/>
+                                            <geom class="pad_box1" rgba="1 0 0 0.0" size="0.014 0.0035 0.0091" pos="0.007 0.0105  0" euler=" 0 -0 0.5"/>
+                                            <geom class="pad_box2" rgba="1 0 0 0.0" size="0.014 0.0035 0.0091" pos="0.007 0.01092 0" euler=" 0 -0 0.5"/>
+                                            <geom class="pad_box2" rgba="1 0 0 0.0" size="0.014 0.0035 0.0091" pos="0.007 0.0112 0" euler=" 0 -0 0.5"/>
+                                        </body>
+                                    </body>
+                                </body>
+                            </body>
+                        </body>
+                    </body>
+                </body>
+            </body>
+        </body>
+    </body>
+    <body name="Bearing_Column_Right_2" pos="0 0 0">
+        <!-- <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="0.1" diaginertia="6.25e-05 3.291665e-05 3.291665e-05"/> -->
+        <joint name="ColumnRightBearingJoint_2" pos="0 0 0" axis="0 0 1" type="slide" range="0 1.43"  stiffness="58000" damping="2000"/>
+        <geom mesh="RightVerticalRotationSlider_0" material="0.501961_0.501961_0.501961_0.000000_0.008" class="visual"/>
+        <geom mesh="RightVerticalRotationSlider_1" material="0.301961_0.301961_0.301961_0.000000_0.026" class="visual"/>
+        <geom mesh="RightVerticalRotationSlider_2" material="0.901961_0.901961_0.901961_0.000000_0.016" class="visual"/>
+        <body name="Rotation_Link_Right_2">
+            <body name="Contact_Cylinder_2_2" pos="-0.049998 0.040458  0.069379">
+                <!-- <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="0.001" diaginertia="1.5625e-07 7.81665e-08 7.81665e-08"/> -->
+                <joint name="ContactCylinderJoint2_2" pos="0 0 0" axis="0 1 0"  damping="0.0"/>
+                <geom pos="-0.325 -0.05 -0.5" quat="1 0 0 0" type="mesh" rgba="0.75 0.75 0.75 1" mesh="Contact_Cylinder"/>
+                <site name="arm_weld_site_2" pos="0 0 0" size="0.005" rgba="1 0 0 0" type="sphere" material="connection_marker_blue"/>
+            </body>
+        </body>
+</body>
+</body>
+</body>
+</body>
+
+</mujocoinclude>

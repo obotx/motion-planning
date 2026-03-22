@@ -1,0 +1,39 @@
+<include>
+    <!-- =================================================
+    Copyright 2019 Vikash Kumar
+    Model   :: kettle (MuJoCoV2.0)
+    Author  :: Vikash Kumar (vikashplus@gmail.com)
+    Details :: https://github.com/vikashplus/furniture_sim
+    License :: Under Apache License, Version 2.0 (the "License"); you may not use this file except
+    in compliance with the License. You may obtain a copy of the License at
+    http://www.apache.org/licenses/LICENSE-2.0 Unless required by applicable law or agreed to
+    in writing, software distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+    ====================================================== -©vk©-->
+<body name="kettleroot5" childclass="kettle">
+    <!-- Visual geoms -->
+    <geom material="kettle_wood" pos="0 0 0.0467" size="0.1000 0.1000 0.0433" type="ellipsoid"/>
+    <geom material="kettle_wood" euler="0 1.57 0" pos="0 0 0.1727" size="0.0213 0.0667" type="capsule"/>
+    <geom material="kettle_metal" euler="0 0 0" pos="0 0 0.0467" size="0.0467 0.0467" type="cylinder"/>
+    <geom material="kettle_wood" pos="0 0 0.1000" size="0.0133" type="sphere"/>
+    <geom euler="0 1.57 0" pos="0 0 0.1727" size="0.0133 0.0767" type="capsule"/>
+    <geom material="kettle_metal" pos="0.0613 0 0.1200" size="0.0100 0.0467" type="capsule"/>
+    <geom material="kettle_metal" pos="-0.0613 0 0.1200" size="0.0100 0.0467" type="capsule"/>
+    <geom material="kettle_wood" pos="-0.0613 0 0.1467" size="0.0147 0.0100" type="capsule"/>
+    <geom material="kettle_wood" pos="0.0613 0 0.1467" size="0.0147 0.0100" type="capsule"/>
+    <geom euler="0 2.25 0" pos="-0.0840 0 0.0467" size="0.0140 0.0333" type="cylinder"/>
+
+    <!-- Collision geoms (with scaled masses) -->
+    <geom class="kettle_collision" euler="0 1.57 0" pos="0 0 0.1727" size="0.0213 0.0667" type="capsule" mass="0.0089"/>
+    <geom class="kettle_collision" pos="0.0613 0 0.1200" size="0.0100 0.0467" type="capsule" mass="0.0030"/>
+    <geom class="kettle_collision" pos="-0.0613 0 0.1200" size="0.0100 0.0467" type="capsule" mass="0.0030"/>
+    <geom class="kettle_collision" euler="0 2.25 0" pos="-0.0840 0 0.0467" size="0.0140 0.0333" type="cylinder" mass="0.0089"/>
+    <geom class="kettle_collision" pos="0 0 0.0467" size="0.1000 0.1000 0.0433" type="ellipsoid" mass="0.1778"/>
+    <geom class="kettle_collision" euler="0 0 0" pos="0 0 0.0467" size="0.0467 0.0467" type="cylinder" mass="0.0889"/>
+
+    <!-- Site scaled accordingly -->
+    <site type="sphere" name="kettle_site5" pos="0 0 0.1727" size="0.0067" group="3" rgba="1 0 0 1"/>
+</body>
+</include>

@@ -1,0 +1,6 @@
+<mujocoinclude>
+    <body name="couch">
+      <geom material="std_mtl" mesh="couch" class="visual"/>
+      <geom mesh="couch" class="collision"/>
+    </body>
+</mujocoinclude>

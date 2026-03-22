@@ -1,0 +1,73 @@
+<mujocoinclude>
+    <asset>
+        <texture type="2d" name="brisk_texture" file="brisk/texture.png"/>
+        <material name="material_0.001" texture="brisk_texture" specular="0.0" shininess="0.0"/>
+        <mesh file="brisk/brisk.obj" name="brisk"/>
+
+        <material name="0.250980_0.250980_0.250980_0.000000_0.000000" specular="0.0" shininess="0.0" rgba="0.251000 0.251000 0.251000 1.000000"/>
+        <material name="0.752941_0.752941_0.752941_0.000000_0.000000" specular="0.0" shininess="0.0" rgba="0.752900 0.752900 0.752900 1.000000"/>
+        <material name="0.752941_1.000000_0.752941_0.000000_0.000000" specular="0.0" shininess="0.0" rgba="0.752900 1.000000 0.752900 1.000000"/>
+        <mesh file="racks/racks_0.obj" name="racks_0"/>
+        <mesh file="racks/racks_1.obj" name="racks_1"/>
+        <mesh file="racks/racks_2.obj" name="racks_2"/>
+        <mesh file="racks/racks_3.obj" name="racks_3"/>
+
+        <texture type="2d" name="crunch_texture" file="crunch/texture.png"/>
+        <material name="material_0.002" texture="crunch_texture" specular="0.0" shininess="0.0"/>
+        <mesh file="crunch/crunch.obj" name="crunch"/>
+
+        <texture type="2d" name="nescafe_caffeine_texture" file="nescafe_caffeine/texture.png"/>
+        <material name="material_0.011" texture="nescafe_caffeine_texture" specular="0.0" shininess="0.0"/>
+        <mesh file="nescafe_caffeine/nescafe_caffeine.obj" name="nescafe_caffeine"/>
+    
+        <texture type="2d" name="nescafe_caramel_texture" file="nescafe_caramel/texture.png"/>
+        <material name="material_0.005" texture="nescafe_caramel_texture" specular="0.0" shininess="0.0"/>
+        <mesh file="nescafe_caramel/nescafe_caramel.obj" name="nescafe_caramel"/>
+
+        <texture type="2d" name="nescafe_dolce_texture" file="nescafe_dolce/texture.png"/>
+        <material name="material_0.004" texture="nescafe_dolce_texture" specular="0.0" shininess="0.0"/>
+        <mesh file="nescafe_dolce/nescafe_dolce.obj" name="nescafe_dolce"/>
+
+        <texture type="2d" name="nescafe_mocha_texture" file="nescafe_mocha/texture.png"/>
+        <material name="material_0.006" texture="nescafe_mocha_texture" specular="0.0" shininess="0.0"/>
+        <mesh file="nescafe_mocha/nescafe_mocha.obj" name="nescafe_mocha"/>
+
+        <texture type="2d" name="nescafe_spark_water_texture" file="nescafe_spark_water/texture.png"/>
+        <material name="material_0.013" texture="nescafe_spark_water_texture" specular="0.0" shininess="0.0"/>
+        <mesh file="nescafe_spark_water/nescafe_spark_water.obj" name="nescafe_spark_water"/>
+   
+        <texture type="2d" name="nescafe_taster_texture" file="nescafe_taster/texture.png"/>
+        <material name="material_0.007" texture="nescafe_taster_texture" specular="0.0" shininess="0.0"/>
+        <mesh file="nescafe_taster/nescafe_taster_1.obj" name="nescafe_taster"/>
+
+        <texture type="2d" name="nestle_candy_texture" file="nestle_candy/texture.png"/>
+        <material name="material_0.014" texture="nestle_candy_texture" specular="0.0" shininess="0.0"/>
+        <mesh file="nestle_candy/nestle_candy.obj" name="nestle_candy"/>
+
+        <texture type="2d" name="nestle_cirnation_texture" file="nestle_cirnation/texture.png"/>
+        <material name="material_0.015" texture="nestle_cirnation_texture" specular="0.0" shininess="0.0"/>
+        <mesh file="nestle_cirnation/nestle_cirnation.obj" name="nestle_cirnation"/>
+    
+        <texture type="2d" name="pepsi_cerry_texture" file="pepsi_cerry/texture.png"/>
+        <material name="material_0.010" texture="pepsi_cerry_texture" specular="0.0" shininess="0.0"/>
+        <mesh file="pepsi_cerry/pepsi_cerry.obj" name="pepsi_cerry"/>
+
+        <texture type="2d" name="pepsi_diet_texture" file="pepsi_diet/texture.png"/>
+        <material name="material_0.003" texture="pepsi_diet_texture" specular="0.0" shininess="0.0"/>
+        <mesh file="pepsi_diet/pepsi_diet.obj" name="pepsi_diet"/>
+
+        <texture type="2d" name="pepsi_max_texture" file="pepsi_max/texture.png"/>
+        <material name="material_0.009" texture="pepsi_max_texture" specular="0.0" shininess="0.0"/>
+        <mesh file="pepsi_max/pepsi_max.obj" name="pepsi_max"/>
+
+        <texture type="2d" name="skinny_cow_texture" file="skinny_cow/texture.png"/>
+        <material name="material_0.012" texture="skinny_cow_texture" specular="0.0" shininess="0.0"/>
+        <mesh name="skinny_cow" file="skinny_cow/skinny_cow.obj"/>
+
+        <texture type="2d" name="vans_cereal_texture" file="vans_cereal/texture.png"/>
+        <material name="material_0.008" texture="vans_cereal_texture" specular="0.0" shininess="0.0"/>
+        <mesh name="vans_cereal" file="vans_cereal/vans_cereal.obj"/>
+
+        <mesh name="one_nescaafe_taster" file="one_nescaafe_taster/one_nescaafe_taster.obj"/>
+    </asset>
+</mujocoinclude>

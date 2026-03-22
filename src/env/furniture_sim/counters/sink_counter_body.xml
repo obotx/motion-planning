@@ -1,0 +1,25 @@
+<mujocoinclude>
+<body name="sink_counter2" childclass="counters_3">
+    <geom material="counter_blue" mesh="cabinetbase_only"/>
+    <geom material="counter_marble" mesh="countertop_only"/>
+    <geom euler="0 1.57 0" pos="0.906 -0.46333333 0.92666667" size="0.01466667 0.18666667" type="cylinder"/>
+    <geom euler="1.57 0 0" pos="0.77333333 -0.44333333 0.92666667" size="0.012 0.02" type="cylinder"/>
+    <geom euler="1.57 0 0" pos="1.03866667 -0.44333333 0.92666667" size="0.012 0.02" type="cylinder"/>
+    <geom euler="0 1.57 0" pos="0.906 -0.46333333 0.76" size="0.01466667 0.18666667" type="cylinder"/>
+    <geom euler="1.57 0 0" pos="0.77333333 -0.44333333 0.76" size="0.012 0.02" type="cylinder"/>
+    <geom euler="1.57 0 0" pos="1.03866667 -0.44333333 0.76" size="0.012 0.02" type="cylinder"/>
+    <geom class="counter_collision" rgba="1 0 0 1" pos="0.90466667 -0.03 0.53333333" size="0.30666667 0.404 0.53333333" type="box" mass="3"/>
+</body>
+
+<body name="sink_counter3" pos="2.18666667 0 0" childclass="counters_3">
+    <geom material="counter_blue" mesh="cabinetbase_only"/>
+    <geom material="counter_marble" mesh="countertop_only"/>
+    <geom euler="0 1.57 0" pos="0.906 -0.46333333 0.92666667" size="0.01466667 0.18666667" type="cylinder"/>
+    <geom euler="1.57 0 0" pos="0.77333333 -0.44333333 0.92666667" size="0.012 0.02" type="cylinder"/>
+    <geom euler="1.57 0 0" pos="1.03866667 -0.44333333 0.92666667" size="0.012 0.02" type="cylinder"/>
+    <geom euler="0 1.57 0" pos="0.906 -0.46333333 0.76" size="0.01466667 0.18666667" type="cylinder"/>
+    <geom euler="1.57 0 0" pos="0.77333333 -0.44333333 0.76" size="0.012 0.02" type="cylinder"/>
+    <geom euler="1.57 0 0" pos="1.03866667 -0.44333333 0.76" size="0.012 0.02" type="cylinder"/>
+    <geom class="counter_collision" rgba="1 0 0 1" pos="0.90466667 -0.03 0.53333333" size="0.30666667 0.404 0.53333333" type="box" mass="3"/>
+</body>
+</mujocoinclude>

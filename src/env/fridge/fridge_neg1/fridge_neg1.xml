@@ -1,0 +1,32 @@
+<mujocoinclude>
+    <body name="fridge_neg1">
+      <geom mesh="fridge_neg1_0" material="Material7" class="visual"/>
+      <geom mesh="fridge_neg1_1" material="skp_front_default" class="visual"/>
+      <geom mesh="fridge_neg1_2" material="vitre_" class="visual"/>
+      <geom mesh="fridge_neg1_3" material="Material8" class="visual"/>
+      <geom mesh="fridge_neg1_4" material="Metal_Corrogated_Shiny" class="visual"/>
+      <geom mesh="fridge_neg1_5" material="Color_B24" class="visual"/>
+      <geom mesh="fridge_neg1_6" material="Material4" class="visual"/>
+      <geom mesh="fridge_neg1_7" material="Material3" class="visual"/>
+      <geom mesh="fridge_neg1_8" material="led_" class="visual"/>
+      <geom mesh="fridge_neg1_9" material="Material5" class="visual"/>
+      <geom mesh="fridge_neg1_10" material="Material2" class="visual"/>
+      <geom mesh="fridge_neg1_11" material="Material6" class="visual"/>
+      <geom mesh="fridge_neg1_12" material="Metal_Rough" class="visual"/>
+      <geom mesh="fridge_neg1_13" material="Material1" class="visual"/>
+      <geom mesh="fridge_neg1_0" class="collision"/>
+      <geom mesh="fridge_neg1_1" class="collision"/>
+      <geom mesh="fridge_neg1_2" class="collision"/>
+      <geom mesh="fridge_neg1_3" class="collision"/>
+      <geom mesh="fridge_neg1_4" class="collision"/>
+      <geom mesh="fridge_neg1_5" class="collision"/>
+      <geom mesh="fridge_neg1_6" class="collision"/>
+      <geom mesh="fridge_neg1_7" class="collision"/>
+      <geom mesh="fridge_neg1_8" class="collision"/>
+      <geom mesh="fridge_neg1_9" class="collision"/>
+      <geom mesh="fridge_neg1_10" class="collision"/>
+      <geom mesh="fridge_neg1_11" class="collision"/>
+      <geom mesh="fridge_neg1_12" class="collision"/>
+      <geom mesh="fridge_neg1_13" class="collision"/>
+    </body>
+</mujocoinclude>

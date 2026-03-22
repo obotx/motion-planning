@@ -1,0 +1,21 @@
+<mujocoinclude>
+    <actuator>
+        <!-- === ARM 1 FINGER ACTUATORS === -->
+        <position joint="finger_c_joint_1_1" name="finger_c_joint_1_1" ctrlrange="0.0495 1.2218" kp="5"/>
+        <position joint="finger_c_joint_2_1" name="finger_c_joint_2_1" ctrlrange="0 1.5708" kp="5"/>
+        <position joint="finger_c_joint_3_1" name="finger_c_joint_3_1" ctrlrange="-1.2217 -0.0523" kp="5"/>
+        <position joint="finger_b_joint_1_1" name="finger_b_joint_1_1" ctrlrange="0.0495 1.2218" kp="5"/>
+        <position joint="finger_b_joint_2_1" name="finger_b_joint_2_1" ctrlrange="0 1.5708" kp="5"/>
+        <position joint="finger_b_joint_3_1" name="finger_b_joint_3_1" ctrlrange="-1.2217 -0.0523" kp="5"/>
+        <position joint="finger_a_joint_1_1" name="finger_a_joint_1_1" ctrlrange="0.0495 1.2218" kp="5"/>
+        <position joint="finger_a_joint_2_1" name="finger_a_joint_2_1" ctrlrange="0 1.5708" kp="5"/>
+        <position joint="finger_a_joint_3_1" name="finger_a_joint_3_1" ctrlrange="-1.2217 -0.0523" kp="5"/>
+        <position joint="palm_finger_c_joint_1" name="palm_finger_c_joint_1" ctrlrange="-0.1784 0.192" kp="5"/>
+        <position joint="palm_finger_b_joint_1" name="palm_finger_b_joint_1" ctrlrange="-0.192 0.1784" kp="5"/>
+
+        <position name="wrist_X_1" joint="gripper_x_rotation_1" ctrlrange="-0.8 0.8" kp="100"/>
+        <position name="wrist_Y_1" joint="gripper_y_rotation_1" ctrlrange="-0.8 0.8" kp="100"/>
+        <position name="wrist_Z_1" joint="gripper_z_rotation_1" ctrlrange="-3.14159 3.14159" kp="100"/>
+        <position name="HandBearing_1" joint="HandBearingJoint_1" ctrlrange="-1.57 1.57" kp="127"/>
+    </actuator>
+</mujocoinclude>

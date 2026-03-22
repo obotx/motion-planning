@@ -1,0 +1,613 @@
+<mujoco model="Market">
+
+    <compiler autolimits="true" angle="radian"/>
+    <option cone="elliptic" impratio="100" timestep="0.002" noslip_iterations="3" integrator="implicitfast"/>
+
+    <size njmax='1000' nconmax='1000'/>
+    <visual>
+        <quality shadowsize="0"/>
+        <global offwidth="1024" offheight="640"/>
+    </visual>
+
+    <include file="robot/assets/assets.xml"/>
+    <include file="minimarket/market_assets.xml"/>
+    <include file="env_assets.xml"/>
+    <include file='robot/assets/summit_xls_actuator.xml' />
+    <include file='robot/assets/arm_obotx_actuator_V2.xml' />
+    <include file='robot/assets/gripper_actuator_V2.xml' />
+
+    <worldbody>
+        <light name="main_light" pos="4 -4 20" dir="0 0 -1" 
+            diffuse="0.8 0.8 0.8" specular="1.0 1.0 1.0"/>
+
+        <geom name='floor' pos='4 -4 0' size='4 4 0.067' conaffinity='1' contype='1' type='plane' material="MatPlane" condim='3'/>
+        <site name='xaxis' pos='0.333 0 0' size='0.0033 0.333' type='capsule' rgba='1 0 0 .25' euler='0 1.57 0' group='3'/>
+        <site name='yaxis' pos='0 0.333 0' size='0.0033 0.333' type='capsule' rgba='0 1 0 .25' euler='1.57 0 0' group='3'/>
+
+        <body name="minimarket_racks" pos="4 -4 0">
+            <include file="minimarket/racks/racks.xml"/>
+        </body>
+        <body name="minimarket_brisk" pos="4 -4 0">
+            <include file="minimarket/brisk/brisk.xml"/>
+        </body>
+        <body name="minimarket_crunch" pos="4 -4 0">
+            <include file="minimarket/crunch/crunch.xml"/>
+        </body>
+        <body name="minimarket_nescafe_caffeine" pos="4 -4 0">
+            <include file="minimarket/nescafe_caffeine/nescafe_caffeine.xml"/>
+        </body>
+        <body name="minimarket_nescafe_caramel" pos="4 -4 0">
+            <include file="minimarket/nescafe_caramel/nescafe_caramel.xml"/>
+        </body>
+        <body name="minimarket_nescafe_dolce" pos="4 -4 0">
+            <include file="minimarket/nescafe_dolce/nescafe_dolce.xml"/>
+        </body>
+        <body name="minimarket_nescafe_mocha" pos="4 -4 0">
+            <include file="minimarket/nescafe_mocha/nescafe_mocha.xml"/>
+        </body>
+        <body name="minimarket_nescafe_spark_water" pos="4 -4 0">
+            <include file="minimarket/nescafe_spark_water/nescafe_spark_water.xml"/>
+        </body>
+        <body name="minimarket_nescafe_taster" pos="4 -4 0">
+            <include file="minimarket/nescafe_taster/nescafe_taster.xml"/>
+        </body>
+        <body name="minimarket_nestle_candy" pos="4 -4 0">
+            <include file="minimarket/nestle_candy/nestle_candy.xml"/>
+        </body>
+        <body name="minimarket_nestle_cirnation" pos="4 -4 0">
+            <include file="minimarket/nestle_cirnation/nestle_cirnation.xml"/>
+        </body>
+        <body name="minimarket_pepsi_cerry" pos="4 -4 0">
+            <include file="minimarket/pepsi_cerry/pepsi_cerry.xml"/>
+        </body>
+        <body name="minimarket_pepsi_diet" pos="4 -4 0">
+            <include file="minimarket/pepsi_diet/pepsi_diet.xml"/>
+        </body>
+        <body name="minimarket_pepsi_max" pos="4 -4 0">
+            <include file="minimarket/pepsi_max/pepsi_max.xml"/>
+        </body>
+        <body name="minimarket_skinny_cow" pos="4 -4 0">
+            <include file="minimarket/skinny_cow/skinny_cow.xml"/>
+        </body>
+        <body name="minimarket_vans_cereal" pos="4 -4 0">
+            <include file="minimarket/vans_cereal/vans_cereal.xml"/>
+        </body>
+
+        <body name="target" pos="3.7 -6 0.2" euler="0 0 0">
+            <joint type="free"/>
+            <include file="minimarket/one_nescaafe_taster/one_nescaafe_taster.xml"/>
+        </body>
+
+        <body name="robot" pos="3 -6 0" euler="0 0 0">
+            <joint type="free" stiffness="0" damping="0" frictionloss="0" armature="0"/>
+            <include file="robot/obotx_V2_OBJs.xml"/>
+        </body>
+
+        <body name="camera_corner" pos="-0.8 -5.3 3" euler="0.6 -0.6 -0.6">
+            <!-- <geom type="cylinder" size="0.1 0.2"/> -->
+            <camera name="top_view" fovy="60"/>
+        </body>
+
+    </worldbody>
+
+
+    <contact>
+        <!-- Finger A exclusions for Arm1 -->
+        <exclude body1="Arm_1" body2="Arm_2"/>
+        <exclude body1="Bearing_Column_Left_1" body2="Rotation_Link_Left_1"/>
+        <exclude body1="Bearing_Column_Left_1" body2="Arm_Left_1"/>
+        <exclude body1="Bearing_Column_Left_1" body2="Arm_Right_1"/>
+        <exclude body1="Bearing_Column_Left_1" body2="Contact_Cylinder_1_1"/>
+        <exclude body1="Bearing_Column_Left_1" body2="Hand_Bearing_1"/>
+        <exclude body1="Bearing_Column_Left_1" body2="Gripper_Link1_1"/>
+        <exclude body1="Bearing_Column_Left_1" body2="Gripper_Link2_1"/>
+        <exclude body1="Bearing_Column_Left_1" body2="Gripper_Link3_1"/>
+        <exclude body1="Bearing_Column_Left_1" body2="finger_c_link_0_1"/>
+        <exclude body1="Bearing_Column_Left_1" body2="finger_c_link_1_1"/>
+        <exclude body1="Bearing_Column_Left_1" body2="finger_c_link_2_1"/>
+        <exclude body1="Bearing_Column_Left_1" body2="finger_c_link_3_1"/>
+        <exclude body1="Bearing_Column_Left_1" body2="finger_b_link_0_1"/>
+        <exclude body1="Bearing_Column_Left_1" body2="finger_b_link_1_1"/>
+        <exclude body1="Bearing_Column_Left_1" body2="finger_b_link_2_1"/>
+        <exclude body1="Bearing_Column_Left_1" body2="finger_b_link_3_1"/>
+        <exclude body1="Bearing_Column_Left_1" body2="finger_a_link_1_1"/>
+        <exclude body1="Bearing_Column_Left_1" body2="finger_a_link_2_1"/>
+        <exclude body1="Bearing_Column_Left_1" body2="finger_a_link_3_1"/>
+
+        <exclude body1="Rotation_Link_Left_1" body2="Arm_Left_1"/>
+        <exclude body1="Rotation_Link_Left_1" body2="Arm_Right_1"/>
+        <exclude body1="Rotation_Link_Left_1" body2="Contact_Cylinder_1_1"/>
+        <exclude body1="Rotation_Link_Left_1" body2="Hand_Bearing_1"/>
+        <exclude body1="Rotation_Link_Left_1" body2="Gripper_Link1_1"/>
+        <exclude body1="Rotation_Link_Left_1" body2="Gripper_Link2_1"/>
+        <exclude body1="Rotation_Link_Left_1" body2="Gripper_Link3_1"/>
+        <exclude body1="Rotation_Link_Left_1" body2="finger_c_link_0_1"/>
+        <exclude body1="Rotation_Link_Left_1" body2="finger_c_link_1_1"/>
+        <exclude body1="Rotation_Link_Left_1" body2="finger_c_link_2_1"/>
+        <exclude body1="Rotation_Link_Left_1" body2="finger_c_link_3_1"/>
+        <exclude body1="Rotation_Link_Left_1" body2="finger_b_link_0_1"/>
+        <exclude body1="Rotation_Link_Left_1" body2="finger_b_link_1_1"/>
+        <exclude body1="Rotation_Link_Left_1" body2="finger_b_link_2_1"/>
+        <exclude body1="Rotation_Link_Left_1" body2="finger_b_link_3_1"/>
+        <exclude body1="Rotation_Link_Left_1" body2="finger_a_link_1_1"/>
+        <exclude body1="Rotation_Link_Left_1" body2="finger_a_link_2_1"/>
+        <exclude body1="Rotation_Link_Left_1" body2="finger_a_link_3_1"/>
+
+        <exclude body1="Arm_Left_1" body2="Arm_Right_1"/>
+        <exclude body1="Arm_Left_1" body2="Contact_Cylinder_1_1"/>
+        <exclude body1="Arm_Left_1" body2="Hand_Bearing_1"/>
+        <exclude body1="Arm_Left_1" body2="Gripper_Link1_1"/>
+        <exclude body1="Arm_Left_1" body2="Gripper_Link2_1"/>
+        <exclude body1="Arm_Left_1" body2="Gripper_Link3_1"/>
+        <exclude body1="Arm_Left_1" body2="finger_c_link_0_1"/>
+        <exclude body1="Arm_Left_1" body2="finger_c_link_1_1"/>
+        <exclude body1="Arm_Left_1" body2="finger_c_link_2_1"/>
+        <exclude body1="Arm_Left_1" body2="finger_c_link_3_1"/>
+        <exclude body1="Arm_Left_1" body2="finger_b_link_0_1"/>
+        <exclude body1="Arm_Left_1" body2="finger_b_link_1_1"/>
+        <exclude body1="Arm_Left_1" body2="finger_b_link_2_1"/>
+        <exclude body1="Arm_Left_1" body2="finger_b_link_3_1"/>
+        <exclude body1="Arm_Left_1" body2="finger_a_link_1_1"/>
+        <exclude body1="Arm_Left_1" body2="finger_a_link_2_1"/>
+        <exclude body1="Arm_Left_1" body2="finger_a_link_3_1"/>
+
+        <exclude body1="Arm_Right_1" body2="Contact_Cylinder_1_1"/>
+        <exclude body1="Arm_Right_1" body2="Hand_Bearing_1"/>
+        <exclude body1="Arm_Right_1" body2="Gripper_Link1_1"/>
+        <exclude body1="Arm_Right_1" body2="Gripper_Link2_1"/>
+        <exclude body1="Arm_Right_1" body2="Gripper_Link3_1"/>
+        <exclude body1="Arm_Right_1" body2="finger_c_link_0_1"/>
+        <exclude body1="Arm_Right_1" body2="finger_c_link_1_1"/>
+        <exclude body1="Arm_Right_1" body2="finger_c_link_2_1"/>
+        <exclude body1="Arm_Right_1" body2="finger_c_link_3_1"/>
+        <exclude body1="Arm_Right_1" body2="finger_b_link_0_1"/>
+        <exclude body1="Arm_Right_1" body2="finger_b_link_1_1"/>
+        <exclude body1="Arm_Right_1" body2="finger_b_link_2_1"/>
+        <exclude body1="Arm_Right_1" body2="finger_b_link_3_1"/>
+        <exclude body1="Arm_Right_1" body2="finger_a_link_1_1"/>
+        <exclude body1="Arm_Right_1" body2="finger_a_link_2_1"/>
+        <exclude body1="Arm_Right_1" body2="finger_a_link_3_1"/>
+
+        <exclude body1="Contact_Cylinder_1_1" body2="Hand_Bearing_1"/>
+        <exclude body1="Contact_Cylinder_1_1" body2="Gripper_Link1_1"/>
+        <exclude body1="Contact_Cylinder_1_1" body2="Gripper_Link2_1"/>
+        <exclude body1="Contact_Cylinder_1_1" body2="Gripper_Link3_1"/>
+        <exclude body1="Contact_Cylinder_1_1" body2="finger_c_link_0_1"/>
+        <exclude body1="Contact_Cylinder_1_1" body2="finger_c_link_1_1"/>
+        <exclude body1="Contact_Cylinder_1_1" body2="finger_c_link_2_1"/>
+        <exclude body1="Contact_Cylinder_1_1" body2="finger_c_link_3_1"/>
+        <exclude body1="Contact_Cylinder_1_1" body2="finger_b_link_0_1"/>
+        <exclude body1="Contact_Cylinder_1_1" body2="finger_b_link_1_1"/>
+        <exclude body1="Contact_Cylinder_1_1" body2="finger_b_link_2_1"/>
+        <exclude body1="Contact_Cylinder_1_1" body2="finger_b_link_3_1"/>
+        <exclude body1="Contact_Cylinder_1_1" body2="finger_a_link_1_1"/>
+        <exclude body1="Contact_Cylinder_1_1" body2="finger_a_link_2_1"/>
+        <exclude body1="Contact_Cylinder_1_1" body2="finger_a_link_3_1"/>
+
+        <exclude body1="Hand_Bearing_1" body2="Gripper_Link1_1"/>
+        <exclude body1="Hand_Bearing_1" body2="Gripper_Link2_1"/>
+        <exclude body1="Hand_Bearing_1" body2="Gripper_Link3_1"/>
+        <exclude body1="Hand_Bearing_1" body2="finger_c_link_0_1"/>
+        <exclude body1="Hand_Bearing_1" body2="finger_c_link_1_1"/>
+        <exclude body1="Hand_Bearing_1" body2="finger_c_link_2_1"/>
+        <exclude body1="Hand_Bearing_1" body2="finger_c_link_3_1"/>
+        <exclude body1="Hand_Bearing_1" body2="finger_b_link_0_1"/>
+        <exclude body1="Hand_Bearing_1" body2="finger_b_link_1_1"/>
+        <exclude body1="Hand_Bearing_1" body2="finger_b_link_2_1"/>
+        <exclude body1="Hand_Bearing_1" body2="finger_b_link_3_1"/>
+        <exclude body1="Hand_Bearing_1" body2="finger_a_link_1_1"/>
+        <exclude body1="Hand_Bearing_1" body2="finger_a_link_2_1"/>
+        <exclude body1="Hand_Bearing_1" body2="finger_a_link_3_1"/>
+
+        <exclude body1="Gripper_Link1_1" body2="Gripper_Link2_1"/>
+        <exclude body1="Gripper_Link1_1" body2="Gripper_Link3_1"/>
+        <exclude body1="Gripper_Link1_1" body2="finger_c_link_0_1"/>
+        <exclude body1="Gripper_Link1_1" body2="finger_c_link_1_1"/>
+        <exclude body1="Gripper_Link1_1" body2="finger_c_link_2_1"/>
+        <exclude body1="Gripper_Link1_1" body2="finger_c_link_3_1"/>
+        <exclude body1="Gripper_Link1_1" body2="finger_b_link_0_1"/>
+        <exclude body1="Gripper_Link1_1" body2="finger_b_link_1_1"/>
+        <exclude body1="Gripper_Link1_1" body2="finger_b_link_2_1"/>
+        <exclude body1="Gripper_Link1_1" body2="finger_b_link_3_1"/>
+        <exclude body1="Gripper_Link1_1" body2="finger_a_link_1_1"/>
+        <exclude body1="Gripper_Link1_1" body2="finger_a_link_2_1"/>
+        <exclude body1="Gripper_Link1_1" body2="finger_a_link_3_1"/>
+
+        <exclude body1="Gripper_Link2_1" body2="Gripper_Link3_1"/>
+        <exclude body1="Gripper_Link2_1" body2="finger_c_link_0_1"/>
+        <exclude body1="Gripper_Link2_1" body2="finger_c_link_1_1"/>
+        <exclude body1="Gripper_Link2_1" body2="finger_c_link_2_1"/>
+        <exclude body1="Gripper_Link2_1" body2="finger_c_link_3_1"/>
+        <exclude body1="Gripper_Link2_1" body2="finger_b_link_0_1"/>
+        <exclude body1="Gripper_Link2_1" body2="finger_b_link_1_1"/>
+        <exclude body1="Gripper_Link2_1" body2="finger_b_link_2_1"/>
+        <exclude body1="Gripper_Link2_1" body2="finger_b_link_3_1"/>
+        <exclude body1="Gripper_Link2_1" body2="finger_a_link_1_1"/>
+        <exclude body1="Gripper_Link2_1" body2="finger_a_link_2_1"/>
+        <exclude body1="Gripper_Link2_1" body2="finger_a_link_3_1"/>
+
+        <exclude body1="Gripper_Link3_1" body2="finger_c_link_0_1"/>
+        <exclude body1="Gripper_Link3_1" body2="finger_c_link_1_1"/>
+        <exclude body1="Gripper_Link3_1" body2="finger_c_link_2_1"/>
+        <exclude body1="Gripper_Link3_1" body2="finger_c_link_3_1"/>
+        <exclude body1="Gripper_Link3_1" body2="finger_b_link_0_1"/>
+        <exclude body1="Gripper_Link3_1" body2="finger_b_link_1_1"/>
+        <exclude body1="Gripper_Link3_1" body2="finger_b_link_2_1"/>
+        <exclude body1="Gripper_Link3_1" body2="finger_b_link_3_1"/>
+        <exclude body1="Gripper_Link3_1" body2="finger_a_link_1_1"/>
+        <exclude body1="Gripper_Link3_1" body2="finger_a_link_2_1"/>
+        <exclude body1="Gripper_Link3_1" body2="finger_a_link_3_1"/>
+
+        <exclude body1="finger_c_link_0_1" body2="finger_c_link_1_1"/>
+        <exclude body1="finger_c_link_0_1" body2="finger_c_link_2_1"/>
+        <exclude body1="finger_c_link_0_1" body2="finger_c_link_3_1"/>
+        <exclude body1="finger_c_link_0_1" body2="finger_b_link_0_1"/>
+        <exclude body1="finger_c_link_0_1" body2="finger_b_link_1_1"/>
+        <exclude body1="finger_c_link_0_1" body2="finger_b_link_2_1"/>
+        <exclude body1="finger_c_link_0_1" body2="finger_b_link_3_1"/>
+        <exclude body1="finger_c_link_0_1" body2="finger_a_link_1_1"/>
+        <exclude body1="finger_c_link_0_1" body2="finger_a_link_2_1"/>
+        <exclude body1="finger_c_link_0_1" body2="finger_a_link_3_1"/>
+
+        <exclude body1="finger_c_link_1_1" body2="finger_c_link_2_1"/>
+        <exclude body1="finger_c_link_1_1" body2="finger_c_link_3_1"/>
+        <exclude body1="finger_c_link_1_1" body2="finger_b_link_0_1"/>
+        <exclude body1="finger_c_link_1_1" body2="finger_b_link_1_1"/>
+        <exclude body1="finger_c_link_1_1" body2="finger_b_link_2_1"/>
+        <exclude body1="finger_c_link_1_1" body2="finger_b_link_3_1"/>
+        <exclude body1="finger_c_link_1_1" body2="finger_a_link_1_1"/>
+        <exclude body1="finger_c_link_1_1" body2="finger_a_link_2_1"/>
+        <exclude body1="finger_c_link_1_1" body2="finger_a_link_3_1"/>
+
+        <exclude body1="finger_c_link_2_1" body2="finger_c_link_3_1"/>
+        <exclude body1="finger_c_link_2_1" body2="finger_b_link_0_1"/>
+        <exclude body1="finger_c_link_2_1" body2="finger_b_link_1_1"/>
+        <exclude body1="finger_c_link_2_1" body2="finger_b_link_2_1"/>
+        <exclude body1="finger_c_link_2_1" body2="finger_b_link_3_1"/>
+        <exclude body1="finger_c_link_2_1" body2="finger_a_link_1_1"/>
+        <exclude body1="finger_c_link_2_1" body2="finger_a_link_2_1"/>
+        <exclude body1="finger_c_link_2_1" body2="finger_a_link_3_1"/>
+
+        <exclude body1="finger_c_link_3_1" body2="finger_b_link_0_1"/>
+        <exclude body1="finger_c_link_3_1" body2="finger_b_link_1_1"/>
+        <exclude body1="finger_c_link_3_1" body2="finger_b_link_2_1"/>
+        <exclude body1="finger_c_link_3_1" body2="finger_b_link_3_1"/>
+        <exclude body1="finger_c_link_3_1" body2="finger_a_link_1_1"/>
+        <exclude body1="finger_c_link_3_1" body2="finger_a_link_2_1"/>
+        <exclude body1="finger_c_link_3_1" body2="finger_a_link_3_1"/>
+
+        <exclude body1="finger_b_link_0_1" body2="finger_b_link_1_1"/>
+        <exclude body1="finger_b_link_0_1" body2="finger_b_link_2_1"/>
+        <exclude body1="finger_b_link_0_1" body2="finger_b_link_3_1"/>
+        <exclude body1="finger_b_link_0_1" body2="finger_a_link_1_1"/>
+        <exclude body1="finger_b_link_0_1" body2="finger_a_link_2_1"/>
+        <exclude body1="finger_b_link_0_1" body2="finger_a_link_3_1"/>
+
+        <exclude body1="finger_b_link_1_1" body2="finger_b_link_2_1"/>
+        <exclude body1="finger_b_link_1_1" body2="finger_b_link_3_1"/>
+        <exclude body1="finger_b_link_1_1" body2="finger_a_link_1_1"/>
+        <exclude body1="finger_b_link_1_1" body2="finger_a_link_2_1"/>
+        <exclude body1="finger_b_link_1_1" body2="finger_a_link_3_1"/>
+
+        <exclude body1="finger_b_link_2_1" body2="finger_b_link_3_1"/>
+        <exclude body1="finger_b_link_2_1" body2="finger_a_link_1_1"/>
+        <exclude body1="finger_b_link_2_1" body2="finger_a_link_2_1"/>
+        <exclude body1="finger_b_link_2_1" body2="finger_a_link_3_1"/>
+
+        <exclude body1="finger_b_link_3_1" body2="finger_a_link_1_1"/>
+        <exclude body1="finger_b_link_3_1" body2="finger_a_link_2_1"/>
+        <exclude body1="finger_b_link_3_1" body2="finger_a_link_3_1"/>
+
+        <exclude body1="finger_a_link_1_1" body2="finger_a_link_2_1"/>
+        <exclude body1="finger_a_link_1_1" body2="finger_a_link_3_1"/>
+
+        <exclude body1="finger_a_link_2_1" body2="finger_a_link_3_1"/>
+
+        <!-- Gripper to arm exclusions for Arm1 -->
+        <exclude body1="Gripper_Link3_1" body2="Arm_Left_1"/>
+        <exclude body1="Gripper_Link2_1" body2="Arm_Left_1"/>
+        <exclude body1="Gripper_Link1_1" body2="Arm_Left_1"/>
+        <exclude body1="Gripper_Link3_1" body2="Arm_Right_1"/>
+        <exclude body1="Gripper_Link2_1" body2="Arm_Right_1"/>
+        <exclude body1="Gripper_Link1_1" body2="Arm_Right_1"/> 
+
+        <exclude body1="Bearing_Column_Right_1" body2="Rotation_Link_Right_1"/>
+        <exclude body1="Bearing_Column_Right_1" body2="Contact_Cylinder_1_2"/>
+        <exclude body1="Rotation_Link_Right_1" body2="Contact_Cylinder_1_2"/>
+
+        <exclude body1="Bearing_Column_Right_1" body2="Contact_Cylinder_1_1"/>
+        <exclude body1="Bearing_Column_Right_1" body2="Contact_Cylinder_1_1"/>
+        <exclude body1="Rotation_Link_Right_1" body2="Contact_Cylinder_1_1"/>
+        <exclude body1="Contact_Cylinder_1_2" body2="Contact_Cylinder_1_1"/>
+
+        <!-- Hand bearing & contact cylinder exclusions for Arm2 -->
+        <exclude body1="Hand_Bearing_1" body2="Contact_Cylinder_2_1"/>
+        <exclude body1="Hand_Bearing_1" body2="base"/>
+        <exclude body1="Contact_Cylinder_2_1" body2="Arm_Left_1"/>
+        <exclude body1="Contact_Cylinder_2_1" body2="Arm_Right_1"/>
+        <exclude body1="Hand_Bearing_1" body2="Arm_Left_1"/>
+        <exclude body1="Hand_Bearing_1" body2="Arm_Right_1"/>
+        <exclude body1="Bearing_Column_Right_2" body2="Arm_Right_1"/>
+        <exclude body1="Hand_Bearing_1" body2="Gripper_Link1_1"/>
+        <exclude body1="Hand_Bearing_1" body2="Gripper_Link2_1"/>
+        <exclude body1="Hand_Bearing_1" body2="Gripper_Link3_1"/>
+        <exclude body1="Contact_Cylinder_2_1" body2="Gripper_Link1_1"/>
+
+        <!-- Finger A exclusions for Arm2 -->
+        <exclude body1="Bearing_Column_Left_2" body2="Rotation_Link_Left_2"/>
+        <exclude body1="Bearing_Column_Left_2" body2="Arm_Left_2"/>
+        <exclude body1="Bearing_Column_Left_2" body2="Arm_Right_2"/>
+        <exclude body1="Bearing_Column_Left_2" body2="Contact_Cylinder_1_2"/>
+        <exclude body1="Bearing_Column_Left_2" body2="Hand_Bearing_2"/>
+        <exclude body1="Bearing_Column_Left_2" body2="Gripper_Link1_2"/>
+        <exclude body1="Bearing_Column_Left_2" body2="Gripper_Link2_2"/>
+        <exclude body1="Bearing_Column_Left_2" body2="Gripper_Link3_2"/>
+        <exclude body1="Bearing_Column_Left_2" body2="finger_c_link_0_2"/>
+        <exclude body1="Bearing_Column_Left_2" body2="finger_c_link_1_2"/>
+        <exclude body1="Bearing_Column_Left_2" body2="finger_c_link_2_2"/>
+        <exclude body1="Bearing_Column_Left_2" body2="finger_c_link_3_2"/>
+        <exclude body1="Bearing_Column_Left_2" body2="finger_b_link_0_2"/>
+        <exclude body1="Bearing_Column_Left_2" body2="finger_b_link_1_2"/>
+        <exclude body1="Bearing_Column_Left_2" body2="finger_b_link_2_2"/>
+        <exclude body1="Bearing_Column_Left_2" body2="finger_b_link_3_2"/>
+        <exclude body1="Bearing_Column_Left_2" body2="finger_a_link_1_2"/>
+        <exclude body1="Bearing_Column_Left_2" body2="finger_a_link_2_2"/>
+        <exclude body1="Bearing_Column_Left_2" body2="finger_a_link_3_2"/>
+
+        <exclude body1="Rotation_Link_Left_2" body2="Arm_Left_2"/>
+        <exclude body1="Rotation_Link_Left_2" body2="Arm_Right_2"/>
+        <exclude body1="Rotation_Link_Left_2" body2="Contact_Cylinder_1_2"/>
+        <exclude body1="Rotation_Link_Left_2" body2="Hand_Bearing_2"/>
+        <exclude body1="Rotation_Link_Left_2" body2="Gripper_Link1_2"/>
+        <exclude body1="Rotation_Link_Left_2" body2="Gripper_Link2_2"/>
+        <exclude body1="Rotation_Link_Left_2" body2="Gripper_Link3_2"/>
+        <exclude body1="Rotation_Link_Left_2" body2="finger_c_link_0_2"/>
+        <exclude body1="Rotation_Link_Left_2" body2="finger_c_link_1_2"/>
+        <exclude body1="Rotation_Link_Left_2" body2="finger_c_link_2_2"/>
+        <exclude body1="Rotation_Link_Left_2" body2="finger_c_link_3_2"/>
+        <exclude body1="Rotation_Link_Left_2" body2="finger_b_link_0_2"/>
+        <exclude body1="Rotation_Link_Left_2" body2="finger_b_link_1_2"/>
+        <exclude body1="Rotation_Link_Left_2" body2="finger_b_link_2_2"/>
+        <exclude body1="Rotation_Link_Left_2" body2="finger_b_link_3_2"/>
+        <exclude body1="Rotation_Link_Left_2" body2="finger_a_link_1_2"/>
+        <exclude body1="Rotation_Link_Left_2" body2="finger_a_link_2_2"/>
+        <exclude body1="Rotation_Link_Left_2" body2="finger_a_link_3_2"/>
+
+        <exclude body1="Arm_Left_2" body2="Arm_Right_2"/>
+        <exclude body1="Arm_Left_2" body2="Contact_Cylinder_1_2"/>
+        <exclude body1="Arm_Left_2" body2="Hand_Bearing_2"/>
+        <exclude body1="Arm_Left_2" body2="Gripper_Link1_2"/>
+        <exclude body1="Arm_Left_2" body2="Gripper_Link2_2"/>
+        <exclude body1="Arm_Left_2" body2="Gripper_Link3_2"/>
+        <exclude body1="Arm_Left_2" body2="finger_c_link_0_2"/>
+        <exclude body1="Arm_Left_2" body2="finger_c_link_1_2"/>
+        <exclude body1="Arm_Left_2" body2="finger_c_link_2_2"/>
+        <exclude body1="Arm_Left_2" body2="finger_c_link_3_2"/>
+        <exclude body1="Arm_Left_2" body2="finger_b_link_0_2"/>
+        <exclude body1="Arm_Left_2" body2="finger_b_link_1_2"/>
+        <exclude body1="Arm_Left_2" body2="finger_b_link_2_2"/>
+        <exclude body1="Arm_Left_2" body2="finger_b_link_3_2"/>
+        <exclude body1="Arm_Left_2" body2="finger_a_link_1_2"/>
+        <exclude body1="Arm_Left_2" body2="finger_a_link_2_2"/>
+        <exclude body1="Arm_Left_2" body2="finger_a_link_3_2"/>
+
+        <exclude body1="Arm_Right_2" body2="Contact_Cylinder_1_2"/>
+        <exclude body1="Arm_Right_2" body2="Hand_Bearing_2"/>
+        <exclude body1="Arm_Right_2" body2="Gripper_Link1_2"/>
+        <exclude body1="Arm_Right_2" body2="Gripper_Link2_2"/>
+        <exclude body1="Arm_Right_2" body2="Gripper_Link3_2"/>
+        <exclude body1="Arm_Right_2" body2="finger_c_link_0_2"/>
+        <exclude body1="Arm_Right_2" body2="finger_c_link_1_2"/>
+        <exclude body1="Arm_Right_2" body2="finger_c_link_2_2"/>
+        <exclude body1="Arm_Right_2" body2="finger_c_link_3_2"/>
+        <exclude body1="Arm_Right_2" body2="finger_b_link_0_2"/>
+        <exclude body1="Arm_Right_2" body2="finger_b_link_1_2"/>
+        <exclude body1="Arm_Right_2" body2="finger_b_link_2_2"/>
+        <exclude body1="Arm_Right_2" body2="finger_b_link_3_2"/>
+        <exclude body1="Arm_Right_2" body2="finger_a_link_1_2"/>
+        <exclude body1="Arm_Right_2" body2="finger_a_link_2_2"/>
+        <exclude body1="Arm_Right_2" body2="finger_a_link_3_2"/>
+
+        <exclude body1="Contact_Cylinder_1_2" body2="Hand_Bearing_2"/>
+        <exclude body1="Contact_Cylinder_1_2" body2="Gripper_Link1_2"/>
+        <exclude body1="Contact_Cylinder_1_2" body2="Gripper_Link2_2"/>
+        <exclude body1="Contact_Cylinder_1_2" body2="Gripper_Link3_2"/>
+        <exclude body1="Contact_Cylinder_1_2" body2="finger_c_link_0_2"/>
+        <exclude body1="Contact_Cylinder_1_2" body2="finger_c_link_1_2"/>
+        <exclude body1="Contact_Cylinder_1_2" body2="finger_c_link_2_2"/>
+        <exclude body1="Contact_Cylinder_1_2" body2="finger_c_link_3_2"/>
+        <exclude body1="Contact_Cylinder_1_2" body2="finger_b_link_0_2"/>
+        <exclude body1="Contact_Cylinder_1_2" body2="finger_b_link_1_2"/>
+        <exclude body1="Contact_Cylinder_1_2" body2="finger_b_link_2_2"/>
+        <exclude body1="Contact_Cylinder_1_2" body2="finger_b_link_3_2"/>
+        <exclude body1="Contact_Cylinder_1_2" body2="finger_a_link_1_2"/>
+        <exclude body1="Contact_Cylinder_1_2" body2="finger_a_link_2_2"/>
+        <exclude body1="Contact_Cylinder_1_2" body2="finger_a_link_3_2"/>
+
+        <exclude body1="Hand_Bearing_2" body2="Gripper_Link1_2"/>
+        <exclude body1="Hand_Bearing_2" body2="Gripper_Link2_2"/>
+        <exclude body1="Hand_Bearing_2" body2="Gripper_Link3_2"/>
+        <exclude body1="Hand_Bearing_2" body2="finger_c_link_0_2"/>
+        <exclude body1="Hand_Bearing_2" body2="finger_c_link_1_2"/>
+        <exclude body1="Hand_Bearing_2" body2="finger_c_link_2_2"/>
+        <exclude body1="Hand_Bearing_2" body2="finger_c_link_3_2"/>
+        <exclude body1="Hand_Bearing_2" body2="finger_b_link_0_2"/>
+        <exclude body1="Hand_Bearing_2" body2="finger_b_link_1_2"/>
+        <exclude body1="Hand_Bearing_2" body2="finger_b_link_2_2"/>
+        <exclude body1="Hand_Bearing_2" body2="finger_b_link_3_2"/>
+        <exclude body1="Hand_Bearing_2" body2="finger_a_link_1_2"/>
+        <exclude body1="Hand_Bearing_2" body2="finger_a_link_2_2"/>
+        <exclude body1="Hand_Bearing_2" body2="finger_a_link_3_2"/>
+
+        <exclude body1="Gripper_Link1_2" body2="Gripper_Link2_2"/>
+        <exclude body1="Gripper_Link1_2" body2="Gripper_Link3_2"/>
+        <exclude body1="Gripper_Link1_2" body2="finger_c_link_0_2"/>
+        <exclude body1="Gripper_Link1_2" body2="finger_c_link_1_2"/>
+        <exclude body1="Gripper_Link1_2" body2="finger_c_link_2_2"/>
+        <exclude body1="Gripper_Link1_2" body2="finger_c_link_3_2"/>
+        <exclude body1="Gripper_Link1_2" body2="finger_b_link_0_2"/>
+        <exclude body1="Gripper_Link1_2" body2="finger_b_link_1_2"/>
+        <exclude body1="Gripper_Link1_2" body2="finger_b_link_2_2"/>
+        <exclude body1="Gripper_Link1_2" body2="finger_b_link_3_2"/>
+        <exclude body1="Gripper_Link1_2" body2="finger_a_link_1_2"/>
+        <exclude body1="Gripper_Link1_2" body2="finger_a_link_2_2"/>
+        <exclude body1="Gripper_Link1_2" body2="finger_a_link_3_2"/>
+
+        <exclude body1="Gripper_Link2_2" body2="Gripper_Link3_2"/>
+        <exclude body1="Gripper_Link2_2" body2="finger_c_link_0_2"/>
+        <exclude body1="Gripper_Link2_2" body2="finger_c_link_1_2"/>
+        <exclude body1="Gripper_Link2_2" body2="finger_c_link_2_2"/>
+        <exclude body1="Gripper_Link2_2" body2="finger_c_link_3_2"/>
+        <exclude body1="Gripper_Link2_2" body2="finger_b_link_0_2"/>
+        <exclude body1="Gripper_Link2_2" body2="finger_b_link_1_2"/>
+        <exclude body1="Gripper_Link2_2" body2="finger_b_link_2_2"/>
+        <exclude body1="Gripper_Link2_2" body2="finger_b_link_3_2"/>
+        <exclude body1="Gripper_Link2_2" body2="finger_a_link_1_2"/>
+        <exclude body1="Gripper_Link2_2" body2="finger_a_link_2_2"/>
+        <exclude body1="Gripper_Link2_2" body2="finger_a_link_3_2"/>
+
+        <exclude body1="Gripper_Link3_2" body2="finger_c_link_0_2"/>
+        <exclude body1="Gripper_Link3_2" body2="finger_c_link_1_2"/>
+        <exclude body1="Gripper_Link3_2" body2="finger_c_link_2_2"/>
+        <exclude body1="Gripper_Link3_2" body2="finger_c_link_3_2"/>
+        <exclude body1="Gripper_Link3_2" body2="finger_b_link_0_2"/>
+        <exclude body1="Gripper_Link3_2" body2="finger_b_link_1_2"/>
+        <exclude body1="Gripper_Link3_2" body2="finger_b_link_2_2"/>
+        <exclude body1="Gripper_Link3_2" body2="finger_b_link_3_2"/>
+        <exclude body1="Gripper_Link3_2" body2="finger_a_link_1_2"/>
+        <exclude body1="Gripper_Link3_2" body2="finger_a_link_2_2"/>
+        <exclude body1="Gripper_Link3_2" body2="finger_a_link_3_2"/>
+
+        <exclude body1="finger_c_link_0_2" body2="finger_c_link_1_2"/>
+        <exclude body1="finger_c_link_0_2" body2="finger_c_link_2_2"/>
+        <exclude body1="finger_c_link_0_2" body2="finger_c_link_3_2"/>
+        <exclude body1="finger_c_link_0_2" body2="finger_b_link_0_2"/>
+        <exclude body1="finger_c_link_0_2" body2="finger_b_link_1_2"/>
+        <exclude body1="finger_c_link_0_2" body2="finger_b_link_2_2"/>
+        <exclude body1="finger_c_link_0_2" body2="finger_b_link_3_2"/>
+        <exclude body1="finger_c_link_0_2" body2="finger_a_link_1_2"/>
+        <exclude body1="finger_c_link_0_2" body2="finger_a_link_2_2"/>
+        <exclude body1="finger_c_link_0_2" body2="finger_a_link_3_2"/>
+
+        <exclude body1="finger_c_link_1_2" body2="finger_c_link_2_2"/>
+        <exclude body1="finger_c_link_1_2" body2="finger_c_link_3_2"/>
+        <exclude body1="finger_c_link_1_2" body2="finger_b_link_0_2"/>
+        <exclude body1="finger_c_link_1_2" body2="finger_b_link_1_2"/>
+        <exclude body1="finger_c_link_1_2" body2="finger_b_link_2_2"/>
+        <exclude body1="finger_c_link_1_2" body2="finger_b_link_3_2"/>
+        <exclude body1="finger_c_link_1_2" body2="finger_a_link_1_2"/>
+        <exclude body1="finger_c_link_1_2" body2="finger_a_link_2_2"/>
+        <exclude body1="finger_c_link_1_2" body2="finger_a_link_3_2"/>
+
+        <exclude body1="finger_c_link_2_2" body2="finger_c_link_3_2"/>
+        <exclude body1="finger_c_link_2_2" body2="finger_b_link_0_2"/>
+        <exclude body1="finger_c_link_2_2" body2="finger_b_link_1_2"/>
+        <exclude body1="finger_c_link_2_2" body2="finger_b_link_2_2"/>
+        <exclude body1="finger_c_link_2_2" body2="finger_b_link_3_2"/>
+        <exclude body1="finger_c_link_2_2" body2="finger_a_link_1_2"/>
+        <exclude body1="finger_c_link_2_2" body2="finger_a_link_2_2"/>
+        <exclude body1="finger_c_link_2_2" body2="finger_a_link_3_2"/>
+
+        <exclude body1="finger_c_link_3_2" body2="finger_b_link_0_2"/>
+        <exclude body1="finger_c_link_3_2" body2="finger_b_link_1_2"/>
+        <exclude body1="finger_c_link_3_2" body2="finger_b_link_2_2"/>
+        <exclude body1="finger_c_link_3_2" body2="finger_b_link_3_2"/>
+        <exclude body1="finger_c_link_3_2" body2="finger_a_link_1_2"/>
+        <exclude body1="finger_c_link_3_2" body2="finger_a_link_2_2"/>
+        <exclude body1="finger_c_link_3_2" body2="finger_a_link_3_2"/>
+
+        <exclude body1="finger_b_link_0_2" body2="finger_b_link_1_2"/>
+        <exclude body1="finger_b_link_0_2" body2="finger_b_link_2_2"/>
+        <exclude body1="finger_b_link_0_2" body2="finger_b_link_3_2"/>
+        <exclude body1="finger_b_link_0_2" body2="finger_a_link_1_2"/>
+        <exclude body1="finger_b_link_0_2" body2="finger_a_link_2_2"/>
+        <exclude body1="finger_b_link_0_2" body2="finger_a_link_3_2"/>
+
+        <exclude body1="finger_b_link_1_2" body2="finger_b_link_2_2"/>
+        <exclude body1="finger_b_link_1_2" body2="finger_b_link_3_2"/>
+        <exclude body1="finger_b_link_1_2" body2="finger_a_link_1_2"/>
+        <exclude body1="finger_b_link_1_2" body2="finger_a_link_2_2"/>
+        <exclude body1="finger_b_link_1_2" body2="finger_a_link_3_2"/>
+
+        <exclude body1="finger_b_link_2_2" body2="finger_b_link_3_2"/>
+        <exclude body1="finger_b_link_2_2" body2="finger_a_link_1_2"/>
+        <exclude body1="finger_b_link_2_2" body2="finger_a_link_2_2"/>
+        <exclude body1="finger_b_link_2_2" body2="finger_a_link_3_2"/>
+
+        <exclude body1="finger_b_link_3_2" body2="finger_a_link_1_2"/>
+        <exclude body1="finger_b_link_3_2" body2="finger_a_link_2_2"/>
+        <exclude body1="finger_b_link_3_2" body2="finger_a_link_3_2"/>
+
+        <exclude body1="finger_a_link_1_2" body2="finger_a_link_2_2"/>
+        <exclude body1="finger_a_link_1_2" body2="finger_a_link_3_2"/>
+
+        <exclude body1="finger_a_link_2_2" body2="finger_a_link_3_2"/>
+
+        <!-- Hand bearing & contact cylinder exclusions for Arm2 -->
+        <exclude body1="Hand_Bearing_2" body2="Contact_Cylinder_2_2"/>
+        <exclude body1="Contact_Cylinder_2_2" body2="Arm_Left_2"/>
+        <exclude body1="Contact_Cylinder_2_2" body2="Arm_Right_2"/>
+        <exclude body1="Hand_Bearing_2" body2="Arm_Left_2"/>
+        <exclude body1="Hand_Bearing_2" body2="Arm_Right_2"/>
+        <exclude body1="Bearing_Column_Right_2" body2="Arm_Right_2"/>
+        <exclude body1="Hand_Bearing_2" body2="Gripper_Link1_2"/>
+        <exclude body1="Hand_Bearing_2" body2="Gripper_Link2_2"/>
+        <exclude body1="Hand_Bearing_2" body2="Gripper_Link3_2"/>
+        <exclude body1="Contact_Cylinder_2_2" body2="Gripper_Link1_2"/>
+
+        <exclude body1="Bearing_Column_Right_2" body2="Rotation_Link_Right_2"/>
+        <exclude body1="Bearing_Column_Right_2" body2="Contact_Cylinder_2_2"/>
+        <exclude body1="Rotation_Link_Right_2" body2="Contact_Cylinder_2_2"/>
+
+        <exclude body1="Bearing_Column_Right_2" body2="Contact_Cylinder_2_1"/>
+        <exclude body1="Bearing_Column_Right_2" body2="Contact_Cylinder_2_1"/>
+        <exclude body1="Rotation_Link_Right_2" body2="Contact_Cylinder_2_1"/>
+        <exclude body1="Contact_Cylinder_2_2" body2="Contact_Cylinder_2_1"/>
+    </contact>
+
+    <equality>
+        <connect name="weld_contact_arm_sites_1" site1="cyl_weld_site_1_1" site2="arm_weld_site_1" solimp="0.95 0.9 0.9 0.5 100" solref="0.00000001 1"/>
+        <connect name="weld_contact_arm_sites_2" site1="cyl_weld_site_1_2" site2="arm_weld_site_2" solimp="0.95 0.9 0.9 0.5 100" solref="0.00000001 1"/>
+    </equality>
+
+    <keyframe>
+        <key
+            name="home" 
+            qpos="  3.700000 -5.999928 0.079946 1.000000 0.000398 -0.000000 0.000000 6.004310 -1.999992 
+                    -0.003416 0.000785 0.000101 -0.000001 -1.000000 -0.004749 0.000000 -0.000000 -0.000000 
+                    -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 0.004407 0.005755 0.000000 0.000000 
+                    -0.004761 -0.000000 -0.000000 -0.000000 -0.000000 0.000000 0.000000 0.000000 0.000000 
+                    -0.000000 0.011144 -0.003036 -0.000000 0.005260 -0.000000 -0.000000 0.000000 0.000000 
+                    0.000000 0.000000 0.000000 0.000000 0.000000 0.003243 -0.000719 -0.000000 0.005268 0.000000 
+                    0.000000 0.000000 0.000000 -0.000000 -0.000000 -0.000000 0.000000 0.004240 -0.000006 
+                    0.000000 0.000000 0.000003 0.301637 0.000444 0.199967 -0.199507 0.001890 0.005077 
+                    -0.000001 0.002825 -0.000000 0.000000 0.044532 0.000527 -0.043003 0.000000 0.044532 
+                    0.000527 -0.043003 0.040673 -0.000438 -0.043145 0.301904 0.002334 0.000003 0.301637 
+                    0.000444 0.199967 -0.199507 0.001890 0.005077 -0.000001 0.002824 -0.000000 0.000000 0.044532 
+                    0.000527 -0.043003 0.000000 0.044532 0.000527 -0.043003 0.040673 -0.000438 -0.043145 0.301904 
+                    0.002334" 
+            qvel="  -0.000000 0.000000 0.000000 -0.000000 -0.000000 0.000000 0.000000 0.000000 -0.000000 
+                    0.000000 -0.000000 -0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 
+                    0.000000 0.000000 -0.000000 -0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 
+                    0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 -0.000001 -0.000001 0.000000 -0.000000 
+                    0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 
+                    0.000000 0.000000 -0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 
+                    0.000000 0.000000 0.000000 0.000000 0.000000 -0.000001 0.000000 -0.000000 -0.000000 0.000000 
+                    0.001465 0.000000 -0.000000 0.000073 0.000000 -0.000000 0.000355 0.000000 -0.000704 -0.000000 
+                    0.000355 0.000000 -0.000704 0.000345 -0.000067 -0.000705 -0.000000 0.001465 -0.000001 0.000000 
+                    -0.000000 -0.000000 0.000000 0.001465 0.000000 -0.000000 0.000073 0.000000 -0.000000 0.000355 
+                    0.000000 -0.000704 -0.000000 0.000355 0.000000 -0.000704 0.000344 -0.000067 -0.000705 -0.000000 0.001465" 
+            ctrl="  0.000000 0.000000 0.000000 0.000000 -0.000046 -0.000046 30.000000 30.000000 20.000000 30.000000 30.000000 
+                    20.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 
+                    0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 
+                    0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000"
+        />
+        <key
+            name="home_0"
+            qpos="  3.650000 -5.999928 0.079946 0 0 0 1 3 -6.2 -0.003427 1.000000 0.000002 0.000089 0.000007 -0.000156 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 0.000010 -0.000224 -0.000000 -0.000000 -0.000157 -0.000000 -0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 -0.000020 -0.000171 -0.000000 -0.000151 -0.000000 -0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 -0.000021 -0.000021 -0.000000 -0.000150 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000009 0.000013 0.000000 0.000000 0.000003 0.334117 0.145099 0.197591 -0.198230 -0.142797 0.005042 -0.000001 0.002794 0.000000 0.000000 0.006698 0.000300 -0.046583 0.000000 0.006699 0.000300 -0.046583 0.004552 -0.000155 -0.046658 0.348960 0.002302 0.000003 0.334117 0.145099 0.197591 -0.198230 -0.142797 0.005042 -0.000001 0.002794 0.000000 0.000000 0.006698 0.000300 -0.046583 0.000000 0.006699 0.000300 -0.046583 0.004552 -0.000155 -0.046658 0.348960 0.002302"
+            qvel="  -0.024443 0.001175 0.000598 -0.027386 -0.008435 0.514997 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 0.000000 0.000000 -0.000000 -0.000000 -0.000002 0.000000 0.000000 0.000000 -0.000000 0.001448 0.000000 -0.000000 0.000097 0.000000 0.000000 0.000216 0.000009 -0.001083 0.000000 0.000216 0.000009 -0.001083 0.000177 -0.000065 -0.001085 0.000000 0.001448 -0.000002 0.000000 0.000000 0.000000 -0.000000 0.001448 0.000000 -0.000000 0.000098 0.000000 0.000000 0.000216 0.000009 -0.001083 0.000000 0.000216 0.000009 -0.001083 0.000177 -0.000065 -0.001085 0.000000 0.001448"
+            ctrl="  0.000000 0.000000 0.000000 0.000000 -0.000037 -0.000037 33.187006 34.690276 19.732984 33.187006 34.690276 19.732984 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000"
+        />
+    </keyframe>
+
+</mujoco>

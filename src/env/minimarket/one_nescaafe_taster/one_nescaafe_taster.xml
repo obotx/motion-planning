@@ -1,0 +1,9 @@
+<mujocoinclude model="one_nescaafe_taster">
+    <body name="one_nescaafe_taster" euler="1.57 0 0">
+      <geom material="material_0.007" mesh="one_nescaafe_taster" class="visual"/>
+      <geom type="box" pos="0 0 0" euler="1.57 0 0" size="0.05 0.03 0.10" rgba="1 0 0 0."/>
+      <geom type="box" pos="0 0.0 0" euler="1.57 0 0" size="0.04 0.045 0.09" rgba="1 0 0 0."/>
+      <!-- <geom type="box" pos="0 0.09 0" euler="1.57 0 0" size="0.05 0.045 0.02" rgba="1 0 0 0.5"/> -->
+      <!-- <geom type="mesh" mass="0" mesh="one_nescaafe_taster" rgba="1 0 0 0."/> -->
+    </body>
+</mujocoinclude>

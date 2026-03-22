@@ -1,0 +1,6 @@
+<mujocoinclude model="nescafe_caffeine">
+    <body name="nescafe_caffeine" euler="1.57 0 0">
+      <geom material="material_0.011" mesh="nescafe_caffeine" class="visual"/>
+      <!-- <geom mesh="nescafe_caffeine" class="collision"/> -->
+    </body>
+</mujocoinclude>

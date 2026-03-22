@@ -1,0 +1,48 @@
+<mujoco model="RightHorizontalSlider">
+  <default>
+    <default class="visual">
+      <geom group="2" type="mesh" contype="0" conaffinity="0"/>
+    </default>
+    <default class="collision">
+      <geom group="3" type="mesh"/>
+    </default>
+  </default>
+  <asset>
+    <material name="0.000000_1.000000_0.000000_0.000000_0.002" specular="0.0" shininess="0.0" rgba="0.000000 1.000000 0.000000 1.000000"/>
+    <material name="0.250980_0.250980_0.250980_0.000000_0.002" specular="0.0" shininess="0.0" rgba="0.251000 0.251000 0.251000 1.000000"/>
+    <material name="0.301961_0.301961_0.301961_0.000000_0.041" specular="0.0" shininess="0.0" rgba="0.302000 0.302000 0.302000 1.000000"/>
+    <material name="0.666667_0.666667_0.666667_0.000000_0.002" specular="0.0" shininess="0.0" rgba="0.666700 0.666700 0.666700 1.000000"/>
+    <material name="0.666667_0.698039_0.768627_0.000000_0.002" specular="0.0" shininess="0.0" rgba="0.666700 0.698000 0.768600 1.000000"/>
+    <material name="0.780392_0.760784_0.741176_0.000000_0.002" specular="0.0" shininess="0.0" rgba="0.780400 0.760800 0.741200 1.000000"/>
+    <material name="0.792157_0.819608_0.933333_0.000000_0.002" specular="0.0" shininess="0.0" rgba="0.792200 0.819600 0.933300 1.000000"/>
+    <material name="0.898039_0.898039_0.898039_0.000000_0.002" specular="0.0" shininess="0.0" rgba="0.898000 0.898000 0.898000 1.000000"/>
+    <mesh file="RightHorizontalSlider_0.obj"/>
+    <mesh file="RightHorizontalSlider_1.obj"/>
+    <mesh file="RightHorizontalSlider_2.obj"/>
+    <mesh file="RightHorizontalSlider_3.obj"/>
+    <mesh file="RightHorizontalSlider_4.obj"/>
+    <mesh file="RightHorizontalSlider_5.obj"/>
+    <mesh file="RightHorizontalSlider_6.obj"/>
+    <mesh file="RightHorizontalSlider_7.obj"/>
+  </asset>
+  <worldbody>
+    <body name="RightHorizontalSlider">
+      <geom mesh="RightHorizontalSlider_0" material="0.666667_0.666667_0.666667_0.000000_0.002" class="visual"/>
+      <geom mesh="RightHorizontalSlider_1" material="0.780392_0.760784_0.741176_0.000000_0.002" class="visual"/>
+      <geom mesh="RightHorizontalSlider_2" material="0.898039_0.898039_0.898039_0.000000_0.002" class="visual"/>
+      <geom mesh="RightHorizontalSlider_3" material="0.666667_0.698039_0.768627_0.000000_0.002" class="visual"/>
+      <geom mesh="RightHorizontalSlider_4" material="0.792157_0.819608_0.933333_0.000000_0.002" class="visual"/>
+      <geom mesh="RightHorizontalSlider_5" material="0.250980_0.250980_0.250980_0.000000_0.002" class="visual"/>
+      <geom mesh="RightHorizontalSlider_6" material="0.000000_1.000000_0.000000_0.000000_0.002" class="visual"/>
+      <geom mesh="RightHorizontalSlider_7" material="0.301961_0.301961_0.301961_0.000000_0.041" class="visual"/>
+      <geom mesh="RightHorizontalSlider_0" class="collision"/>
+      <geom mesh="RightHorizontalSlider_1" class="collision"/>
+      <geom mesh="RightHorizontalSlider_2" class="collision"/>
+      <geom mesh="RightHorizontalSlider_3" class="collision"/>
+      <geom mesh="RightHorizontalSlider_4" class="collision"/>
+      <geom mesh="RightHorizontalSlider_5" class="collision"/>
+      <geom mesh="RightHorizontalSlider_6" class="collision"/>
+      <geom mesh="RightHorizontalSlider_7" class="collision"/>
+    </body>
+  </worldbody>
+</mujoco>

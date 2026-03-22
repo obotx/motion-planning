@@ -1,0 +1,93 @@
+<mujocoinclude>
+<body name="Gripper_Link1" pos="0.05 0.05 0" quat="0.707107 0 0.707107 0">
+    <site name="attachment_site" size="0.01" rgba="1 0 0 1" group="1"/>
+    <inertial pos="0 0 0" quat="0.5 0.5 -0.5 0.5" mass="0.05" diaginertia="2.25e-05 1.5e-05 1.5e-05"/>
+    <joint name="gripper_z_rotation" pos="0 0 0" axis="0 0 1" range="-3.14159 3.14159"  stiffness="200" damping="30"/>
+    <geom size="0.03 0.015" type="cylinder" rgba="0.35 0.35 0.35 1"/>
+    <body name="Gripper_Link2" pos="0 0 0.015">
+        <inertial pos="0 0 0" mass="0.05" diaginertia="5.33333e-05 5.33333e-05 5.33333e-05"/>
+        <joint name="gripper_y_rotation" pos="0 0 0" axis="0 1 0" range="-1.5708 1.5708"  stiffness="200" damping="30"/>
+        <geom size="0.04" rgba="0.95 0.35 0.35 1"/>
+        <body name="Gripper_Link3">
+            <joint name="gripper_x_rotation" pos="0 0 0" axis="1 0 0" range="-1.5708 1.5708"  stiffness="200" damping="30"/>
+            <geom pos="0 0 0.04" quat="0.707107 0.707107 0 0" type="mesh" rgba="0.4 0.2 0.2 1" mesh="palm"/>
+            <geom pos="0.0455159 0 0.0814" quat="0.500199 0.500199 -0.499801 0.499801" type="mesh" mesh="link_0" friction="5 5 5" solimp="0.9 0.95 0.001 0.5 2" solref="0.001 1" solmix="3" priority="1" condim="6"/>
+            <body name="finger_c_link_0" pos="-0.0455 -0.036 0.0614" quat="-0.499803 0.499799 0.500197 0.500201">
+                <joint name="palm_finger_c_joint" pos="0 0 0" axis="0 1 0" range="-0.1784 0.192" stiffness="1000" damping="5"/>
+                <geom pos="0.02 0 0" quat="1 0 0 0" type="mesh" mesh="link_0" friction="5 5 5" solimp="0.9 0.95 0.001 0.5 2" solref="0.001 1" solmix="3" priority="1" condim="6" />
+                <body name="finger_c_link_1" pos="0.02 0 0">
+                    <inertial pos="0 0 0" euler="0 0 0" mass="0.1" diaginertia="0.000015 0.000015 0.000015"/>
+                    <joint name="finger_c_joint_1" pos="0 0 0" axis="0 0 1" range="0.0495 1.2218" stiffness="1000" damping="5"/>
+                    <geom pos="0.05 -0.028 0" quat="0.96639 0 0 -0.257081" type="mesh" mesh="link_1" friction="5 5 5" solimp="0.9 0.95 0.001 0.5 2" solref="0.001 1" solmix="3" priority="1" condim="6"/>
+                    <geom class="pad_box1" size="0.031 0.003 0.015" pos="0.035 -0.01  0" euler=" 0 -0 -0.55" rgba=" 0 0 0 0"/>
+                    <geom class="pad_box2" size="0.031 0.003 0.015" pos="0.035 -0.012 0" euler=" 0 -0 -0.55" rgba=" 0 0 0 0"/>
+                    <body name="finger_c_link_2" pos="0.05 -0.028 0" quat="0.96639 0 0 -0.257081">
+                        <inertial pos="0 0 0" euler="0 0 0" mass="0.1" diaginertia="0.000015 0.000015 0.000015"/>
+                        <joint name="finger_c_joint_2" pos="0 0 0" axis="0 0 1" range="0 1.5708" stiffness="1000" damping="5"/>
+                        <geom pos="0.039 0 0.0075" quat="1 0 0 0" type="mesh" mesh="link_2" friction="5 5 5" solimp="0.9 0.95 0.001 0.5 2" solref="0.001 1" solmix="3" priority="1" condim="6"/>
+                        <geom class="pad_box1" size="0.022 0.003 0.015" pos="0.025 0.007  0" euler=" 0 -0 0" rgba=" 0 0 0 0"/>
+                        <geom class="pad_box2" size="0.022 0.003 0.015" pos="0.025 0.0072 0" euler=" 0 -0 0" rgba=" 0 0 0 0"/>
+                        <body name="finger_c_link_3" pos="0.039 0 0">
+                            <inertial pos="0 0 0" quat="0.614353 0.390886 -0.585309 0.35664" mass="0.05" diaginertia="0.00163315 0.00136097 0.000726883"/>
+                            <joint name="finger_c_joint_3" pos="0 0 0" axis="0 0 1" range="-1.2217 -0.0523" stiffness="1000" damping="5"/>
+                            <geom quat="0.96639 0 0 0.257081" type="mesh" mesh="link_3" friction="5 5 5" solimp="0.9 0.95 0.001 0.5 2" solref="0.001 1" solmix="3" priority="1" condim="6"/>
+                            <geom class="pad_box1" size="0.02 0.003 0.015" pos="0.01 0.015  0"  euler=" 0 -0 0.5" rgba=" 0 0 0 0"/>
+                            <geom class="pad_box2" size="0.02 0.003 0.015" pos="0.01 0.0152 0" euler=" 0 -0 0.5" rgba=" 0 0 0 0"/>
+                            <geom class="pad_box2" size="0.02 0.003 0.015" pos="0.01 0.0155 0" euler=" 0 -0 0.5" rgba=" 0 0 0 0"/>
+                        </body>
+                    </body>
+                </body>
+            </body>
+            <body name="finger_b_link_0" pos="-0.0455 0.036 0.0614" quat="-0.499803 0.499799 0.500197 0.500201">
+                <inertial pos="0 0 0" euler="0 0 0" mass="0.1" diaginertia="0.000015 0.000015 0.000015"/>
+                <joint name="palm_finger_b_joint" pos="0 0 0" axis="0 1 0" range="-0.192 0.1784" stiffness="1000" damping="5"/>
+                <geom pos="0.02 0 0" quat="1 0 0 0" type="mesh" mesh="link_0" friction="5 5 5" solimp="0.9 0.95 0.001 0.5 2" solref="0.004 1" solmix="3" priority="1" condim="6" />
+                <body name="finger_b_link_1" pos="0.02 0 0">
+                    <inertial pos="0 0 0" euler="0 0 0" mass="0.1" diaginertia="0.000015 0.000015 0.000015"/>
+                    <joint name="finger_b_joint_1" pos="0 0 0" axis="0 0 1" range="0.0495 1.2218" stiffness="1000" damping="5"/>
+                    <geom pos="0.05 -0.028 0" quat="0.96639 0 0 -0.257081" type="mesh" mesh="link_1" friction="5 5 5" solimp="0.9 0.95 0.001 0.5 2" solref="0.004 1" solmix="3" priority="1" condim="6"/>
+                    <geom class="pad_box1" size="0.031 0.003 0.015" pos="0.035 -0.01  0" euler=" 0 -0 -0.55" rgba=" 0 0 0 0"/>
+                    <geom class="pad_box2" size="0.031 0.003 0.015" pos="0.035 -0.012 0" euler=" 0 -0 -0.55" rgba=" 0 0 0 0"/>
+                    <body name="finger_b_link_2" pos="0.05 -0.028 0" quat="0.96639 0 0 -0.257081">
+                        <inertial pos="0 0 0" euler="0 0 0" mass="0.1" diaginertia="0.000015 0.000015 0.000015"/>
+                        <joint name="finger_b_joint_2" pos="0 0 0" axis="0 0 1" range="0 1.5708" stiffness="1000" damping="5"/>
+                        <geom pos="0.039 0 0.0075" quat="1 0 0 0" type="mesh" mesh="link_2" friction="5 5 5" solimp="0.9 0.95 0.001 0.5 2" solref="0.004 1" solmix="3" priority="1" condim="6"/>
+                        <geom class="pad_box1" size="0.022 0.003 0.015" pos="0.025 0.007  0" euler=" 0 -0 0" rgba=" 0 0 0 0"/>
+                        <geom class="pad_box2" size="0.022 0.003 0.015" pos="0.025 0.0072 0" euler=" 0 -0 0" rgba=" 0 0 0 0"/>
+                        <body name="finger_b_link_3" pos="0.039 0 0">
+                            <inertial pos="0 0 0" quat="0.614353 0.390886 -0.585309 0.35664" mass="0.05" diaginertia="0.00163315 0.00136097 0.000726883"/>
+                            <joint name="finger_b_joint_3" pos="0 0 0" axis="0 0 1" range="-1.2217 -0.0523" stiffness="1000" damping="5"/>
+                            <geom quat="0.96639 0 0 0.257081" type="mesh" mesh="link_3" friction="5 5 5" solimp="0.9 0.95 0.001 0.5 2" solref="0.004 1" solmix="3" priority="1" condim="6"/>
+                            <geom class="pad_box1" size="0.02 0.003 0.015" pos="0.01 0.015  0"  euler=" 0 -0 0.5" rgba=" 0 0 0 0"/>
+                            <geom class="pad_box2" size="0.02 0.003 0.015" pos="0.01 0.0152 0" euler=" 0 -0 0.5" rgba=" 0 0 0 0"/>
+                            <geom class="pad_box2" size="0.02 0.003 0.015" pos="0.01 0.0155 0" euler=" 0 -0 0.5" rgba=" 0 0 0 0"/>
+                        </body>
+                    </body>
+                </body>
+            </body>
+            <body name="finger_a_link_1" pos="0.0455159 0 0.0814" quat="0.500199 0.500199 -0.499801 0.499801">
+                <inertial pos="0 0 0" euler="0 0 0" mass="0.1" diaginertia="0.000015 0.000015 0.000015"/>
+                <joint name="finger_a_joint_1" pos="0 0 0" axis="0 0 1" range="0.0495 1.2218" stiffness="1000" damping="5"/>
+                <geom pos="0.05 -0.028 0" quat="0.96639 0 0 -0.257081" type="mesh" mesh="link_1" friction="5 5 5" solimp="0.9 0.95 0.001 0.5 2" solref="0.004 1" solmix="3" priority="1" condim="6"/>
+                <geom class="pad_box1" size="0.031 0.003 0.015" pos="0.035 -0.01  0" euler=" 0 -0 -0.55" rgba=" 0 0 0 0"/>
+                <geom class="pad_box2" size="0.031 0.003 0.015" pos="0.035 -0.012 0" euler=" 0 -0 -0.55" rgba=" 0 0 0 0"/>
+                <body name="finger_a_link_2" pos="0.05 -0.028 0" quat="0.96639 0 0 -0.257081">
+                    <inertial pos="0 0 0" euler="0 0 0" mass="0.1" diaginertia="0.000015 0.000015 0.000015"/>
+                    <joint name="finger_a_joint_2" pos="0 0 0" axis="0 0 1" range="0 1.5708" stiffness="1000" damping="5"/>
+                    <geom pos="0.039 0 0.0075" quat="1 0 0 0" type="mesh" mesh="link_2" friction="5 5 5" solimp="0.9 0.95 0.001 0.5 2" solref="0.004 1" solmix="3" priority="1" condim="6"/>
+                    <geom class="pad_box1" size="0.022 0.003 0.015" pos="0.025 0.007  0" euler=" 0 -0 0" rgba=" 0 0 0 0"/>
+                    <geom class="pad_box2" size="0.022 0.003 0.015" pos="0.025 0.0072 0" euler=" 0 -0 0" rgba=" 0 0 0 0"/>
+                    <body name="finger_a_link_3" pos="0.039 0 0">
+                        <inertial pos="0 0 0" quat="0.614353 0.390886 -0.585309 0.35664" mass="0.05" diaginertia="0.00163315 0.00136097 0.000726883"/>
+                        <joint name="finger_a_joint_3" pos="0 0 0" axis="0 0 1" range="-1.2217 -0.0523" stiffness="1000" damping="5"/>
+                        <geom quat="0.96639 0 0 0.257081" type="mesh" mesh="link_3" friction="5 5 5" solimp="0.9 0.95 0.001 0.5 2" solref="0.001 1" solmix="3" priority="1" condim="6"/>
+                        <geom class="pad_box1" size="0.02 0.003 0.015" pos="0.01 0.015  0" euler=" 0 -0 0.5" rgba=" 0 0 0 0"/>
+                        <geom class="pad_box2" size="0.02 0.003 0.015" pos="0.01 0.0152 0" euler=" 0 -0 0.5" rgba=" 0 0 0 0"/>
+                        <geom class="pad_box2" size="0.02 0.003 0.015" pos="0.01 0.0155 0" euler=" 0 -0 0.5" rgba=" 0 0 0 0"/>
+                    </body>
+                </body>
+            </body>
+        </body>
+    </body>
+</body>
+</mujocoinclude>

@@ -1,0 +1,40 @@
+<mujoco model="VerticalArm">
+  <default>
+    <default class="visual">
+      <geom group="2" type="mesh" contype="0" conaffinity="0"/>
+    </default>
+    <default class="collision">
+      <geom group="3" type="mesh"/>
+    </default>
+  </default>
+  <asset>
+    <material name="0.301961_0.301961_0.301961_0.000000_0.021" specular="0.0" shininess="0.0" rgba="0.302000 0.302000 0.302000 1.000000"/>
+    <material name="0.301961_0.301961_0.301961_0.000000_0.022" specular="0.0" shininess="0.0" rgba="0.302000 0.302000 0.302000 1.000000"/>
+    <material name="0.301961_0.301961_0.301961_0.000000_0.023" specular="0.0" shininess="0.0" rgba="0.302000 0.302000 0.302000 1.000000"/>
+    <material name="0.301961_0.301961_0.301961_0.000000_0.024" specular="0.0" shininess="0.0" rgba="0.302000 0.302000 0.302000 1.000000"/>
+    <material name="0.901961_0.901961_0.901961_0.000000_0.013" specular="0.0" shininess="0.0" rgba="0.902000 0.902000 0.902000 1.000000"/>
+    <material name="0.901961_0.901961_0.901961_0.000000_0.014" specular="0.0" shininess="0.0" rgba="0.902000 0.902000 0.902000 1.000000"/>
+    <mesh file="VerticalArm_0.obj"/>
+    <mesh file="VerticalArm_1.obj"/>
+    <mesh file="VerticalArm_2.obj"/>
+    <mesh file="VerticalArm_3.obj"/>
+    <mesh file="VerticalArm_4.obj"/>
+    <mesh file="VerticalArm_5.obj"/>
+  </asset>
+  <worldbody>
+    <body name="VerticalArm">
+      <geom mesh="VerticalArm_0" material="0.301961_0.301961_0.301961_0.000000_0.024" class="visual"/>
+      <geom mesh="VerticalArm_1" material="0.301961_0.301961_0.301961_0.000000_0.023" class="visual"/>
+      <geom mesh="VerticalArm_2" material="0.301961_0.301961_0.301961_0.000000_0.022" class="visual"/>
+      <geom mesh="VerticalArm_3" material="0.901961_0.901961_0.901961_0.000000_0.014" class="visual"/>
+      <geom mesh="VerticalArm_4" material="0.301961_0.301961_0.301961_0.000000_0.021" class="visual"/>
+      <geom mesh="VerticalArm_5" material="0.901961_0.901961_0.901961_0.000000_0.013" class="visual"/>
+      <geom mesh="VerticalArm_0" class="collision"/>
+      <geom mesh="VerticalArm_1" class="collision"/>
+      <geom mesh="VerticalArm_2" class="collision"/>
+      <geom mesh="VerticalArm_3" class="collision"/>
+      <geom mesh="VerticalArm_4" class="collision"/>
+      <geom mesh="VerticalArm_5" class="collision"/>
+    </body>
+  </worldbody>
+</mujoco>

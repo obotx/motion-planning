@@ -1,0 +1,55 @@
+<mujocoinclude model="racks">
+    <body name="racks" euler="1.57 0 0">
+      <geom mesh="racks_0" material="0.752941_0.752941_0.752941_0.000000_0.000000" class="visual"/>
+      <geom mesh="racks_1" material="0.752941_1.000000_0.752941_0.000000_0.000000" class="visual"/>
+      <geom mesh="racks_2" material="1.000000_1.000000_1.000000_0.000000_0.000000" class="visual"/>
+      <geom mesh="racks_3" material="0.250980_0.250980_0.250980_0.000000_0.000000" class="visual"/>
+      <body name="rack_box" pos="-0.56607 1.1709 3.6648" euler="1.5707963 0 0">
+          <geom type="box"
+                size="0.845 0.2645 0.0129"
+                rgba="1 0 0 1"
+                class="primitive_collision" />
+      </body>
+      <body name="rack_box2"  pos="-0.56607 1.62 3.6648" euler="1.5707963 0 0">
+          <geom type="box"
+                size="0.845 0.2645 0.014"
+                rgba="1 0 0 1"
+                class="primitive_collision" />
+      </body>
+    </body>
+</mujocoinclude>
+
+<!-- <mujoco model="racks_example">
+
+  <asset>
+    <mesh name="racks_0" file="racks_0.obj"/>
+    <mesh name="racks_1" file="racks_1.obj"/>
+    <mesh name="racks_2" file="racks_2.obj"/>
+    <mesh name="racks_3" file="racks_3.obj"/>
+  </asset>
+
+  <worldbody>
+    <body name="racks" euler="1.57 0 0">
+
+      <!-- ✅ MUST specify type="mesh", otherwise MuJoCo makes a sphere -->
+      <geom type="mesh" mesh="racks_0"/>
+      <geom type="mesh" mesh="racks_1"/>
+      <geom type="mesh" mesh="racks_2"/>
+      <geom type="mesh" mesh="racks_3"/>
+
+      <!-- Collision strip 1 -->
+      <body name="rack_box" pos="-0.56607 1.1709 3.6648" euler="90 0 0">
+        <geom type="box" size="0.845 0.2645 0.0129" rgba="1 0 0 1"/>
+      </body>
+
+      <!-- Collision strip 2 -->
+      <body name="rack_box2" pos="-0.56607 1.62 3.6648" euler="90 0 0">
+        <geom type="box" size="0.845 0.2645 0.014" rgba="1 0 0 1"/>
+      </body>
+
+    </body>
+  </worldbody>
+
+</mujoco>
+
+</mujoco> -->

@@ -1,0 +1,5 @@
+<mujocoinclude model="nestle_candy">
+    <body name="nestle_candy" euler="1.57 0 0">
+      <geom material="material_0.014" mesh="nestle_candy" class="visual"/>
+    </body>
+</mujocoinclude>

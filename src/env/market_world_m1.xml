@@ -1,0 +1,295 @@
+<mujoco model="Market_M1">
+
+    <compiler autolimits="true" angle="radian"/>
+    <option cone="elliptic" impratio="100" timestep="0.002" noslip_iterations="3" integrator="implicitfast"/>
+
+    <size njmax='1000' nconmax='1000'/>
+    <visual>
+        <quality shadowsize="0"/>
+        <global offwidth="1024" offheight="640"/>
+    </visual>
+
+    <include file="robot/assets/assets.xml"/>
+    <include file="minimarket/market_assets.xml"/>
+    <include file="env_assets.xml"/>
+    <include file='robot/assets/summit_xls_actuator.xml' />
+    <include file='robot/assets/arm_obotx_actuator_V2.xml' />
+    <include file='robot/assets/gripper_actuator_V2.xml' />
+
+    <!--
+        MILESTONE 1: Asset definitions for 10 pickup objects.
+        Simple colored cylinders represent products on the floor.
+        Each object is ~8cm diameter, 15cm tall (approximate product size).
+        Colors allow visual identification before IDs are shown in UI.
+    -->
+
+    <worldbody>
+        <light name="main_light" pos="4 -4 20" dir="0 0 -1"
+            diffuse="0.8 0.8 0.8" specular="1.0 1.0 1.0"/>
+
+        <geom name='floor' pos='4 -4 0' size='4 4 0.067' conaffinity='1' contype='1' type='plane' material="MatPlane" condim='3'/>
+        <site name='xaxis' pos='0.333 0 0' size='0.0033 0.333' type='capsule' rgba='1 0 0 .25' euler='0 1.57 0' group='3'/>
+        <site name='yaxis' pos='0 0.333 0' size='0.0033 0.333' type='capsule' rgba='0 1 0 .25' euler='1.57 0 0' group='3'/>
+
+        <!-- ===================== STATIC SHOP ENVIRONMENT ===================== -->
+        <body name="minimarket_racks" pos="4 -4 0">
+            <include file="minimarket/racks/racks.xml"/>
+        </body>
+        <body name="minimarket_brisk" pos="4 -4 0">
+            <include file="minimarket/brisk/brisk.xml"/>
+        </body>
+        <body name="minimarket_crunch" pos="4 -4 0">
+            <include file="minimarket/crunch/crunch.xml"/>
+        </body>
+        <body name="minimarket_nescafe_caffeine" pos="4 -4 0">
+            <include file="minimarket/nescafe_caffeine/nescafe_caffeine.xml"/>
+        </body>
+        <body name="minimarket_nescafe_caramel" pos="4 -4 0">
+            <include file="minimarket/nescafe_caramel/nescafe_caramel.xml"/>
+        </body>
+        <body name="minimarket_nescafe_dolce" pos="4 -4 0">
+            <include file="minimarket/nescafe_dolce/nescafe_dolce.xml"/>
+        </body>
+        <body name="minimarket_nescafe_mocha" pos="4 -4 0">
+            <include file="minimarket/nescafe_mocha/nescafe_mocha.xml"/>
+        </body>
+        <body name="minimarket_nescafe_spark_water" pos="4 -4 0">
+            <include file="minimarket/nescafe_spark_water/nescafe_spark_water.xml"/>
+        </body>
+        <body name="minimarket_nescafe_taster" pos="4 -4 0">
+            <include file="minimarket/nescafe_taster/nescafe_taster.xml"/>
+        </body>
+        <body name="minimarket_nestle_candy" pos="4 -4 0">
+            <include file="minimarket/nestle_candy/nestle_candy.xml"/>
+        </body>
+        <body name="minimarket_nestle_cirnation" pos="4 -4 0">
+            <include file="minimarket/nestle_cirnation/nestle_cirnation.xml"/>
+        </body>
+        <body name="minimarket_pepsi_cerry" pos="4 -4 0">
+            <include file="minimarket/pepsi_cerry/pepsi_cerry.xml"/>
+        </body>
+        <body name="minimarket_pepsi_diet" pos="4 -4 0">
+            <include file="minimarket/pepsi_diet/pepsi_diet.xml"/>
+        </body>
+        <body name="minimarket_pepsi_max" pos="4 -4 0">
+            <include file="minimarket/pepsi_max/pepsi_max.xml"/>
+        </body>
+        <body name="minimarket_skinny_cow" pos="4 -4 0">
+            <include file="minimarket/skinny_cow/skinny_cow.xml"/>
+        </body>
+        <body name="minimarket_vans_cereal" pos="4 -4 0">
+            <include file="minimarket/vans_cereal/vans_cereal.xml"/>
+        </body>
+
+        <!-- ===================== ROBOT ===================== -->
+        <body name="robot" pos="3 -6 0" euler="0 0 0">
+            <joint type="free" stiffness="0" damping="0" frictionloss="0" armature="0"/>
+            <include file="robot/obotx_V2_OBJs.xml"/>
+        </body>
+
+        <body name="camera_corner" pos="-0.8 -5.3 3" euler="0.6 -0.6 -0.6">
+            <camera name="top_view" fovy="60"/>
+        </body>
+
+        <!-- ===================== 10 PICKUP OBJECTS (FREE JOINTS) ===================== -->
+        <!--
+            These are the 10 pickable objects.
+            Positions are initialized here but will be overridden by play_m1.py
+            on startup with random floor positions.
+            Each object is a labeled cylinder with a distinct color.
+            NOTE: adjust z so objects rest on floor (floor z=0, cylinder half-height=0.075).
+        -->
+
+        <!-- Object 0: Red -->
+        <body name="pickup_obj_0" pos="3.0 -7.0 0.075">
+            <joint type="free"/>
+            <geom type="cylinder" size="0.04 0.075" rgba="0.9 0.1 0.1 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
+            <geom type="cylinder" size="0.035 0.076" rgba="1.0 0.8 0.8 1" contype="0" conaffinity="0"/>
+        </body>
+
+        <!-- Object 1: Orange -->
+        <body name="pickup_obj_1" pos="3.5 -7.0 0.075">
+            <joint type="free"/>
+            <geom type="cylinder" size="0.04 0.075" rgba="0.9 0.5 0.0 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
+        </body>
+
+        <!-- Object 2: Yellow -->
+        <body name="pickup_obj_2" pos="4.0 -7.0 0.075">
+            <joint type="free"/>
+            <geom type="cylinder" size="0.04 0.075" rgba="0.9 0.9 0.0 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
+        </body>
+
+        <!-- Object 3: Green -->
+        <body name="pickup_obj_3" pos="4.5 -7.0 0.075">
+            <joint type="free"/>
+            <geom type="cylinder" size="0.04 0.075" rgba="0.1 0.8 0.1 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
+        </body>
+
+        <!-- Object 4: Cyan -->
+        <body name="pickup_obj_4" pos="5.0 -7.0 0.075">
+            <joint type="free"/>
+            <geom type="cylinder" size="0.04 0.075" rgba="0.0 0.8 0.9 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
+        </body>
+
+        <!-- Object 5: Blue -->
+        <body name="pickup_obj_5" pos="5.5 -7.0 0.075">
+            <joint type="free"/>
+            <geom type="cylinder" size="0.04 0.075" rgba="0.1 0.2 0.9 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
+        </body>
+
+        <!-- Object 6: Purple -->
+        <body name="pickup_obj_6" pos="3.0 -6.5 0.075">
+            <joint type="free"/>
+            <geom type="cylinder" size="0.04 0.075" rgba="0.6 0.0 0.8 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
+        </body>
+
+        <!-- Object 7: Pink -->
+        <body name="pickup_obj_7" pos="3.5 -6.5 0.075">
+            <joint type="free"/>
+            <geom type="cylinder" size="0.04 0.075" rgba="0.9 0.3 0.6 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
+        </body>
+
+        <!-- Object 8: White -->
+        <body name="pickup_obj_8" pos="4.0 -6.5 0.075">
+            <joint type="free"/>
+            <geom type="cylinder" size="0.04 0.075" rgba="0.95 0.95 0.95 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
+        </body>
+
+        <!-- Object 9: Brown -->
+        <body name="pickup_obj_9" pos="4.5 -6.5 0.075">
+            <joint type="free"/>
+            <geom type="cylinder" size="0.04 0.075" rgba="0.5 0.25 0.0 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
+        </body>
+
+        <!-- ===================== SHELF SLOT MARKERS (10 sites on racks) ===================== -->
+        <!--
+            10 shelf slot target positions distributed across rack shelves.
+            The racks body is at world pos (4, -4, 0).
+            Slots are at 3 heights: low ~0.5m, mid ~1.0m, high ~1.5m.
+            NOTE: Calibrate these positions once you view the actual rack geometry.
+            These are approximate starting values.
+        -->
+        <site name="shelf_slot_0"  pos="2.5 -3.5 0.50" size="0.05" type="sphere" rgba="0.0 1.0 0.0 0.5" group="1"/>
+        <site name="shelf_slot_1"  pos="3.0 -3.5 0.50" size="0.05" type="sphere" rgba="0.0 1.0 0.0 0.5" group="1"/>
+        <site name="shelf_slot_2"  pos="3.5 -3.5 0.50" size="0.05" type="sphere" rgba="0.0 1.0 0.0 0.5" group="1"/>
+        <site name="shelf_slot_3"  pos="4.0 -3.5 0.50" size="0.05" type="sphere" rgba="0.0 1.0 0.0 0.5" group="1"/>
+        <site name="shelf_slot_4"  pos="4.5 -3.5 0.50" size="0.05" type="sphere" rgba="0.0 1.0 0.0 0.5" group="1"/>
+        <site name="shelf_slot_5"  pos="2.5 -3.5 1.00" size="0.05" type="sphere" rgba="0.0 0.8 1.0 0.5" group="1"/>
+        <site name="shelf_slot_6"  pos="3.0 -3.5 1.00" size="0.05" type="sphere" rgba="0.0 0.8 1.0 0.5" group="1"/>
+        <site name="shelf_slot_7"  pos="3.5 -3.5 1.00" size="0.05" type="sphere" rgba="0.0 0.8 1.0 0.5" group="1"/>
+        <site name="shelf_slot_8"  pos="4.0 -3.5 1.50" size="0.05" type="sphere" rgba="1.0 0.8 0.0 0.5" group="1"/>
+        <site name="shelf_slot_9"  pos="4.5 -3.5 1.50" size="0.05" type="sphere" rgba="1.0 0.8 0.0 0.5" group="1"/>
+
+    </worldbody>
+
+    <contact>
+        <!-- Finger A exclusions for Arm1 -->
+        <exclude body1="Arm_1" body2="Arm_2"/>
+        <exclude body1="Bearing_Column_Left_1" body2="Rotation_Link_Left_1"/>
+        <exclude body1="Bearing_Column_Left_1" body2="Arm_Left_1"/>
+        <exclude body1="Bearing_Column_Left_1" body2="Arm_Right_1"/>
+        <exclude body1="Bearing_Column_Left_1" body2="Contact_Cylinder_1_1"/>
+        <exclude body1="Bearing_Column_Left_1" body2="Hand_Bearing_1"/>
+        <exclude body1="Bearing_Column_Left_1" body2="Gripper_Link1_1"/>
+        <exclude body1="Bearing_Column_Left_1" body2="Gripper_Link2_1"/>
+        <exclude body1="Bearing_Column_Left_1" body2="Gripper_Link3_1"/>
+        <exclude body1="Rotation_Link_Left_1" body2="Arm_Left_1"/>
+        <exclude body1="Rotation_Link_Left_1" body2="Arm_Right_1"/>
+        <exclude body1="Rotation_Link_Left_1" body2="Contact_Cylinder_1_1"/>
+        <exclude body1="Rotation_Link_Left_1" body2="Hand_Bearing_1"/>
+        <exclude body1="Arm_Left_1" body2="Arm_Right_1"/>
+        <exclude body1="Arm_Left_1" body2="Contact_Cylinder_1_1"/>
+        <exclude body1="Arm_Left_1" body2="Hand_Bearing_1"/>
+        <exclude body1="Arm_Right_1" body2="Contact_Cylinder_1_1"/>
+        <exclude body1="Arm_Right_1" body2="Hand_Bearing_1"/>
+        <exclude body1="Contact_Cylinder_1_1" body2="Hand_Bearing_1"/>
+        <exclude body1="Hand_Bearing_1" body2="Gripper_Link1_1"/>
+        <exclude body1="Hand_Bearing_1" body2="Gripper_Link2_1"/>
+        <exclude body1="Hand_Bearing_1" body2="Gripper_Link3_1"/>
+        <exclude body1="Gripper_Link1_1" body2="Gripper_Link2_1"/>
+        <exclude body1="Gripper_Link1_1" body2="Gripper_Link3_1"/>
+        <exclude body1="Gripper_Link3_1" body2="Arm_Left_1"/>
+        <exclude body1="Gripper_Link2_1" body2="Arm_Left_1"/>
+        <exclude body1="Gripper_Link1_1" body2="Arm_Left_1"/>
+        <exclude body1="Gripper_Link3_1" body2="Arm_Right_1"/>
+        <exclude body1="Gripper_Link2_1" body2="Arm_Right_1"/>
+        <exclude body1="Gripper_Link1_1" body2="Arm_Right_1"/>
+        <exclude body1="Bearing_Column_Right_1" body2="Rotation_Link_Right_1"/>
+        <exclude body1="Bearing_Column_Right_1" body2="Contact_Cylinder_1_2"/>
+        <exclude body1="Rotation_Link_Right_1" body2="Contact_Cylinder_1_2"/>
+        <exclude body1="Hand_Bearing_1" body2="Contact_Cylinder_2_1"/>
+        <exclude body1="Hand_Bearing_1" body2="base"/>
+        <exclude body1="Contact_Cylinder_2_1" body2="Arm_Left_1"/>
+        <exclude body1="Contact_Cylinder_2_1" body2="Arm_Right_1"/>
+        <exclude body1="Bearing_Column_Right_2" body2="Arm_Right_1"/>
+        <exclude body1="Contact_Cylinder_2_1" body2="Gripper_Link1_1"/>
+        <exclude body1="Bearing_Column_Left_2" body2="Rotation_Link_Left_2"/>
+        <exclude body1="Bearing_Column_Left_2" body2="Arm_Left_2"/>
+        <exclude body1="Bearing_Column_Left_2" body2="Arm_Right_2"/>
+        <exclude body1="Bearing_Column_Left_2" body2="Contact_Cylinder_1_2"/>
+        <exclude body1="Bearing_Column_Left_2" body2="Hand_Bearing_2"/>
+        <exclude body1="Bearing_Column_Left_2" body2="Gripper_Link1_2"/>
+        <exclude body1="Bearing_Column_Left_2" body2="Gripper_Link2_2"/>
+        <exclude body1="Bearing_Column_Left_2" body2="Gripper_Link3_2"/>
+        <exclude body1="Rotation_Link_Left_2" body2="Arm_Left_2"/>
+        <exclude body1="Rotation_Link_Left_2" body2="Arm_Right_2"/>
+        <exclude body1="Rotation_Link_Left_2" body2="Contact_Cylinder_1_2"/>
+        <exclude body1="Rotation_Link_Left_2" body2="Hand_Bearing_2"/>
+        <exclude body1="Arm_Left_2" body2="Arm_Right_2"/>
+        <exclude body1="Arm_Left_2" body2="Contact_Cylinder_1_2"/>
+        <exclude body1="Arm_Left_2" body2="Hand_Bearing_2"/>
+        <exclude body1="Arm_Right_2" body2="Contact_Cylinder_1_2"/>
+        <exclude body1="Arm_Right_2" body2="Hand_Bearing_2"/>
+        <exclude body1="Contact_Cylinder_1_2" body2="Hand_Bearing_2"/>
+        <exclude body1="Hand_Bearing_2" body2="Gripper_Link1_2"/>
+        <exclude body1="Hand_Bearing_2" body2="Gripper_Link2_2"/>
+        <exclude body1="Hand_Bearing_2" body2="Gripper_Link3_2"/>
+        <exclude body1="Gripper_Link1_2" body2="Gripper_Link2_2"/>
+        <exclude body1="Gripper_Link1_2" body2="Gripper_Link3_2"/>
+        <exclude body1="Gripper_Link3_2" body2="Arm_Left_2"/>
+        <exclude body1="Gripper_Link2_2" body2="Arm_Left_2"/>
+        <exclude body1="Gripper_Link1_2" body2="Arm_Left_2"/>
+        <exclude body1="Gripper_Link3_2" body2="Arm_Right_2"/>
+        <exclude body1="Gripper_Link2_2" body2="Arm_Right_2"/>
+        <exclude body1="Gripper_Link1_2" body2="Arm_Right_2"/>
+        <exclude body1="Hand_Bearing_2" body2="Contact_Cylinder_2_2"/>
+        <exclude body1="Contact_Cylinder_2_2" body2="Arm_Left_2"/>
+        <exclude body1="Contact_Cylinder_2_2" body2="Arm_Right_2"/>
+        <exclude body1="Hand_Bearing_2" body2="Arm_Left_2"/>
+        <exclude body1="Hand_Bearing_2" body2="Arm_Right_2"/>
+        <exclude body1="Bearing_Column_Right_2" body2="Arm_Right_2"/>
+        <exclude body1="Contact_Cylinder_2_2" body2="Gripper_Link1_2"/>
+        <exclude body1="Bearing_Column_Right_2" body2="Rotation_Link_Right_2"/>
+        <exclude body1="Bearing_Column_Right_2" body2="Contact_Cylinder_2_2"/>
+        <exclude body1="Rotation_Link_Right_2" body2="Contact_Cylinder_2_2"/>
+    </contact>
+
+    <equality>
+        <connect name="weld_contact_arm_sites_1" site1="cyl_weld_site_1_1" site2="arm_weld_site_1" solimp="0.95 0.9 0.9 0.5 100" solref="0.00000001 1"/>
+        <connect name="weld_contact_arm_sites_2" site1="cyl_weld_site_1_2" site2="arm_weld_site_2" solimp="0.95 0.9 0.9 0.5 100" solref="0.00000001 1"/>
+    </equality>
+
+    <keyframe>
+        <key
+            name="home"
+            qpos="  3.700000 -5.999928 0.079946 1.000000 0.000398 -0.000000 0.000000 6.004310 -1.999992
+                    -0.003416 0.000785 0.000101 -0.000001 -1.000000 -0.004749 0.000000 -0.000000 -0.000000
+                    -0.000000 -0.000000 -0.000000 -0.000000 -0.000000 0.004407 0.005755 0.000000 0.000000
+                    -0.004761 -0.000000 -0.000000 -0.000000 -0.000000 0.000000 0.000000 0.000000 0.000000
+                    -0.000000 0.011144 -0.003036 -0.000000 0.005260 -0.000000 -0.000000 0.000000 0.000000
+                    0.000000 0.000000 0.000000 0.000000 0.000000 0.003243 -0.000719 -0.000000 0.005268 0.000000
+                    0.000000 0.000000 0.000000 -0.000000 -0.000000 -0.000000 0.000000 0.004240 -0.000006
+                    0.000000 0.000000 0.000003 0.301637 0.000444 0.199967 -0.199507 0.001890 0.005077
+                    -0.000001 0.002825 -0.000000 0.000000 0.044532 0.000527 -0.043003 0.000000 0.044532
+                    0.000527 -0.043003 0.040673 -0.000438 -0.043145 0.301904 0.002334 0.000003 0.301637
+                    0.000444 0.199967 -0.199507 0.001890 0.005077 -0.000001 0.002824 -0.000000 0.000000 0.044532
+                    0.000527 -0.043003 0.000000 0.044532 0.000527 -0.043003 0.040673 -0.000438 -0.043145 0.301904
+                    0.002334"
+            qvel="  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+                    0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+                    0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
+            ctrl="  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
+        />
+    </keyframe>
+
+</mujoco>

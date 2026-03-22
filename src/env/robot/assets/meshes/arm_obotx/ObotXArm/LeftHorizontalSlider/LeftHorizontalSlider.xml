@@ -1,0 +1,24 @@
+<mujoco model="LeftHorizontalSlider">
+  <default>
+    <default class="visual">
+      <geom group="2" type="mesh" contype="0" conaffinity="0"/>
+    </default>
+    <default class="collision">
+      <geom group="3" type="mesh"/>
+    </default>
+  </default>
+  <asset>
+    <material name="0.301961_0.301961_0.301961_0.000000_0.028" specular="0.0" shininess="0.098051239" rgba="0.095646 0.095646 0.095646 1.000000"/>
+    <material name="0.901961_0.901961_0.901961_0.000000_0.018" specular="0.0" shininess="0.514335327" rgba="1.000000 1.000000 1.000000 1.000000"/>
+    <mesh file="LeftHorizontalSlider_0.obj"/>
+    <mesh file="LeftHorizontalSlider_1.obj"/>
+  </asset>
+  <worldbody>
+    <body name="LeftHorizontalSlider">
+      <geom mesh="LeftHorizontalSlider_0" material="0.301961_0.301961_0.301961_0.000000_0.028" class="visual"/>
+      <geom mesh="LeftHorizontalSlider_1" material="0.901961_0.901961_0.901961_0.000000_0.018" class="visual"/>
+      <geom mesh="LeftHorizontalSlider_0" class="collision"/>
+      <geom mesh="LeftHorizontalSlider_1" class="collision"/>
+    </body>
+  </worldbody>
+</mujoco>

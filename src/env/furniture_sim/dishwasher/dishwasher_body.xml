@@ -1,0 +1,73 @@
+<mujocoinclude>
+<!-- =================================================
+    Copyright 2019 Vikash Kumar
+    Model   :: dishwasher (MuJoCoV2.0)
+    Author  :: Vikash Kumar (vikashplus@gmail.com), Michael Wu (michael50wu@gmail.com)
+    Details :: https://github.com/vikashplus/furniture_sim
+    License :: Under Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+====================================================== -©vk©-->
+
+<body name="dishwasher1" pos="0 0 0" childclass="vis_dishwasher">
+    <geom type="mesh" mesh="ktc_dishwasher" euler="1.57 0 0"/>
+    <geom type="box" pos="0 0.416 1.008" size="0.387 0.413 0.041" class="col"/>  <!-- top -->
+    <geom type="box" pos="0 0.416 0.073" size="0.387 0.413 0.073" class="col"/> <!-- bottom -->
+    <geom type="box" pos="0.347 0.416 0.504" size="0.041 0.413 0.504" class="col"/> <!-- left -->
+    <geom type="box" pos="-0.347 0.416 0.504" size="0.041 0.413 0.504" class="col"/> <!-- right -->
+    <geom type="box" pos="0 0.095 0.504" size="0.387 0.095 0.504" class="col"/> <!-- back -->
+
+    <body name="top_rack" pos="0 0.50 0.647">
+        <inertial pos="0 0 0" mass="0.592" diaginertia="0.296 0.296 0.296" /> <!-- mass scaled by 1/(1.5)^3 -->
+        <joint name="top_rack" pos="0 0 0" axis="0 1 0" type="slide" limited="true" range="0 0.365" damping="0.01" frictionloss="0.01" />
+        <geom type="mesh" mesh="ktc_dishwasher_rack" euler="1.57 0 0"/>
+    </body>
+
+    <body name="door" pos="0 0.70 0.067">
+        <inertial pos="0 0 0" mass="0.592" diaginertia="0.296 0.296 0.296" />
+        <joint name="door" axis="1 0 0" limited="true" range="-3.0 0" damping="0.01" frictionloss="0.01"/> <!-- range unchanged (angular) -->
+        <geom type="mesh" mesh="ktc_dishwasher_door" mass="0.592" euler="1.57 0 0"/>
+
+        <!-- Visual-only geoms (non-collision) -->
+        <geom type="box" pos="0 0.033 0.493" size="0.387 0.013 0.487" rgba=".1 .1 .1 1" />
+        <geom type="capsule" pos="0 0.107 0.833" size="0.027 0.347" euler="0 1.57 0"/>
+        <geom type="capsule" pos="0.347 0.08 0.833" size="0.027 0.027" euler="1.57 0 0"/>
+        <geom type="capsule" pos="-0.347 0.08 0.833" size="0.027 0.027" euler="1.57 0 0"/>
+
+        <!-- Collision geoms -->
+        <geom type="box" pos="0 0.017 0.493" size="0.387 0.028 0.487" class="col"/>
+        <geom type="capsule" pos="0 0.107 0.833" size="0.027 0.347" euler="0 1.57 0" class="col"/>
+        <geom type="capsule" pos="0.347 0.08 0.833" size="0.027 0.027" euler="1.57 0 0" class="col"/>
+        <geom type="capsule" pos="-0.347 0.08 0.833" size="0.027 0.027" euler="1.57 0 0" class="col"/>
+    </body>
+</body>
+
+<body name="dishwasher2" pos="-0.787 0 0" childclass="vis_dishwasher"> <!-- -1.18 / 1.5 = -0.787 -->
+    <geom type="mesh" mesh="ktc_dishwasher" euler="1.57 0 0"/>
+    <geom type="box" pos="0 0.416 1.008" size="0.387 0.413 0.041" class="col"/>  <!-- top -->
+    <geom type="box" pos="0 0.416 0.073" size="0.387 0.413 0.073" class="col"/> <!-- bottom -->
+    <geom type="box" pos="0.347 0.416 0.504" size="0.041 0.413 0.504" class="col"/> <!-- left -->
+    <geom type="box" pos="-0.347 0.416 0.504" size="0.041 0.413 0.504" class="col"/> <!-- right -->
+    <geom type="box" pos="0 0.095 0.504" size="0.387 0.095 0.504" class="col"/> <!-- back -->
+
+    <body name="top_rack2" pos="0 0.50 0.647">
+        <inertial pos="0 0 0" mass="0.592" diaginertia="0.296 0.296 0.296" />
+        <joint name="top_rack2" pos="0 0 0" axis="0 1 0" type="slide" limited="true" range="0 0.365" damping="0.01" frictionloss="0.01" />
+        <geom type="mesh" mesh="ktc_dishwasher_rack" euler="1.57 0 0"/>
+    </body>
+
+    <body name="door2" pos="0 0.70 0.067">
+        <inertial pos="0 0 0" mass="0.592" diaginertia="0.296 0.296 0.296" />
+        <joint name="door2" axis="1 0 0" limited="true" range="-3.0 0" damping="0.01" frictionloss="0.01"/> <!-- angular range unchanged -->
+        <geom type="mesh" mesh="ktc_dishwasher_door" mass="0.592" euler="1.57 0 0"/>
+
+        <geom type="box" pos="0 0.033 0.493" size="0.387 0.013 0.487" rgba=".1 .1 .1 1" />
+        <geom type="capsule" pos="0 0.107 0.833" size="0.027 0.347" euler="0 1.57 0"/>
+        <geom type="capsule" pos="0.347 0.08 0.833" size="0.027 0.027" euler="1.57 0 0"/>
+        <geom type="capsule" pos="-0.347 0.08 0.833" size="0.027 0.027" euler="1.57 0 0"/>
+
+        <geom type="box" pos="0 0.017 0.493" size="0.387 0.028 0.487" class="col"/>
+        <geom type="capsule" pos="0 0.107 0.833" size="0.027 0.347" euler="0 1.57 0" class="col"/>
+        <geom type="capsule" pos="0.347 0.08 0.833" size="0.027 0.027" euler="1.57 0 0" class="col"/>
+        <geom type="capsule" pos="-0.347 0.08 0.833" size="0.027 0.027" euler="1.57 0 0" class="col"/>
+    </body>
+</body>
+</mujocoinclude>

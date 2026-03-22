@@ -1,0 +1,5 @@
+<mujocoinclude model="vans_cereal">
+    <body name="vans_cereal" euler="1.57 0 0">
+      <geom material="material_0.008" mesh="vans_cereal" class="visual"/>
+    </body>
+</mujocoinclude>

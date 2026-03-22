@@ -1,0 +1,5 @@
+<mujocoinclude model="pepsi_diet">
+    <body name="pepsi_diet" euler="1.57 0 0">
+      <geom material="material_0.003" mesh="pepsi_diet" class="visual"/>
+    </body>
+</mujocoinclude>

@@ -1,0 +1,5 @@
+<mujocoinclude model="nescafe_spark_water">
+    <body name="nescafe_spark_water" euler="1.57 0 0">
+      <geom material="material_0.013" mesh="nescafe_spark_water" class="visual"/>
+    </body>
+</mujocoinclude>

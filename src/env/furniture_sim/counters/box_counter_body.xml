@@ -1,0 +1,13 @@
+<mujocoinclude>
+<body name="box_counter" childclass="counters_3">
+    <geom material="counter_blue" mesh="cabinetbase_long"/>
+    <geom material="counter_marble" mesh="countertop_long"/>
+    <geom euler="0 1.57 0" pos="0.906 -0.3567 0.9267" size="0.0147 0.1867" type="cylinder"/>
+    <geom euler="1.57 0 0" pos="0.7733 -0.3367 0.9267" size="0.012 0.02" type="cylinder"/>
+    <geom euler="1.57 0 0" pos="1.0387 -0.3367 0.9267" size="0.012 0.02" type="cylinder"/>
+    <geom euler="0 1.57 0" pos="0.906 -0.3567 0.76" size="0.0147 0.1867" type="cylinder"/>
+    <geom euler="1.57 0 0" pos="0.7733 -0.3367 0.76" size="0.012 0.02" type="cylinder"/>
+    <geom euler="1.57 0 0" pos="1.0387 -0.3367 0.76" size="0.012 0.02" type="cylinder"/>
+    <geom class="counter_collision" rgba="1 0 0 1" pos="0.9047 -0.03 0.5333" size="0.3067 0.404 0.5333" type="box" mass="2"/>
+</body>
+</mujocoinclude>

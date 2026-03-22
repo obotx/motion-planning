@@ -1,0 +1,92 @@
+<mujocoinclude>
+
+      <!-- Enhanced lighting for desert atmosphere -->
+      <light cutoff="10" diffuse="1.0 0.95 0.85" dir="-0.3 -0.2 -1" directional="true" exponent="1" pos="5 3 8" specular="0.8 0.7 0.6" castshadow="true"/>
+
+      <!-- Additional ambient lighting for softer shadows -->
+      <light cutoff="50" diffuse="0.4 0.4 0.5" dir="0.5 0.3 -0.8" directional="true" exponent="1" pos="-3 -2 5" specular="0.2 0.2 0.3"/>
+
+      <!-- Main sandy ground plane -->
+      <geom material="sand_floor" name="floor" pos="0 0 0" size="25 25 0.2" type="plane" condim="3" conaffinity="1"/>
+
+      <!-- Sand dunes and mounds for terrain variation -->
+      <geom name="dune1" type="ellipsoid" size="3 2 0.3" pos="8 -6 0.25" material="sand_dunes" friction="0.7 0.25 0.15" condim="3" conaffinity="1"/>
+
+      <geom name="dune2" type="ellipsoid" size="2.5 1.8 0.4" pos="-7 4 0.35" material="sand_dunes" friction="0.7 0.25 0.15" condim="3" conaffinity="1"/>
+
+      <geom name="dune3" type="ellipsoid" size="1.8 2.2 0.25" pos="5 8 0.2" material="sand_dunes" friction="0.7 0.25 0.15" condim="3" conaffinity="1"/>
+
+      <!-- Small sand mounds scattered around -->
+      <geom name="mound1" type="sphere" size="0.8" pos="-3 -2 0.15" material="sand_dunes" friction="0.6 0.2 0.1"/>
+      <geom name="mound2" type="sphere" size="0.6" pos="6 -3 0.12" material="sand_dunes" friction="0.6 0.2 0.1"/>
+      <geom name="mound3" type="sphere" size="0.4" pos="-5 1 0.08" material="sand_dunes" friction="0.6 0.2 0.1"/>
+
+      <!-- Weathered rocks partially buried in sand -->
+      <geom name="rock1" type="box" size="0.3 0.4 0.15" pos="2 -4 0.1" rgba="0.4 0.35 0.3 1" friction="1.2 0.4 0.3" euler="0.2 0.3 0.8"/>
+      <geom name="rock2" type="box" size="0.25 0.3 0.2" pos="-4 -5 0.12" rgba="0.45 0.4 0.32 1" friction="1.2 0.4 0.3" euler="0.1 -0.2 1.2"/>
+      <geom name="rock3" type="ellipsoid" size="0.2 0.3 0.1" pos="3 5 0.08" rgba="0.5 0.42 0.35 1" friction="1.2 0.4 0.3"/>
+
+      <!-- Load Geometry (weathered appearance) -->
+      <body name="Cube1" pos="0.0 0.80 0.175" euler="0 0 1.57080">
+            <joint type="free"/>
+
+            <!-- Inertial properties for 2 kg cube -->
+            <inertial pos="0 0 0" mass="2.0" diaginertia="0.0817 0.0817 0.0817"/>
+
+            <!-- Visual mesh with weathered coloring -->
+            <geom name="load_geom" type="mesh" mesh="Load" rgba="0.45 0.25 0.15 1" condim="3" friction="1 1 1" contype="1" conaffinity="1" solref="0.01 1"/>
+
+      </body>
+
+      <!-- Weathered wooden table -->
+      <body name="Table" pos="1.7 0.0 0.2" euler="0 0 1.57080">
+            <geom name="Table_mesh" type="box" size="2.0 0.8 0.2" mass="10.1" material="weathered_wood" friction="0.9 0.3 0.2" condim="3" conaffinity="1" contype="1"/>
+      </body>
+
+      <!-- Sun-bleached small cube -->
+      <body name="Cube2" pos="0.0 -0.5 0.70" euler="0 0 1.57080">
+            <joint type="free"/>
+            <geom name="top_cube_geom" type="box" size="0.15 0.15 0.15" material="sun_bleached"  friction=".8 .8 .8" solimp="0.95 0.95 0.001 0.5 2" solref="0.0001 10"/>
+            <geom name="handle_geom" type="box" size="0.02 0.15 0.03" pos="0.0 0.0 0.18" rgba="0.7 0.7 0.7 1" friction=".8 .8 .8" solimp="0.95 0.95 0.001 0.5 2" solref="0.0001 10"  material="sun_bleached"/>
+      </body>
+
+      <body name="shpere1" pos=".4 -0.4 0.1">
+            <joint type="free"/>
+            <geom type="box" size="0.03 0.03 0.03" rgba="0.35 0.25 0.2 1" friction="1 1 1" solimp="0.95 0.95 0.001 0.5 2" solref="0.0001 10"/>
+      </body>
+
+      <body name="shpere2" pos="-3.0 2.8 0.08">
+            <joint type="free"/>
+           <geom type="box" size="0.03 0.03 0.03" rgba="0.35 0.25 0.2 1" friction="1 1 1" solimp="0.95 0.95 0.001 0.5 2" solref="0.0001 10"/>
+      </body>
+
+      <body name="shpere3" pos="4.5 -1.5 0.1">
+            <joint type="free"/>
+            <geom type="box" size="0.03 0.03 0.03" rgba="0.35 0.25 0.2 1" friction="1 1 1" solimp="0.95 0.95 0.001 0.5 2" solref="0.0001 10"/>
+      </body>
+<!-- Additional desert elements -->
+
+<!-- Scattered debris and small objects -->
+<body name="debris1" pos="-2.5 -1.8 0.05">
+      <geom type="cylinder" size="0.05 0.02" rgba="0.3 0.2 0.15 1" friction=".8 .8 .8" solimp="0.95 0.95 0.001 0.5 2" solref="0.0001 10"/>
+</body>
+
+<body name="debris2" pos="4.2 2.1 0.03">
+      <geom type="box" size="0.08 0.03 0.02" rgba="0.4 0.25 0.18 1" friction=".8 .8 .8" solimp="0.95 0.95 0.001 0.5 2" solref="0.0001 10" mass="0.03" euler="0.5 0.2 1.1"/>
+</body>
+
+<!-- Partially buried pipe or tube -->
+<body name="buried_pipe" pos="-1.2 3.5 0.05">
+      <geom type="cylinder" size="0.1 0.8" rgba="0.35 0.25 0.2 1" friction="0.9 0.4 0.3" mass="2.0" euler="0.3 0 0.8"/>
+</body>
+
+<!-- Sandy wind patterns (flat decorative elements) -->
+<geom name="wind_pattern1" type="box" size="1.5 0.8 0.01" pos="7 1 0.01" rgba="0.8 0.72 0.55 0.7" friction="0.5 0.1 0.05" euler="0 0 0.5"/>
+<geom name="wind_pattern2" type="box" size="1.2 0.6 0.01" pos="-6 -3 0.01" rgba="0.78 0.7 0.52 0.6" friction="0.5 0.1 0.05" euler="0 0 -0.3"/>
+
+<!-- Distant hills/dunes on horizon -->
+<geom name="horizon_dune1" type="ellipsoid" size="8 3 1.2" pos="18 -12 0.8" rgba="0.7 0.62 0.48 0.8" friction="0.6 0.2 0.1"/>
+<geom name="horizon_dune2" type="ellipsoid" size="6 4 1.0" pos="-15 10 0.6" rgba="0.72 0.64 0.5 0.8" friction="0.6 0.2 0.1"/>
+<geom name="horizon_dune3" type="ellipsoid" size="7 2.5 0.8" pos="12 15 0.5" rgba="0.68 0.6 0.46 0.8" friction="0.6 0.2 0.1"/>
+
+</mujocoinclude>

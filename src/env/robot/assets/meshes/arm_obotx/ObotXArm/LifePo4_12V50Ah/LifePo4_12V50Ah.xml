@@ -1,0 +1,9 @@
+<mujocoinclude model="LifePo4_12V50Ah">
+    <body name="LifePo4_12V50Ah">
+      <geom mesh="LifePo4_12V50Ah_0" material="1.000000_0.000000_0.000000_0.000000_0.001" class="visual"/>
+      <geom mesh="LifePo4_12V50Ah_1" material="0.301961_0.301961_0.301961_0.000000_0.001" class="visual"/>
+      <geom mesh="LifePo4_12V50Ah_2" material="0.792157_0.819608_0.933333_0.000000_0.001" class="visual"/>
+      <geom mesh="LifePo4_12V50Ah_3" material="1.000000_1.000000_1.000000_0.000000_0.001" class="visual"/>
+      <geom type="box" pos="-0.17 0. 0.08" size="0.15 0.3 0.08" rgba="1 0 0 0.5"/>
+    </body>
+</mujocoinclude>

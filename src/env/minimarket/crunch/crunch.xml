@@ -1,0 +1,5 @@
+<mujocoinclude model="crunch">
+    <body name="crunch" euler="1.57 0 0">
+      <geom material="material_0.002" mesh="crunch" class="visual"/>
+    </body>
+</mujocoinclude>

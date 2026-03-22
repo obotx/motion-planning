@@ -1,0 +1,28 @@
+<mujoco model="LeftVerticalRotationSlider">
+  <default>
+    <default class="visual">
+      <geom group="2" type="mesh" contype="0" conaffinity="0"/>
+    </default>
+    <default class="collision">
+      <geom group="3" type="mesh"/>
+    </default>
+  </default>
+  <asset>
+    <material name="0.301961_0.301961_0.301961_0.000000_0.030" specular="0.0" shininess="0.0" rgba="0.302000 0.302000 0.302000 1.000000"/>
+    <material name="0.501961_0.501961_0.501961_0.000000_0.007" specular="0.0" shininess="0.0" rgba="0.502000 0.502000 0.502000 1.000000"/>
+    <material name="0.901961_0.901961_0.901961_0.000000_0.019" specular="0.0" shininess="0.0" rgba="0.902000 0.902000 0.902000 1.000000"/>
+    <mesh file="LeftVerticalRotationSlider_0.obj"/>
+    <mesh file="LeftVerticalRotationSlider_1.obj"/>
+    <mesh file="LeftVerticalRotationSlider_2.obj"/>
+  </asset>
+  <worldbody>
+    <body name="LeftVerticalRotationSlider">
+      <geom mesh="LeftVerticalRotationSlider_0" material="0.301961_0.301961_0.301961_0.000000_0.030" class="visual"/>
+      <geom mesh="LeftVerticalRotationSlider_1" material="0.901961_0.901961_0.901961_0.000000_0.019" class="visual"/>
+      <geom mesh="LeftVerticalRotationSlider_2" material="0.501961_0.501961_0.501961_0.000000_0.007" class="visual"/>
+      <geom mesh="LeftVerticalRotationSlider_0" class="collision"/>
+      <geom mesh="LeftVerticalRotationSlider_1" class="collision"/>
+      <geom mesh="LeftVerticalRotationSlider_2" class="collision"/>
+    </body>
+  </worldbody>
+</mujoco>

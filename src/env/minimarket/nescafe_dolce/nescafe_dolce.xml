@@ -1,0 +1,5 @@
+<mujocoinlcude model="nescafe_dolce">
+    <body name="nescafe_dolce" euler="1.57 0 0">
+      <geom material="material_0.004" mesh="nescafe_dolce" class="visual"/>
+    </body>
+</mujocoinlcude>

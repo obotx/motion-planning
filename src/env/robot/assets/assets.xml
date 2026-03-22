@@ -1,0 +1,92 @@
+<mujocoinclude>
+    <statistic meansize="0.767828" extent="17.3945" center="-1.30273 -0.281443 0.819464" />
+
+    <!-- <asset>
+        <texture builtin="checker" height="100" name="texplane" rgb1="0.6 0.6 0.6" rgb2="0.7 0.7 0.7" type="2d" width="100"/>
+        <material name="MatPlane" reflectance="0.5" shininess="1" specular="1" texrepeat="60 60" texture="texplane" />
+    </asset> -->
+    
+    <asset>
+        <!-- Mobile Base Assets-->
+        <mesh name="summit_xls_omni_wheel_1" file="meshes/wheels/omni_wheel_1.stl"/>
+        <mesh name="summit_xls_omni_wheel_2" file="meshes/wheels/omni_wheel_2.stl"/>
+        <!-- <mesh name="structure_hokuyo" file="structures/structure_hokuyo.stl" scale="1.0 1.0 0.6"/> -->
+
+        <!-- Arm Assets -->
+        <mesh name="Column_Rotation" file="meshes/arm_obotx/Column_Rotation.stl"/>
+        <mesh name="Column_Left" file="meshes/arm_obotx/New/Column_Left_New.stl"/>
+        <mesh name="Column_Right" file="meshes/arm_obotx/New/Column_Right_New.stl"/>
+        <mesh name="Bearing_Column_Left" file="meshes/arm_obotx/New/Bearing_Column_Left_New.stl"/>
+        <mesh name="Bearing_Column_Right" file="meshes/arm_obotx/New/Bearing_Column_Right_New.stl"/>
+        <mesh name="Left_Rotation" file="meshes/arm_obotx/New/Left_Rotation_Combined_New.stl"/>
+        <mesh name="Right_Rotation" file="meshes/arm_obotx/New/Right_Rotation_Combined_New.stl"/>
+        <mesh name="Arm_Left" file="meshes/arm_obotx/New/Arm_Left_New.stl"/>
+        <mesh name="Arm_Right" file="meshes/arm_obotx/New/Arm_Right_New.stl"/>
+        <mesh name="Hand_Bearing" file="meshes/arm_obotx/New/Hand_Bearing_New.stl"/>
+        <mesh name="Contact_Cylinder" file="meshes/arm_obotx/Contact_Cylinder.stl"/>
+
+        <!-- Arm Assets V2-->
+        <mesh name="summit_xls_chapas_inox_tapas" file="meshes/arm_obotx/V2/base_mobile_brand.stl" scale="1.0 1.0 0.7"/>
+        <mesh name="summit_xls_chassis" file="meshes/arm_obotx/V2/base_mobile.stl" scale="1.0 1.0 0.7"/>
+        <mesh name="Column_Rotation_Small" file="meshes/arm_obotx/V2/base_rotation.stl"/>
+        <mesh name="Column_Left_V2" file="meshes/arm_obotx/V2/Column_Left_V2_2.stl"/>
+        <mesh name="Column_Right_V2" file="meshes/arm_obotx/V2/Column_Right_V2_2.stl"/>
+        <mesh name="Top_Column" file="meshes/arm_obotx/V2/top_barrier.stl"/>
+        <mesh name="Bearing_Column_Left_V2" file="meshes/arm_obotx/V2/Bearing_Column_Left_V2.stl"/>
+        <mesh name="Bearing_Column_Left_V2_Screw" file="meshes/arm_obotx/V2/Bearing_Column_Left_V2_Screw.stl"/>
+        <mesh name="Bearing_Column_Right_V2" file="meshes/arm_obotx/V2/Bearing_Column_Right_V2.stl"/>
+        <mesh name="Bearing_Column_Right_V2_Screw" file="meshes/arm_obotx/V2/Bearing_Column_Right_V2_Screw.stl"/>
+        <mesh name="Left_Rotation_V2" file="meshes/arm_obotx/V2/Left_Rotation_Combined_V2.stl"/>
+        <mesh name="Left_Rotation_V2_Screw" file="meshes/arm_obotx/V2/Left_Rotation_Combined_V2_Screw.stl"/>
+        <mesh name="Right_Slider_V2" file="meshes/arm_obotx/V2/Right_Rotation2_V2.stl"/>
+        <mesh name="Right_Rotation_V2" file="meshes/arm_obotx/V2/Right_Rotation_V2.stl"/>
+        <mesh name="Right_Rotation_V2_Screw" file="meshes/arm_obotx/V2/Right_Rotation_Combined_V2_Screw.stl"/>
+        <mesh name="Arm_Left_V2" file="meshes/arm_obotx/V2/Arm_Left_V2.stl"/>
+        <mesh name="Motor_Arm_Left_V2" file="meshes/arm_obotx/V2/Motor_Arm_Left_V2.stl"/>
+        <mesh name="Hand_Bearing_V2" file="meshes/arm_obotx/New/Hand_Bearing_New.stl" scale="0.7 0.7 0.7"/>
+
+
+        <!-- Robotiq 3f gripper Assets -->
+        <mesh name="link_0" file="meshes/robotiq_3f_gripper/collision/link_0.STL"/>
+        <mesh name="link_1" file="meshes/robotiq_3f_gripper/collision/link_1.STL"/>
+        <mesh name="link_2" file="meshes/robotiq_3f_gripper/collision/link_2.STL"/>
+        <mesh name="link_3" file="meshes/robotiq_3f_gripper/collision/link_3.STL"/>
+        <mesh name="palm" file="meshes/robotiq_3f_gripper/collision/palm.STL"/>
+
+        <mesh name="link_0_real" file="meshes/mj_robotiq_3f/link_0_real.stl"/>
+        <mesh name="link_1_real" file="meshes/mj_robotiq_3f/link_1_real.stl"/>
+        <mesh name="link_2_real" file="meshes/mj_robotiq_3f/link_2_real.stl"/>
+        <mesh name="link_3_real" file="meshes/mj_robotiq_3f/link_3_real.stl"/>
+        <mesh name="palm_real" file="meshes/mj_robotiq_3f/palm_real.stl"/>
+        <mesh name="palm_atc" file="meshes/mj_robotiq_3f/chrome.stl"/>
+
+        <mesh name="link_0_V2" file="meshes/robotiq_3f_gripper/collision/link_0.STL" scale="0.7 0.7 0.7"/>
+        <mesh name="link_1_V2" file="meshes/robotiq_3f_gripper/collision/link_1.STL" scale="0.7 0.7 0.7"/>
+        <mesh name="link_2_V2" file="meshes/robotiq_3f_gripper/collision/link_2.STL" scale="0.7 0.7 0.7"/>
+        <mesh name="link_3_V2" file="meshes/robotiq_3f_gripper/collision/link_3.STL" scale="0.7 0.7 0.7"/>
+        <mesh name="palm_V2" file="meshes/robotiq_3f_gripper/collision/palm.STL" scale="0.7 0.7 0.7"/>
+
+        <mesh name="link_0_real_V2" file="meshes/mj_robotiq_3f/link_0_real.stl" scale="0.7 0.7 0.7"/>
+        <mesh name="link_1_real_V2" file="meshes/mj_robotiq_3f/link_1_real.stl" scale="0.7 0.7 0.7"/>
+        <mesh name="link_2_real_V2" file="meshes/mj_robotiq_3f/link_2_real.stl" scale="0.7 0.7 0.7"/>
+        <mesh name="link_3_real_V2" file="meshes/mj_robotiq_3f/link_3_real.stl" scale="0.7 0.7 0.7"/>
+        <mesh name="palm_real_V2" file="meshes/mj_robotiq_3f/palm_real.stl" scale="0.7 0.7 0.7"/>
+        <mesh name="palm_atc_V2" file="meshes/mj_robotiq_3f/chrome.stl" scale="0.7 0.7 0.7"/>
+
+
+        <material name="connection_marker_green" rgba="0 1 0 1"/>
+        <material name="connection_marker_blue" rgba="0 0 1 1"/>
+
+        <!-- Environment -->
+         <!-- <mesh name="Load" file="environment/Load.stl"/> -->
+
+          <!-- Materials for sandy appearance -->
+        <!-- <material name="sand_floor" rgba="0.76 0.69 0.5 1" specular="0.2" shininess="0.1" reflectance="0.05"/>
+        <material name="sand_dunes" rgba="0.82 0.75 0.58 1" specular="0.15" shininess="0.05" reflectance="0.03"/>
+        <material name="weathered_wood" rgba="0.6 0.45 0.3 1" specular="0.1" shininess="0.02"/>
+        <material name="rusty_metal" rgba="0.5 0.3 0.2 1" specular="0.3" shininess="0.1"/>
+        <material name="sun_bleached" rgba="0.9 0.85 0.7 1" specular="0.1" shininess="0.05"/> -->
+
+    </asset>
+
+</mujocoinclude>

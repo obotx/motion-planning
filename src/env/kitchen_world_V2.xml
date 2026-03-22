@@ -1,0 +1,316 @@
+<mujoco model="kitchen">
+
+    <include file="robot/assets/assets.xml"/>
+    <compiler autolimits="true"/>
+    <option cone="elliptic" impratio="100" timestep="0.002" noslip_iterations="3" integrator="implicitfast"/>
+
+    <size njmax='1000' nconmax='1000'/>
+
+    <include file="furniture_sim/objects/oven_asset.xml"/>
+    <include file="furniture_sim/objects/counters_asset.xml"/>
+    <include file="furniture_sim/objects/backwall_asset.xml"/>
+    <include file="furniture_sim/objects/slidecabinet_asset.xml"/>
+    <include file="furniture_sim/objects/hingecabinet_asset.xml"/>
+    <include file="furniture_sim/objects/microwave_asset.xml"/>
+    <include file="furniture_sim/objects/kettle_asset.xml"/>
+    <include file="furniture_sim/objects/trashbin_asset.xml"/>
+    <include file="furniture_sim/ventionTable/ventionTable_asset.xml"/>
+    <include file="furniture_sim/dishwasher/dishwasher_asset.xml"/>
+    <include file="furniture_sim/counters/counters_asset.xml"/>
+
+    <visual>
+        <quality shadowsize="0"/>
+        <global offwidth="1024" offheight="640"/>
+    </visual>
+
+    <default>
+        <default class="visual">
+            <geom group="2" type="mesh" contype="0" conaffinity="0"/>
+        </default>
+        <default class="collision">
+            <geom group="3" type="mesh"/>
+        </default>
+        <default class="pad_box1">
+            <geom mass="0" type="box" friction="5 5 5" solimp="0.9 0.95 0.001 0.5 2" solref="0.0001 1" solmix="3" priority="1" condim="6"/>
+        </default>
+        <default class="pad_box2">
+            <geom mass="0" type="box" friction="5 5 5" solimp="0.9 0.95 0.001 0.5 2" solref="0.0001 1" solmix="3" priority="1" condim="6"/>
+        </default>
+    </default>
+
+    <asset>
+        <material name="Material1" specular="0.0" shininess="0.01" rgba="1.0000 1.0000 1.0000 1.0000"/>
+        <material name="Metal_Rough" specular="0.0" shininess="0.01" rgba="1.0000 1.0000 1.0000 1.0000"/>
+        <material name="Material6" specular="0.0" shininess="0.01" rgba="1.0000 1.0000 1.0000 1.0000"/>
+        <material name="Material2" specular="0.0" shininess="0.01" rgba="1.0000 1.0000 1.0000 0.2800"/>
+        <material name="Material5" specular="0.0" shininess="0.01" rgba="1.0000 1.0000 1.0000 1.0000"/>
+        <material name="led_" specular="0.0" shininess="0.01" rgba="1.0000 1.0000 1.0000 1.0000"/>
+        <material name="Material3" specular="0.0" shininess="0.01" rgba="0.3569 0.3569 0.3569 1.0000"/>
+        <material name="Material4" specular="0.0" shininess="0.01" rgba="0.4549 0.5451 0.7020 0.3400"/>
+        <material name="Color_B24" specular="0.0" shininess="0.01" rgba="0.2000 0.1373 0.1176 1.0000"/>
+        <material name="Metal_Corrogated_Shiny" specular="0.0" shininess="0.01" rgba="1.0000 1.0000 1.0000 1.0000"/>
+        <material name="Material8" specular="0.0" shininess="0.01" rgba="0.9294 0.9294 0.9294 1.0000"/>
+        <material name="vitre_" specular="0.0" shininess="0.01" rgba="0.7765 0.7765 0.7765 0.3800"/>
+        <material name="skp_front_default" specular="0.0" shininess="0.01" rgba="1.0000 1.0000 1.0000 1.0000"/>
+        <material name="Material7" specular="0.0" shininess="0.01" rgba="0.1569 0.1569 0.1569 1.0000"/>
+        <mesh file="fridge/fridge_neg1/fridge_neg1_0.obj"   scale="0.0266667 0.03 0.0266667"/>
+        <mesh file="fridge/fridge_neg1/fridge_neg1_1.obj"   scale="0.0266667 0.03 0.0266667"/>
+        <mesh file="fridge/fridge_neg1/fridge_neg1_2.obj"   scale="0.0266667 0.03 0.0266667"/>
+        <mesh file="fridge/fridge_neg1/fridge_neg1_3.obj"   scale="0.0266667 0.03 0.0266667"/>
+        <mesh file="fridge/fridge_neg1/fridge_neg1_4.obj"   scale="0.0266667 0.03 0.0266667"/>
+        <mesh file="fridge/fridge_neg1/fridge_neg1_5.obj"   scale="0.0266667 0.03 0.0266667"/>
+        <mesh file="fridge/fridge_neg1/fridge_neg1_6.obj"   scale="0.0266667 0.03 0.0266667"/>
+        <mesh file="fridge/fridge_neg1/fridge_neg1_7.obj"   scale="0.0266667 0.03 0.0266667"/>
+        <mesh file="fridge/fridge_neg1/fridge_neg1_8.obj"   scale="0.0266667 0.03 0.0266667"/>
+        <mesh file="fridge/fridge_neg1/fridge_neg1_9.obj"   scale="0.0266667 0.03 0.0266667"/>
+        <mesh file="fridge/fridge_neg1/fridge_neg1_10.obj"  scale="0.0266667 0.03 0.0266667"/>
+        <mesh file="fridge/fridge_neg1/fridge_neg1_11.obj"  scale="0.0266667 0.03 0.0266667"/>
+        <mesh file="fridge/fridge_neg1/fridge_neg1_12.obj"  scale="0.0266667 0.03 0.0266667"/>
+        <mesh file="fridge/fridge_neg1/fridge_neg1_13.obj"  scale="0.0266667 0.03 0.0266667"/>
+
+        <mesh file="chair_bar/chair_bar/chair_bar.obj"      scale="0.012 0.012 0.012"/>
+        <mesh file="couch/couch/couch.obj" scale="0.0366667 0.0366667 0.0366667"/>
+        <material name="std_mtl" specular="0.0" shininess="0.01" rgba="0.5880 0.5880 0.5880 1.0000"/>
+    </asset>
+
+
+    <asset>
+        <texture name="texplane" type="2d" height="1" width="1" file="furniture_sim/objects/textures/white_marble_tile2.png"/>
+        <material name='MatPlane' shininess="1" texture="texplane" texrepeat="4 4" texuniform="true"/>
+        <material name="robotiq_black" 
+                shininess="0.9" 
+                specular="0.9" 
+                reflectance="0.7" 
+                rgba="0.1 0.1 0.1 1" />
+
+        <material name="robotiq_chrome" 
+                shininess="0.95" 
+                specular="1.0" 
+                reflectance="0.9"
+                rgba="0.8 0.8 0.85 1"/>
+    </asset>
+
+    <worldbody>
+        <light directional='true' diffuse='.3 .3 .3' specular='0.3 0.3 0.3' pos='-1 -1 1' dir='1 1 -1'/>
+        <light directional='true' diffuse='.3 .3 .3' specular='0.3 0.3 0.3' pos='1 -1 1' dir='-1 1 -1'/>
+        <light directional='true' diffuse='.3 .3 .3' specular='0.3 0.3 0.3' pos='0 0 1.5' dir='0 -1 -1'/>
+        <geom name='floor' pos='2.333 -2.333 0' size='3.333 3.333 0.067' conaffinity='1' contype='1' type='plane' material="MatPlane" condim='3'/>
+        <site name='xaxis' pos='0.333 0 0' size='0.0033 0.333' type='capsule' rgba='1 0 0 .25' euler='0 1.57 0' group='3'/>
+        <site name='yaxis' pos='0 0.333 0' size='0.0033 0.333' type='capsule' rgba='0 1 0 .25' euler='1.57 0 0' group='3'/>
+
+
+        <body name='desk' pos='-0.067 0.5 0'>
+            <body name="oven" pos="0 0 0">
+                <include file="furniture_sim/objects/chains/oven_chain.xml"/>
+            </body>
+            <body name="ovenhood" pos="0 0 0">
+                <include file="furniture_sim/objects/chains/ovenhood_chain.xml"/>
+            </body>
+            <body name="backwall" pos="0 0 0">
+                <include file="furniture_sim/objects/chains/backwall_chain.xml"/>
+            </body>
+            <body name="hingecabinet" pos="-0.567 0.187 1.733">
+                <include file="furniture_sim/objects/chains/hingecabinet_chain.xml"/>
+            </body>
+            <body name="microwave" pos="-0.500 -0.017 1.067" euler="0 0 0.3">
+                <include file="furniture_sim/objects/chains/microwave_chain3.xml"/>
+            </body>
+        </body>
+
+        <body name="table" pos='-0.067 0.5 -0.02'>
+            <include file="furniture_sim/objects/chains/counters_chain.xml"/>
+        </body>
+
+        <body name="dishwasher" pos="2.407 0.867 0" euler="0 0 -3.14">
+            <include file="furniture_sim/dishwasher/dishwasher_body.xml"/>
+        </body>
+
+        <body name="counters_faucet" pos="0.595 0.5 -0.01" euler="0 0 0">
+            <include file="furniture_sim/counters/sink_counter_faucet_body.xml"/>
+        </body>
+
+        <body name="counters_only" pos="0.80 0.5 -0.02" euler="0 0 0">
+            <include file="furniture_sim/counters/sink_counter_body.xml"/>
+        </body>
+
+        <body name="box_only" pos="-0.667 -1.605 -0.025" euler="0 0 1.57">
+            <include file="furniture_sim/counters/box_counter_body.xml"/>
+        </body>
+
+        <body name="cabin1" pos="5.2 -5.0 0" euler="0 0 -1.57">
+            <include file="furniture_sim/ventionTable/ventionTable_body.xml"/>
+        </body>
+
+        <body name="kettle" pos="-0.147 0.233 1.084" euler="0 0 3.14">
+            <freejoint/>
+            <include file="furniture_sim/objects/chains/kettle_chain3.xml"/>
+        </body>
+
+        <body name="kettle1" pos="0.147 0.233 1.084" euler="0 0 3.14">
+            <freejoint/>
+            <include file="furniture_sim/objects/chains/kettle_chain5.xml"/>
+        </body>
+
+        <body name="bin" pos="-0.667 -1.467 0.01" euler="1.57 0 0">
+            <freejoint/>
+            <include file="furniture_sim/objects/chains/trashbin_chain.xml"/>
+        </body>
+
+        <body name="fridge" pos="4.900 0.467 0" euler="1.57 0 0">
+            <include file="fridge/fridge_neg1/fridge_neg1.xml"/>
+        </body>
+
+        <body name="chair_chain" pos="2.000 -1.467 0" euler="0 0 0">
+            <include file="chair_bar/chair_bar/chair_bar.xml"/>
+        </body>
+
+        <body name="couch_chain" pos="1.333 -5.000 0" euler="1.57 3.14 0">
+            <include file="couch/couch/couch.xml"/>
+        </body>
+
+        <body name="robot" pos="4.333 -4.000 0">
+            <joint type="free" stiffness="0" damping="0" frictionloss="0" armature="0"/>
+            <include file="robot/obotx_V2.xml"/>
+        </body>
+
+        <body name="target_arm" pos="4.733 -4.000 0.8" quat="0 -1 0 0" mocap="true">
+            <geom type="box" size="0.033 0.033 0.033" contype="0" conaffinity="0" rgba=".6 .3 .3 0"/>
+            <site type="sphere" size="0.007" rgba="0 0 1 1" group="1"/>
+        </body>
+
+        <body name="target_base" pos="4.333 -4.000 -0.009" quat="0 -1 0 0" mocap="true">
+            <geom type="box" size="0.033 0.033 0.033" contype="0" conaffinity="0" rgba="0 0 0 0"/>
+            <site type="sphere" size="0.007" rgba="0 0 0 0" group="1"/>
+        </body>
+
+        <body name="camera_corner" pos="-0.8 -5.3 3" euler="0.6 -0.6 -0.6">
+            <!-- <geom type="cylinder" size="0.1 0.2"/> -->
+            <camera name="top_view" fovy="60"/>
+        </body>
+
+    </worldbody>
+
+    <include file='robot/assets/summit_xls_actuator.xml' />
+    <include file='robot/assets/arm_obotx_actuator_V2.xml' />
+    <include file='robot/assets/gripper_actuator_V2.xml' />
+
+    <contact>
+        <!-- Finger A exclusions for Arm1 -->
+        <exclude body1="Arm1" body2="Arm2"/>
+        <exclude body1="finger_a_link_1_1" body2="finger_a_link_2_1"/>
+        <exclude body1="finger_a_link_2_1" body2="finger_a_link_3_1"/>
+        <exclude body1="finger_a_link_1_1" body2="finger_a_link_3_1"/>
+
+        <!-- Finger B exclusions for Arm1 -->
+        <exclude body1="finger_b_link_0_1" body2="finger_b_link_1_1"/>
+        <exclude body1="finger_b_link_1_1" body2="finger_b_link_2_1"/>
+        <exclude body1="finger_b_link_0_1" body2="finger_b_link_2_1"/>
+        <exclude body1="finger_b_link_2_1" body2="finger_b_link_3_1"/>
+        <exclude body1="finger_b_link_0_1" body2="finger_b_link_3_1"/>
+        <exclude body1="finger_b_link_1_1" body2="finger_b_link_3_1"/>
+
+        <!-- Finger C exclusions for Arm1 -->
+        <exclude body1="finger_c_link_0_1" body2="finger_c_link_1_1"/>
+        <exclude body1="finger_c_link_1_1" body2="finger_c_link_2_1"/>
+        <exclude body1="finger_c_link_0_1" body2="finger_c_link_2_1"/>
+        <exclude body1="finger_c_link_2_1" body2="finger_c_link_3_1"/>
+        <exclude body1="finger_c_link_0_1" body2="finger_c_link_3_1"/>
+        <exclude body1="finger_c_link_1_1" body2="finger_c_link_3_1"/>
+
+        <!-- Gripper internal exclusions for Arm1 -->
+        <exclude body1="Gripper_Link3_1" body2="finger_a_link_1_1"/>
+        <exclude body1="Gripper_Link3_1" body2="finger_b_link_1_1"/>
+        <exclude body1="Gripper_Link3_1" body2="finger_c_link_1_1"/>
+        <exclude body1="Gripper_Link3_1" body2="finger_b_link_0_1"/>
+        <exclude body1="Gripper_Link3_1" body2="finger_c_link_0_1"/>
+        <exclude body1="Gripper_Link1_1" body2="finger_a_link_1_1"/>
+        <exclude body1="Gripper_Link1_1" body2="finger_b_link_1_1"/>
+        <exclude body1="Gripper_Link1_1" body2="finger_c_link_1_1"/>
+        <exclude body1="Gripper_Link1_1" body2="finger_b_link_0_1"/>
+        <exclude body1="Gripper_Link1_1" body2="finger_c_link_0_1"/>
+        <exclude body1="Gripper_Link1_1" body2="Gripper_Link3_1"/>
+        <exclude body1="Gripper_Link1_1" body2="Gripper_Link2_1"/>
+
+        <!-- Gripper to arm exclusions for Arm1 -->
+        <!-- <exclude body1="Gripper_Link3_1" body2="Arm_Left1"/> -->
+        <exclude body1="Gripper_Link2_1" body2="Arm_Left1"/>
+        <exclude body1="Gripper_Link1_1" body2="Arm_Left1"/>
+        <!-- <exclude body1="Gripper_Link3_1" body2="Arm_Right_1"/> -->
+        <exclude body1="Gripper_Link2_1" body2="Arm_Right_1"/>
+        <exclude body1="Gripper_Link1_1" body2="Arm_Right_1"/> 
+
+        <!-- Hand bearing & contact cylinder exclusions for Arm1 -->
+        <exclude body1="Hand_Bearing_1" body2="Contact_Cylinder_1_1"/>
+        <exclude body1="Contact_Cylinder_1_1" body2="Arm_Left1"/>
+        <exclude body1="Contact_Cylinder_1_1" body2="Arm_Right_1"/>
+        <exclude body1="Hand_Bearing_1" body2="Arm_Left1"/>
+        <exclude body1="Hand_Bearing_1" body2="Arm_Right_1"/>
+        <exclude body1="Bearing_Column_Right_1" body2="Arm_Right_1"/>
+        <exclude body1="Hand_Bearing_1" body2="Gripper_Link1_1"/>
+        <exclude body1="Hand_Bearing_1" body2="Gripper_Link2_1"/>
+        <exclude body1="Hand_Bearing_1" body2="Gripper_Link3_1"/>
+        <exclude body1="Contact_Cylinder_1_1" body2="Gripper_Link1_1"/>
+
+        <!-- === ARM 2 EXCLUSIONS === -->
+
+        <!-- Finger A exclusions for Arm2 -->
+        <exclude body1="finger_a_link_1_2" body2="finger_a_link_2_2"/>
+        <exclude body1="finger_a_link_2_2" body2="finger_a_link_3_2"/>
+        <exclude body1="finger_a_link_1_2" body2="finger_a_link_3_2"/>
+
+        <!-- Finger B exclusions for Arm2 -->
+        <exclude body1="finger_b_link_0_2" body2="finger_b_link_1_2"/>
+        <exclude body1="finger_b_link_1_2" body2="finger_b_link_2_2"/>
+        <exclude body1="finger_b_link_0_2" body2="finger_b_link_2_2"/>
+        <exclude body1="finger_b_link_2_2" body2="finger_b_link_3_2"/>
+        <exclude body1="finger_b_link_0_2" body2="finger_b_link_3_2"/>
+        <exclude body1="finger_b_link_1_2" body2="finger_b_link_3_2"/>
+
+        <!-- Finger C exclusions for Arm2 -->
+        <exclude body1="finger_c_link_0_2" body2="finger_c_link_1_2"/>
+        <exclude body1="finger_c_link_1_2" body2="finger_c_link_2_2"/>
+        <exclude body1="finger_c_link_0_2" body2="finger_c_link_2_2"/>
+        <exclude body1="finger_c_link_2_2" body2="finger_c_link_3_2"/>
+        <exclude body1="finger_c_link_0_2" body2="finger_c_link_3_2"/>
+        <exclude body1="finger_c_link_1_2" body2="finger_c_link_3_2"/>
+
+        <!-- Gripper internal exclusions for Arm2 -->
+        <exclude body1="Gripper_Link3_2" body2="finger_a_link_1_2"/>
+        <exclude body1="Gripper_Link3_2" body2="finger_b_link_1_2"/>
+        <exclude body1="Gripper_Link3_2" body2="finger_c_link_1_2"/>
+        <exclude body1="Gripper_Link3_2" body2="finger_b_link_0_2"/>
+        <exclude body1="Gripper_Link3_2" body2="finger_c_link_0_2"/>
+        <exclude body1="Gripper_Link1_2" body2="finger_a_link_1_2"/>
+        <exclude body1="Gripper_Link1_2" body2="finger_b_link_1_2"/>
+        <exclude body1="Gripper_Link1_2" body2="finger_c_link_1_2"/>
+        <exclude body1="Gripper_Link1_2" body2="finger_b_link_0_2"/>
+        <exclude body1="Gripper_Link1_2" body2="finger_c_link_0_2"/>
+        <exclude body1="Gripper_Link1_2" body2="Gripper_Link3_2"/>
+        <exclude body1="Gripper_Link1_2" body2="Gripper_Link2_2"/>
+
+        <!-- Gripper to arm exclusions for Arm2 -->
+        <!-- <exclude body1="Gripper_Link3_2" body2="Arm_Left2"/> -->
+        <exclude body1="Gripper_Link2_2" body2="Arm_Left2"/>
+        <exclude body1="Gripper_Link1_2" body2="Arm_Left2"/>
+        <!-- <exclude body1="Gripper_Link3_2" body2="Arm_Right_2"/> -->
+        <exclude body1="Gripper_Link2_2" body2="Arm_Right_2"/>
+        <exclude body1="Gripper_Link1_2" body2="Arm_Right_2"/> 
+
+        <!-- Hand bearing & contact cylinder exclusions for Arm2 -->
+        <exclude body1="Hand_Bearing_2" body2="Contact_Cylinder_2_1"/>
+        <exclude body1="Contact_Cylinder_2_1" body2="Arm_Left2"/>
+        <exclude body1="Contact_Cylinder_2_1" body2="Arm_Right_2"/>
+        <exclude body1="Hand_Bearing_2" body2="Arm_Left2"/>
+        <exclude body1="Hand_Bearing_2" body2="Arm_Right_2"/>
+        <exclude body1="Bearing_Column_Right2" body2="Arm_Right_2"/>
+        <exclude body1="Hand_Bearing_2" body2="Gripper_Link1_2"/>
+        <exclude body1="Hand_Bearing_2" body2="Gripper_Link2_2"/>
+        <exclude body1="Hand_Bearing_2" body2="Gripper_Link3_2"/>
+        <exclude body1="Contact_Cylinder_2_1" body2="Gripper_Link1_2"/>
+    </contact>
+
+    <equality>
+        <connect name="weld_contact_arm_sites_1" site1="cyl_weld_site_1_1" site2="arm_weld_site_1" solimp="0.99 0.99 0.001" solref="0.000001 1"/>
+        <connect name="weld_contact_arm_sites_2" site1="cyl_weld_site_2_1" site2="arm_weld_site_2" solimp="0.99 0.99 0.001" solref="0.000001 1"/>
+    </equality>
+</mujoco>

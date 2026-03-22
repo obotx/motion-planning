@@ -1,0 +1,6 @@
+<mujocoinclude model="brisk">
+    <body name="brisk" euler="1.57 0 0">
+      <geom material="material_0.001" mesh="brisk" class="visual"/>
+      <!-- <geom mesh="brisk" class="collision"/> -->
+    </body>
+</mujocoinclude>
