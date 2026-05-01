@@ -6,6 +6,7 @@ ompl_windows_bridge.py  —  Windows-side OMPL navigator
 3. Executes validated path in simulation
 """
 
+import os, sys
 import subprocess, json, threading, time, math
 import numpy as np
 import mujoco
@@ -15,8 +16,14 @@ GOAL_REACH_DIST     = 0.65
 WAYPOINT_TIMEOUT    = 180.0
 MIN_WAYPOINT_DIST   = 0.40
 
-WSL_PYTHON  = "/home/user1/ompl_clean/bin/python3"
-WSL_PLAN_PY = "/home/user1/ompl_bridge/plan.py"
+BRIDGE_MODE = os.environ.get("OMPL_BRIDGE_MODE", "wsl").lower()
+WSL_PYTHON  = os.environ.get("OMPL_WSL_PYTHON", "/home/user1/ompl_clean/bin/python3")
+WSL_PLAN_PY = os.environ.get("OMPL_WSL_PLAN_PY", "/home/user1/ompl_bridge/plan.py")
+LOCAL_PYTHON = os.environ.get("OMPL_PYTHON", sys.executable)
+LOCAL_PLAN_PY = os.environ.get(
+    "OMPL_PLAN_PY",
+    os.path.join(os.path.dirname(__file__), "plan.py"),
+)
 
 
 # ---------------------------------------------------------------------------
@@ -138,12 +145,17 @@ class InProcessNavigator:
         self._cancel_flag = False
         self._nav_thread  = None
         self.validator    = MujocoValidator(sim.model, sim.data)
-        # Pre-warm WSL
-        try:
-            subprocess.run(["wsl", "echo", "ok"], capture_output=True, timeout=10)
-        except Exception:
-            pass
-        print("[OMPL Bridge] Navigator initialized.")
+        if BRIDGE_MODE == "wsl":
+            try:
+                subprocess.run(["wsl", "echo", "ok"], capture_output=True, timeout=10)
+            except Exception:
+                pass
+        print(f"[OMPL Bridge] Navigator initialized. mode={BRIDGE_MODE}")
+
+    def _planner_command(self):
+        if BRIDGE_MODE == "native":
+            return [LOCAL_PYTHON, LOCAL_PLAN_PY]
+        return ["wsl", WSL_PYTHON, WSL_PLAN_PY]
 
     def navigate_to(self, goal_xy, on_complete=None):
         self._cancel_flag = True
@@ -166,10 +178,14 @@ class InProcessNavigator:
                 "solve_time": 3.0
             })
 
-            print(f"[OMPL] Calling WSL: ({x:.2f},{y:.2f}) → ({float(goal_xy[0]):.2f},{float(goal_xy[1]):.2f})")
+            print(
+                f"[OMPL] Calling planner mode={BRIDGE_MODE}: "
+                f"({x:.2f},{y:.2f}) -> "
+                f"({float(goal_xy[0]):.2f},{float(goal_xy[1]):.2f})"
+            )
 
             result = subprocess.run(
-                ["wsl", WSL_PYTHON, WSL_PLAN_PY],
+                self._planner_command(),
                 input=payload, capture_output=True, text=True, timeout=60)
 
             path_json = None
@@ -211,7 +227,7 @@ class InProcessNavigator:
             if on_complete: on_complete(success)
 
         except subprocess.TimeoutExpired:
-            print("[OMPL] WSL timed out")
+            print(f"[OMPL] Planner timed out mode={BRIDGE_MODE}")
             if on_complete: on_complete(False)
         except Exception as e:
             print(f"[OMPL] Error: {e}")
