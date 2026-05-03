@@ -1,8 +1,8 @@
 # M1 OMPL Object Navigation
 
-<p align="center">
+
 https://github.com/user-attachments/assets/42763aa0-9ef5-449a-b3e7-d32c80e5af17
-</p>
+
 
 <p align="center">▶ <strong>Watch: Full GUI Walkthrough</strong> — object selection, MOVE button, and live OMPL base navigation</p>
 
@@ -53,26 +53,17 @@ The user opens a GUI, selects a target object (for example, a can of Pepsi Max),
 
 ## Video Demos
 
-Below are demonstration videos of the OMPL-based navigation in action.
+### 1. Perspective View (GUI)
+https://github.com/user-attachments/assets/dde71c04-72fd-4ab9-8e5d-97656738ded6
 
-<p align="center">
-  <table border="0">
-    <tr>
-      <td align="center" width="50%">
-        <strong>1. Perspective View (GUI)</strong><br>
-        https://github.com/user-attachments/assets/dde71c04-72fd-4ab9-8e5d-97656738ded6
-        <br>
-        <em>Full recording of the GUI and robot navigation.</em>
-      </td>
-      <td align="center" width="50%">
-        <strong>2. Top-Down View</strong><br>
-        https://github.com/user-attachments/assets/034b1e6d-49c2-4bee-a92e-144ae6dffd88
-        <br>
-        <em>Clear view of the planned path through obstacles.</em>
-      </td>
-    </tr>
-  </table>
-</p>
+*Full recording of the GUI and robot navigation.*
+
+---
+
+### 2. Top-Down View
+https://github.com/user-attachments/assets/034b1e6d-49c2-4bee-a92e-144ae6dffd88
+
+*Clear view of the planned path through obstacles.*
 
 ---
 
