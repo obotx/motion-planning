@@ -16,7 +16,7 @@ GOAL_REACH_DIST     = 0.65
 WAYPOINT_TIMEOUT    = 180.0
 MIN_WAYPOINT_DIST   = 0.40
 
-BRIDGE_MODE = os.environ.get("OMPL_BRIDGE_MODE", "wsl").lower()
+BRIDGE_MODE = os.environ.get("OMPL_BRIDGE_MODE", "native").lower()
 WSL_PYTHON  = os.environ.get("OMPL_WSL_PYTHON", "/home/user1/ompl_clean/bin/python3")
 WSL_PLAN_PY = os.environ.get("OMPL_WSL_PLAN_PY", "/home/user1/ompl_bridge/plan.py")
 LOCAL_PYTHON = os.environ.get("OMPL_PYTHON", sys.executable)

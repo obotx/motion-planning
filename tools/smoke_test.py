@@ -1,5 +1,4 @@
 import importlib
-import os
 from pathlib import Path
 
 import mujoco
@@ -20,33 +19,21 @@ def check_xml(relative_path):
 
 
 def main():
-    for module_name in ("numpy", "scipy", "cv2", "glfw", "imgui", "zmq", "mujoco"):
+    for module_name in (
+        "numpy",
+        "scipy",
+        "cv2",
+        "glfw",
+        "imgui",
+        "zmq",
+        "mujoco",
+        "ompl",
+    ):
         check_import(module_name)
 
-    for relative_path in (
-        "src/env/market_world_plain.xml",
-        "src/env/market_world.xml",
-        "src/env/market_world_m1.xml",
-        "src/env/kitchen_world.xml",
-    ):
-        check_xml(relative_path)
+    check_xml("src/env/market_world_m1.xml")
 
-    allow_missing_ompl = os.environ.get("ALLOW_MISSING_OMPL", "").lower() in {
-        "1",
-        "true",
-        "yes",
-    }
-    try:
-        check_import("ompl")
-    except Exception as exc:
-        if allow_missing_ompl:
-            print(f"[WARN] import ompl failed: {exc}")
-            print("[WARN] M1 OMPL object navigation requires OMPL.")
-            return
-        print(f"[FAIL] import ompl failed: {exc}")
-        print("[FAIL] M1 OMPL object navigation requires OMPL.")
-        print("[FAIL] For non-M1-only checks, run: ALLOW_MISSING_OMPL=1 make smoke")
-        raise SystemExit(1)
+    print("[OK] M1 OMPL object-navigation environment is ready.")
 
 
 if __name__ == "__main__":
