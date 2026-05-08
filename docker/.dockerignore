@@ -1,0 +1,11 @@
+.git
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.mypy_cache
+.ruff_cache
+output_videos
+*.mp4.tmp
+*.log
+docker-compose.override.yml

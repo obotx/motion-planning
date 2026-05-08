@@ -166,11 +166,16 @@ class ParallelRobot:
         self.camera.elevation = -45         
         self.camera.lookat[:] = [0, 0, 0]
         
-        self.use_ik = False 
-        self.direct_arm_commands = np.concatenate([self.data.ctrl[self.actuator_ids[0:3]]/100, 
-                                                   [0], 
-                                                   self.data.ctrl[self.actuator_ids[4:7]]/100, 
+        self.use_ik = False
+        self.direct_arm_commands = np.concatenate([self.data.ctrl[self.actuator_ids[0:3]]/100,
+                                                   [0],
+                                                   self.data.ctrl[self.actuator_ids[4:7]]/100,
                                                    [0]])
+
+        # Pin callbacks: list of fn(data) invoked before each mj_step to pin
+        # object freejoints during pre-grasp/transport phases.
+        self._pin_callbacks = []
+        self._pin_lock = threading.Lock()
 
         if self.run_mode == "glfw":
             if not glfw.init():
@@ -345,6 +350,11 @@ class ParallelRobot:
     def reset(self, keyframe_name:str):
         key_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_KEY, keyframe_name)
         mujoco.mj_resetDataKeyframe(self.model, self.data, key_id)
+        self.base_integral_1 = 0.0
+        self.base_prev_error_1 = 0.0
+        self.base_integral_2 = 0.0
+        self.base_prev_error_2 = 0.0
+        self._base_pid_last_time = None
         
     def get_keyframe(self, keyframe_name:str):
         def format_array(arr):
@@ -372,6 +382,22 @@ class ParallelRobot:
         w, xq, yq, zq = self.data.xquat[self.base_id]
         yaw = np.arctan2(2 * (w * zq + xq * yq), 1 - 2 * (yq**2 + zq**2))
         return np.array([x, y, yaw])
+
+    # Pin callback API: register fn(data) to be invoked inside step_simulation
+    # right before mj_step to pin object freejoints at a target world position.
+    def add_pin_callback(self, fn):
+        with self._pin_lock:
+            if fn not in self._pin_callbacks:
+                self._pin_callbacks.append(fn)
+
+    def remove_pin_callback(self, fn):
+        with self._pin_lock:
+            if fn in self._pin_callbacks:
+                self._pin_callbacks.remove(fn)
+
+    def clear_pin_callbacks(self):
+        with self._pin_lock:
+            self._pin_callbacks.clear()
     
     def get_encoder(self):
         z1_left  = self.data.qpos[self.get_joint_qpos_addr("ColumnLeftBearingJoint_1")]
@@ -483,7 +509,16 @@ class ParallelRobot:
         return result
             
     def pid_base_joints(self, target_angle_1, target_angle_2, kp=10, ki=0.0, kd=7):
-        dt = self.model.opt.timestep
+        # Use elapsed simulation time as dt, since control_arms() runs once per
+        # step_simulation() while mj_step advances nstep=10 internal ticks.
+        now = float(self.data.time)
+        last = getattr(self, "_base_pid_last_time", None)
+        if last is None:
+            dt = self.model.opt.timestep * 10
+        else:
+            dt = max(self.model.opt.timestep, now - last)
+        self._base_pid_last_time = now
+
         jnt1_id = self.model.joint("BaseJoint_1").id
         qpos1 = self.data.qpos[self.model.jnt_qposadr[jnt1_id]]
         error1 = (target_angle_1 - qpos1 + np.pi) % (2 * np.pi) - np.pi
@@ -507,11 +542,11 @@ class ParallelRobot:
         return torque1, torque2
                 
     def control_base(self, target, alpha=0):
-        k_p = 20.0      # was 5.0
+        k_p = 20.0
         k_i = 0.1
         k_d = 0.8
-        
-        k_p_theta = 8.0  # was 5.0
+
+        k_p_theta = 8.0
         k_i_theta = 0.1
         k_d_theta = 0.8
 
@@ -604,6 +639,16 @@ class ParallelRobot:
     def step_simulation(self, render=True):
         self.control_base(target=self.target_base, alpha=0.1)
         self.control_arms()
+
+        # Run pin callbacks after ctrl is set but before physics integrates;
+        # each may set qpos for free joints to lock them at a target position.
+        with self._pin_lock:
+            cbs = list(self._pin_callbacks)
+        for cb in cbs:
+            try:
+                cb(self.data)
+            except Exception as e:
+                print(f"[Pin] callback error: {e}")
 
         mujoco.mj_step(self.model, self.data, nstep=10)
 

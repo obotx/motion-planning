@@ -1,0 +1,31 @@
+services:
+  motion-planning:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        USER_UID: ${USER_UID:-1000}
+        USER_GID: ${USER_GID:-1000}
+    image: morph-motion-planning:ubuntu22.04
+    working_dir: /workspace
+    init: true
+    ipc: host
+    environment:
+      DISPLAY: ${DISPLAY:-:0}
+      PYTHONPATH: /workspace/src
+      MUJOCO_GL: glfw
+      QT_X11_NO_MITSHM: "1"
+      OMPL_BRIDGE_MODE: native
+    volumes:
+      - type: bind
+        source: ..
+        target: /workspace
+      - type: bind
+        source: /tmp/.X11-unix
+        target: /tmp/.X11-unix
+    devices:
+      - /dev/dri:/dev/dri
+    network_mode: host
+    stdin_open: true
+    tty: true
+    command: bash

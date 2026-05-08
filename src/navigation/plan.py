@@ -4,10 +4,10 @@ from ompl import geometric as og
 
 FLOOR_X      = (0.0, 8.0)
 FLOOR_Y      = (-8.0, 0.0)
-ROBOT_RADIUS = 0.55   # increased — keeps robot well clear of shelf edge
+ROBOT_RADIUS = 0.55   # inflation radius to keep robot clear of shelf edges
 
 OBSTACLE_RECTS = [
-    (2.5,  8.05, -5.2, -3.1),   # shelf — extended slightly top and bottom
+    (2.5,  8.05, -5.2, -3.1),   # shelf
     (-0.1, 0.1,  -8.0,  0.0),
     (7.9,  8.1,  -8.0,  0.0),
     (0.0,  8.0,  -0.1,  0.1),
@@ -55,8 +55,12 @@ def plan(start_xy, goal_xy, solve_time=3.0):
 
     if not si.isValid(start): start = nudge(si, space, start_xy)
     if start is None: return None
-    if not si.isValid(goal):  goal  = nudge(si, space, goal_xy)
+    goal_was_nudged = False
+    if not si.isValid(goal):
+        goal  = nudge(si, space, goal_xy)
+        goal_was_nudged = True
     if goal is None:  return None
+    final_xy = [float(goal[0]), float(goal[1])] if goal_was_nudged else list(goal_xy)
 
     pdef = ob.ProblemDefinition(si)
     pdef.setStartAndGoalStates(start, goal)
@@ -73,7 +77,7 @@ def plan(start_xy, goal_xy, solve_time=3.0):
     path.interpolate(40)
     waypoints = [[path.getState(i)[0], path.getState(i)[1]]
                  for i in range(path.getStateCount())]
-    waypoints[-1] = list(goal_xy)
+    waypoints[-1] = final_xy
     return waypoints
 
 if __name__ == "__main__":

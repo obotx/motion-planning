@@ -1,80 +1,33 @@
 """
-grasp_controller.py  —  v51
-============================
+Physics-based grasp controller for the MORPH dual-arm system.
 
-ARCHITECTURE: FULLY PHYSICS-BASED
------------------------------------
-Previous versions (v49, v50) manipulated qpos directly every substep (weld),
-which is fundamentally non-physical: the integrator fights the position write
-and produces sawtooth oscillation, requiring hacks like gravcomp to mask it.
+Object hold is implemented through qfrc_applied (a spring-damper added to
+the equations of motion before integration) rather than direct qpos writes,
+so MuJoCo's solver integrates naturally with no oscillation.
 
-v51 removes ALL direct qpos manipulation.  The held object is controlled
-exclusively through qfrc_applied — the generalized-force vector that MuJoCo
-adds to the equations of motion BEFORE integration.  This is how real grippers
-work: finger contact forces are transmitted into the object, and we model the
-net effect as a spring-damper attached between the palm and the object.
+Hold mechanism (called every physics substep from play_m1.py before mj_step):
 
-HOLD MECHANISM — spring-damper in qfrc_applied
------------------------------------------------
-After grip confirmation, every substep (called from play_m1.py before mj_step):
-
-    Phase 1 — world-frozen:  target_pos = grasp_pos (object's position at snap)
+    Phase 1 — world-frozen:  target_pos = object's grasp position
     Phase 2 — palm-relative: target_pos = palm_mat @ local_offset + palm_pos
 
-    F_spring = K * (target_pos − obj_pos)       [restoring force]
-    F_damp   = −D * obj_vel                      [velocity damping]
-    F_grav   = +mass * 9.81 * ẑ                  [counteract gravity]
+    F = K*(target_pos − obj_pos) − D*obj_vel + mass*g*ẑ
 
-    qfrc_applied[dof:dof+3] = F_spring + F_damp + F_grav
+K=600 N/m, D=60 Ns/m is overdamped for the 0.05–0.20 kg object range.
+body_gravcomp[bid]=1.0 is also set at attach so MuJoCo cancels gravity in
+the solver, leaving the spring only to resist perturbations.
 
-    K=600 N/m, D=60 Ns/m  →  overdamped for all object masses (0.05–0.20 kg)
-    No qpos writes.  MuJoCo integrates normally.  Zero oscillation.
-
-Additionally, body_gravcomp[bid]=1.0 is set at attach so MuJoCo's own
-constraint solver also counteracts gravity.  This reduces the DC error of the
-spring (spring only needs to resist perturbation forces, not support full weight).
-
-WHY THIS IS PHYSICALLY CORRECT
---------------------------------
-qfrc_applied[translational dofs] for a free-joint body corresponds to a force
-in the world frame — exactly what a rigid gripper grip transmits.  The object's
-mass, inertia, contact with the floor, and other dynamic effects are preserved.
-There is no teleportation and no solver conflict.
-
-THREE BUGS FIXED vs v49
-------------------------
-Bug-1  VIBRATION:       qpos write → spring qfrc_applied (no integrator conflict)
-Bug-2  ARM/BODY OVERLAP: A1_SAFE=0.05m during ALL vertical moves; extend only
-                         in S4 after arm is already at object height
-Bug-3  UNREALISTIC:     snap-before-extend → physical servo approach (2 cm steps,
-                         stop at SIDE_STOP_DIST), weld only after finger contact
-
-CONFIRMED vs morph_i_free_move.py
------------------------------------
-• alpha=0.25 in control_arms → 99% convergence in 17 render frames (~0.57s)
-  → APPROACH_SETTLE=0.40s gives 96.8% convergence per step: safe
-• step_simulation(per_step_callback=...) calls callback before each of 10 substeps
-• localization() returns np.array([x, y, yaw])
-• direct_arm_commands[0:4] = left arm [h1, h2, a1, theta]
-• direct_arm_commands[4:8] = right arm [h1, h2, a1, theta]
-• body_gravcomp[:] is NOT set in __init__ (configure_model() is never called)
-  → our per-object gravcomp is safe and necessary
-• GOAL_REACH_DIST=0.65m in ompl_windows_bridge → nav stops 0.65m from goal
-  → S0 closes arm pivot to 0.40m from object (base ~0.28m away — safe)
-
-STATE MACHINE (v51)
--------------------
-  S0  APPROACH    — base drives until pivot ≤ 0.40m from object
-  S1  RETRACT+RAISE — h=H_MID, a1=A1_SAFE (arm clear of body at all heights)
-  S2  DESCEND     — h→obj_z (calibrated), a1=A1_SAFE (no body sweep)
-  S2b TILT        — h2 ramps up while h1 locked; a1=A1_SAFE throughout
-  S3  OPEN        — gripper fully open
-  S4  SERVO EXTEND— a1 grows 2cm/step, stop at SIDE_STOP_DIST (physical approach)
-  S5  CLOSE       — fingers ramp closed over T_CLOSE (physical contact)
-  S6  VERIFY      — MuJoCo contact array + proximity fallback
-  S7  ATTACH      — gravcomp=1, spring-force hold activated
-  S8  LIFT        — h→H_CARRY; spring carries object upward
-  S9  RETRACT     — a1→A1_HOME; palm-relative spring tracks
+Grasp state machine:
+  S0  APPROACH      — trim base until arm pivot ≤ ARM_IDEAL_HD
+  S1  RETRACT+RAISE — h=H_MID, a1=A1_SAFE (arm clear of chassis at all heights)
+  S2  DESCEND       — tilted low pose, h1 above LOW_GRASP_H1_MIN
+  S2b TILT          — ramp h2 up with h1 locked
+  S3  OPEN          — fully open gripper
+  S4  SERVO EXTEND  — a1 grows in APPROACH_STEP increments to SIDE_STOP_DIST
+  S5  CLOSE         — fingers ramp closed over T_CLOSE
+  S6  VERIFY        — MuJoCo contact array + proximity fallback
+  S7  ATTACH        — gravcomp=1, spring-force hold activated
+  S8  LIFT          — h→H_CARRY; spring carries object upward
+  S9  RETRACT       — a1→A1_HOME; palm-relative spring tracks
 """
 
 import threading, time, math
@@ -85,29 +38,28 @@ import mujoco
 H_MID  = 0.72    # neutral/home height for both columns
 H_CARRY = 0.65   # carry height after successful grasp
 
-# A1_SAFE: maximum arm extension during ANY vertical motion (raise/descend/tilt).
-# At 5 cm extension the arm tip is 0.17 m from the body centre — clear of chassis.
-# Extending beyond this only happens in S4, when arm is ALREADY at object height.
+# Maximum arm extension during any vertical motion (raise/descend/tilt). At
+# 0.05 m the arm tip clears the chassis. Extending beyond happens only in S4.
 A1_SAFE = 0.05
-A1_HOME = 0.28   # retracted home (used post-grasp)
+A1_HOME = 0.28   # retracted home, used post-grasp
 A1_MIN  = 0.00
 A1_MAX  = 0.58
 
-FINGERTIP_OVERHANG = 0.08   # palm-tip → fingertip (for geometry logging)
+FINGERTIP_OVERHANG = 0.08   # palm-tip → fingertip distance, for logging
 H_MIN              = 0.03   # absolute floor for h1/h2
 
-HD_TARGET = 0.45   # pivot→object target for fine-approach (not used after S0)
+HD_TARGET = 0.45   # pivot→object target for fine-approach (unused after S0)
 
 # ── Spring-force hold ─────────────────────────────────────────────────────────
-# K=600 N/m, D=60 Ns/m → overdamped (D_crit ≈ 11–22 for 0.05–0.20 kg objects)
+# Overdamped for the 0.05–0.20 kg object mass range.
 SPRING_K   = 600.0
 SPRING_D   = 60.0
 
 # ── Servo approach ────────────────────────────────────────────────────────────
-SIDE_STOP_DIST  = 0.17   # stop when palm centre is this far from object centre
+SIDE_STOP_DIST  = 0.17   # stop when palm centre is within this of object centre
 APPROACH_STEP   = 0.02   # a1 increment per servo step
-APPROACH_SETTLE = 0.40   # seconds between steps (96.8% convergence at alpha=0.25)
-APPROACH_MIN_PD = 0.09   # emergency stop (palm too close → collision)
+APPROACH_SETTLE = 0.40   # seconds between steps
+APPROACH_MIN_PD = 0.09   # emergency stop threshold (palm too close)
 
 # ── Calibration defaults ──────────────────────────────────────────────────────
 PALM_Z_OFFSET_DEFAULT = 0.168
@@ -132,9 +84,14 @@ CONTACT_REQUIRED = 1
 ATTACH_DIST_PROX = 0.40   # proximity fallback if contact array misses
 
 # ── Navigate approach ─────────────────────────────────────────────────────────
-ARM_IDEAL_HD = 0.40   # S0 target: pivot→object distance
-# Note: GOAL_REACH_DIST=0.65 in ompl_windows_bridge → nav stops 0.65m from goal.
-# S0 closes the remaining gap to ARM_IDEAL_HD from the arm pivot.
+ARM_IDEAL_HD = 0.62   # target pivot→object distance for fine-approach
+BASE_OBJECT_MIN_DIST = 0.70   # base centre must not approach floor objects closer
+# OMPL base nav targets a pick standoff (not object centre). S0 only trims
+# small residual error; S4 linear a1 extension performs the actual reach.
+
+# ── Low floor grasp clearance ─────────────────────────────────────────────────
+LOW_GRASP_H1_MIN = 0.30   # below this h1 can hit chassis at floor grasp
+LOW_GRASP_H2_DELTA = 0.20 # avoids low h1==h2 singular/chassis-sweep posture
 
 # ── Settle ────────────────────────────────────────────────────────────────────
 SETTLE_THRESHOLD = 0.008
@@ -143,7 +100,7 @@ SETTLE_MAX_WAIT  = 5.0
 SETTLE_STABLE    = 3
 
 # ── Convergence ───────────────────────────────────────────────────────────────
-CONVERGE_MIN_WAIT  = 0.70   # at alpha=0.25, 99% in 0.57s; 0.70s is safe
+CONVERGE_MIN_WAIT  = 0.70
 CONVERGE_THRESHOLD = 0.004
 CONVERGE_INTERVAL  = 0.20
 CONVERGE_STABLE    = 3
@@ -225,7 +182,7 @@ class GraspController:
         self._palm_a1_scale  = PALM_A1_SCALE_DEFAULT
         self._calibrate_arm_offsets()
 
-        print(f"[Grasp] v51  SPRING K={SPRING_K} D={SPRING_D}  "
+        print(f"[Grasp] SPRING K={SPRING_K} D={SPRING_D}  "
               f"A1_SAFE={A1_SAFE}  SIDE_STOP={SIDE_STOP_DIST}  "
               f"ARM_IDEAL_HD={ARM_IDEAL_HD}  "
               f"base_dof={self._base_dof}  "
@@ -535,17 +492,15 @@ class GraspController:
     # ── Spring-force attach / detach / reattach ───────────────────────────────
     def _attach(self, obj_idx, arm):
         """
-        Activate spring-force hold.
+        Activate spring-force hold (phase 1: world-frozen).
 
-        Phase 1 — world-frozen: spring target = object's CURRENT world position.
-        The arm is still tilted when we snap, so we must NOT record a
-        palm-relative offset yet.  The spring keeps the object perfectly still
-        while the arm levels and lifts.
+        Spring target is the object's current world position. The arm is
+        still tilted at this point, so a palm-relative offset would be wrong;
+        the spring keeps the object stationary while the arm levels and lifts,
+        and _reattach() switches to palm-relative once the arm is level.
 
-        body_gravcomp = 1.0: MuJoCo internally cancels gravity on this body,
-        so the spring only needs to resist perturbation forces — much smaller
-        than full weight.  This halves the DC spring displacement and eliminates
-        any residual oscillation.
+        body_gravcomp=1.0 is set so MuJoCo's solver cancels gravity, leaving
+        the spring only to resist perturbation forces.
         """
         bid, qpa, dof = self._resolve_obj_joint(obj_idx)
         if bid is None or dof is None:
@@ -576,9 +531,9 @@ class GraspController:
         """
         Switch to palm-relative spring (phase 2).
 
-        Called after S8 LIFT has converged (arm is level).
-        Records object position in palm's local frame so the spring target
-        tracks the palm correctly through S9 RETRACT and carry.
+        Called after S8 LIFT converges. Records the object position in the
+        palm's local frame so the spring target tracks the palm through S9
+        RETRACT and carry.
         """
         if not self._spring_active or self._held_obj_bid is None:
             return
@@ -628,18 +583,15 @@ class GraspController:
         """
         Apply spring-damper forces to the held object every physics substep.
 
-        This is called by play_m1.py via per_step_callback BEFORE mj_step,
-        so the forces are integrated by MuJoCo's own solver.  No qpos writes.
+        Called by play_m1.py via per_step_callback before mj_step so the
+        forces are integrated by MuJoCo's solver. No qpos writes.
 
-        Force law (world frame, applied at translational DOFs of free joint):
+        Force law (world frame, applied at the free joint's translational DOFs):
             F = K*(target − pos) − D*vel + mass*g*ẑ
 
-        body_gravcomp=1.0 already counteracts gravity in the solver, so the
-        mass*g*ẑ term here is a small correction for residual gravity leakage.
-        Total effect: spring acts as a stiff position constraint with zero DC error.
-
-        Keep fingers closed every substep so the grip is maintained visually
-        and physically (prevents finger backdrive during carry).
+        body_gravcomp=1.0 already cancels gravity in the solver; the mass*g*ẑ
+        term here is a small correction for residual leakage. Fingers are also
+        re-commanded each substep to prevent backdrive during carry.
         """
         if not self._spring_active or self._held_obj_bid is None:
             return
@@ -679,14 +631,24 @@ class GraspController:
         self._close_full(arm, self._close_j1)
 
     # ── Public API ────────────────────────────────────────────────────────────
-    def grasp(self, obj_idx, obj_world_pos, on_complete=None):
+    def grasp(self, obj_idx, obj_world_pos, on_complete=None,
+              preferred_arm=None, skip_approach=False):
+        """
+        preferred_arm: 'left' | 'right' | None (auto-select).
+            Pass 'left' when OMPL pre-approach was done with arm=1 so the
+            same arm is used for the physical grasp.
+        skip_approach: if True, skip S0 base trim, S1 retract+raise,
+            S2/S2b descend+tilt and S4 servo-extend.  The arm is already
+            at the OMPL pre-grasp pose; go straight to S3 open → S5 close.
+        """
         self._cancel = True
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=2.0)
         self._cancel = False
         self._thread = threading.Thread(
             target=self._run,
-            args=(int(obj_idx), np.array(obj_world_pos, dtype=float), on_complete),
+            args=(int(obj_idx), np.array(obj_world_pos, dtype=float),
+                  on_complete, preferred_arm, skip_approach),
             daemon=True)
         self._thread.start()
 
@@ -702,9 +664,14 @@ class GraspController:
     def get_held_idx(self): return self._held_obj_idx
 
     # ── Grasp state machine ───────────────────────────────────────────────────
-    def _run(self, obj_idx, obj_world_init, on_complete):
-        print(f"\n[Grasp] ══ v51  obj_{obj_idx} @ {obj_world_init.round(3)}")
-        arm = self._select_arm(obj_world_init)
+    def _run(self, obj_idx, obj_world_init, on_complete,
+             preferred_arm=None, skip_approach=False):
+        print(f"\n[Grasp] ══  obj_{obj_idx} @ {obj_world_init.round(3)}")
+        if preferred_arm:
+            arm = preferred_arm
+            print(f"[Grasp] Arm: {arm.upper()} (OMPL-selected, skip_approach={skip_approach})")
+        else:
+            arm = self._select_arm(obj_world_init)
         self._active_arm = arm
 
         obj_r, obj_hh = self._get_obj_geom(obj_idx)
@@ -720,48 +687,49 @@ class GraspController:
             print(f"\n[Grasp] Attempt {attempt+1}/{MAX_RETRIES}  obj={live_pos.round(3)}")
 
             # ── S0: APPROACH ──────────────────────────────────────────────────
-            # Drive base until arm pivot is ARM_IDEAL_HD (0.40m) from object.
-            # ompl_windows_bridge GOAL_REACH_DIST=0.65m means nav stopped ~0.65m
-            # from goal; S0 closes the remaining gap precisely.
-            # Safety: base never closer than 0.28m to object.
+            # With skip_approach=True (OMPL pre-positioned the arm), the base
+            # is already at a good standoff; skip the trim loop and freeze.
             if self._base_frozen:
                 self.unfreeze_base()
 
             ax0, ay0 = self._arm_pivot_world(arm)
             hd0 = math.sqrt((live_pos[0]-ax0)**2 + (live_pos[1]-ay0)**2)
-            print(f"[Grasp] S0 APPROACH — hd={hd0:.3f}m  target≤{ARM_IDEAL_HD}m")
 
-            if hd0 > ARM_IDEAL_HD + 0.02:
-                t_s0 = time.time()
-                while not self._cancel:
-                    if time.time()-t_s0 > 20.0:
-                        print("[Grasp] S0 timeout"); break
-                    rx, ry, ryaw = self.sim.localization()
-                    cy, sy = math.cos(ryaw), math.sin(ryaw)
-                    ox, oy = ARM_OFFSETS[arm]
-                    ax2 = rx+cy*ox-sy*oy; ay2 = ry+sy*ox+cy*oy
-                    hd2 = math.sqrt((live_pos[0]-ax2)**2+(live_pos[1]-ay2)**2)
-                    if hd2 <= ARM_IDEAL_HD + 0.01:
-                        print(f"[Grasp] S0 done — hd={hd2:.3f}m"); break
-                    dx2 = live_pos[0]-rx; dy2 = live_pos[1]-ry
-                    db2 = math.sqrt(dx2*dx2+dy2*dy2)
-                    if db2 < 0.01: break
-                    step2 = min(0.08, hd2 - ARM_IDEAL_HD)
-                    if db2 - step2 < 0.28:
-                        step2 = max(0.0, db2 - 0.28)
-                        if step2 < 0.005:
-                            print("[Grasp] S0 safety stop"); break
-                    if step2 < 0.005: break
-                    ux2 = dx2/db2; uy2 = dy2/db2
-                    nx2 = rx+ux2*step2; ny2 = ry+uy2*step2
-                    print(f"[Grasp] S0 step — hd={hd2:.3f}m  Δ={step2:.3f}m")
-                    self.kill_base_vel = False
-                    self._set_base_target(nx2, ny2, ryaw)
-                    t_step = time.time()
-                    while time.time()-t_step < 5.0:
-                        time.sleep(0.15)
-                        bx, by = self.sim.localization()[:2]
-                        if math.sqrt((bx-nx2)**2+(by-ny2)**2) < 0.04: break
+            if not skip_approach:
+                print(f"[Grasp] S0 APPROACH — hd={hd0:.3f}m  target≤{ARM_IDEAL_HD}m")
+                if hd0 > ARM_IDEAL_HD + 0.02:
+                    t_s0 = time.time()
+                    while not self._cancel:
+                        if time.time()-t_s0 > 20.0:
+                            print("[Grasp] S0 timeout"); break
+                        rx, ry, ryaw = self.sim.localization()
+                        cy, sy = math.cos(ryaw), math.sin(ryaw)
+                        ox, oy = ARM_OFFSETS[arm]
+                        ax2 = rx+cy*ox-sy*oy; ay2 = ry+sy*ox+cy*oy
+                        hd2 = math.sqrt((live_pos[0]-ax2)**2+(live_pos[1]-ay2)**2)
+                        if hd2 <= ARM_IDEAL_HD + 0.01:
+                            print(f"[Grasp] S0 done — hd={hd2:.3f}m"); break
+                        dx2 = live_pos[0]-rx; dy2 = live_pos[1]-ry
+                        db2 = math.sqrt(dx2*dx2+dy2*dy2)
+                        if db2 < 0.01: break
+                        step2 = min(0.08, hd2 - ARM_IDEAL_HD)
+                        if db2 - step2 < BASE_OBJECT_MIN_DIST:
+                            step2 = max(0.0, db2 - BASE_OBJECT_MIN_DIST)
+                            if step2 < 0.005:
+                                print("[Grasp] S0 safety stop"); break
+                        if step2 < 0.005: break
+                        ux2 = dx2/db2; uy2 = dy2/db2
+                        nx2 = rx+ux2*step2; ny2 = ry+uy2*step2
+                        print(f"[Grasp] S0 step — hd={hd2:.3f}m  Δ={step2:.3f}m")
+                        self.kill_base_vel = False
+                        self._set_base_target(nx2, ny2, ryaw)
+                        t_step = time.time()
+                        while time.time()-t_step < 5.0:
+                            time.sleep(0.15)
+                            bx, by = self.sim.localization()[:2]
+                            if math.sqrt((bx-nx2)**2+(by-ny2)**2) < 0.04: break
+            else:
+                print(f"[Grasp] S0 SKIP (OMPL base positioned) — hd={hd0:.3f}m")
 
             self.freeze_base()
             self.wait_for_settle()
@@ -774,49 +742,65 @@ class GraspController:
             hd       = math.sqrt((live_pos[0]-ax)**2+(live_pos[1]-ay)**2)
             print(f"[Grasp] θ={math.degrees(theta):.1f}°  hd={hd:.3f}m  obj_z={obj_z:.3f}m")
 
-            # ── S1: RETRACT + RAISE ───────────────────────────────────────────
-            # A1_SAFE=0.05m: arm tip only 0.17m from body centre — clear of chassis
-            # at ALL h values including H_MIN=0.03.
-            print(f"[Grasp] S1 RETRACT+RAISE — h={H_MID:.2f}  a1={A1_SAFE:.2f}  θ={math.degrees(theta):.1f}°")
-            self._open(arm)
-            self._cmd(arm, H_MID, H_MID, A1_SAFE, theta)
-            self._wait_converge(arm, "raise")
-            if self._cancel: break
-
-            # ── S2: DESCEND — lower h1=h2 to object height, a1=A1_SAFE ──────
-            h_sym = self._h_cmd_for_palm_z(obj_z)
-            print(f"[Grasp] S2 DESCEND — h→{h_sym:.3f}  (palm_z≈{obj_z:.3f}m)  "
-                  f"a1={A1_SAFE:.2f}")
-            self._cmd(arm, h_sym, h_sym, A1_SAFE, theta)
-            self._wait_converge(arm, "descend")
-            if self._cancel: break
-
-            palm_z   = float(self._palm_pos(arm)[2])
-            Z_gap    = palm_z - obj_z
-            print(f"[Grasp]   palm_z={palm_z:.3f}  obj_z={obj_z:.3f}  Δz={Z_gap:.3f}")
-
-            # ── S2b: TILT — raise h2 until palm reaches obj_z (a1=A1_SAFE) ──
-            H2_TILT_MAX  = 1.40
-            H2_TILT_STEP = 0.12
-            Z_TOL        = 0.06
-            h1_locked    = max(h_sym, H_MIN)
-            h2_cur       = h1_locked
-
-            if Z_gap > Z_TOL:
-                print(f"[Grasp] S2b TILT — h1={h1_locked:.3f} locked  "
-                      f"h2 ramps to {H2_TILT_MAX}  a1={A1_SAFE:.2f}")
-                while h2_cur < H2_TILT_MAX and not self._cancel:
-                    h2_cur = min(h2_cur + H2_TILT_STEP, H2_TILT_MAX)
-                    self._cmd(arm, h1_locked, h2_cur, A1_SAFE, theta)
-                    self._wait_converge(arm, f"tilt h2={h2_cur:.2f}")
-                    palm_now_z = float(self._palm_pos(arm)[2])
-                    print(f"[Grasp]   h2={h2_cur:.2f}  palm_z={palm_now_z:.3f}  "
-                          f"Δz={palm_now_z-obj_z:.3f}")
-                    if palm_now_z <= obj_z + Z_TOL:
-                        print("[Grasp]   ✓ tilt done"); break
+            if not skip_approach:
+                # ── S1: RETRACT + RAISE ───────────────────────────────────────
+                # A1_SAFE keeps the arm tip clear of the chassis.
+                print(f"[Grasp] S1 RETRACT+RAISE — h={H_MID:.2f}  a1={A1_SAFE:.2f}  "
+                      f"θ={math.degrees(theta):.1f}°")
+                self._open(arm)
+                self._cmd(arm, H_MID, H_MID, A1_SAFE, theta)
+                self._wait_converge(arm, "raise")
                 if self._cancel: break
+
+                # ── S2: DESCEND — keep h1 above chassis, tilted posture ──────
+                h_raw     = self._h_cmd_for_palm_z(obj_z)
+                h1_locked = max(h_raw, LOW_GRASP_H1_MIN)
+                h2_cur    = min(max(h1_locked + LOW_GRASP_H2_DELTA, h_raw), 1.40)
+                print(f"[Grasp] S2 DESCEND — h_raw={h_raw:.3f}  "
+                      f"h1={h1_locked:.3f}  h2={h2_cur:.3f}  "
+                      f"(palm_z≈{obj_z:.3f}m)  a1={A1_SAFE:.2f}")
+                self._cmd(arm, h1_locked, h2_cur, A1_SAFE, theta)
+                self._wait_converge(arm, "descend")
+                if self._cancel: break
+
+                palm_z = float(self._palm_pos(arm)[2])
+                Z_gap  = palm_z - obj_z
+                print(f"[Grasp]   palm_z={palm_z:.3f}  obj_z={obj_z:.3f}  Δz={Z_gap:.3f}")
+
+                # ── S2b: TILT — raise h2 until palm at obj_z ─────────────────
+                H2_TILT_MAX  = 1.40
+                H2_TILT_STEP = 0.12
+                Z_TOL        = 0.06
+
+                if Z_gap > Z_TOL:
+                    print(f"[Grasp] S2b TILT — h1={h1_locked:.3f} locked  "
+                          f"h2 ramps to {H2_TILT_MAX}  a1={A1_SAFE:.2f}")
+                    while h2_cur < H2_TILT_MAX and not self._cancel:
+                        h2_cur = min(h2_cur + H2_TILT_STEP, H2_TILT_MAX)
+                        self._cmd(arm, h1_locked, h2_cur, A1_SAFE, theta)
+                        self._wait_converge(arm, f"tilt h2={h2_cur:.2f}")
+                        palm_now_z = float(self._palm_pos(arm)[2])
+                        print(f"[Grasp]   h2={h2_cur:.2f}  palm_z={palm_now_z:.3f}  "
+                              f"Δz={palm_now_z-obj_z:.3f}")
+                        if palm_now_z <= obj_z + Z_TOL:
+                            print("[Grasp]   ✓ tilt done"); break
+                    if self._cancel: break
+                else:
+                    print(f"[Grasp]   no tilt needed — Δz={Z_gap:.3f}")
+
             else:
-                print(f"[Grasp]   no tilt needed — Δz={Z_gap:.3f}")
+                # S1/S2/S2b skipped — OMPL pre-approach positioned the arm.
+                # Use commanded values (close to actual after PD convergence).
+                if arm == 'left':
+                    h1_locked  = float(self.sim.direct_arm_commands[0])
+                    h2_cur     = float(self.sim.direct_arm_commands[1])
+                    a1_current = float(self.sim.direct_arm_commands[2])
+                else:
+                    h1_locked  = float(self.sim.direct_arm_commands[4])
+                    h2_cur     = float(self.sim.direct_arm_commands[5])
+                    a1_current = float(self.sim.direct_arm_commands[6])
+                print(f"[Grasp] S1-S2b SKIP (OMPL pre-positioned) — "
+                      f"h1={h1_locked:.3f}  h2={h2_cur:.3f}  a1={a1_current:.3f}")
 
             # ── S3: OPEN GRIPPER ──────────────────────────────────────────────
             print("[Grasp] S3 OPEN")
@@ -825,39 +809,47 @@ class GraspController:
             if self._cancel: break
 
             # ── S4: SERVO EXTEND — physical approach ──────────────────────────
-            # Arm is ALREADY at object height (h1_locked, h2_cur).
-            # a1 grows in 2 cm steps; after each step palm_dist is measured.
-            # This is FK-independent: the arm physically approaches the object.
-            # Emergency stop prevents collision with object geometry.
-            live_pos = self._get_obj_live_pos(obj_idx)
-            theta    = self._compute_theta(live_pos, arm)
-
-            print(f"[Grasp] S4 SERVO EXTEND — stop at palm_dist≤{SIDE_STOP_DIST:.2f}m  "
-                  f"step={APPROACH_STEP:.2f}m")
-            a1_servo = A1_SAFE
+            live_pos     = self._get_obj_live_pos(obj_idx)
+            theta        = self._compute_theta(live_pos, arm)
             obj_world_3d = live_pos.copy()
 
-            while a1_servo < A1_MAX and not self._cancel:
-                a1_servo = min(a1_servo + APPROACH_STEP, A1_MAX)
-                self._cmd(arm, h1_locked, h2_cur, a1_servo, theta)
-                time.sleep(APPROACH_SETTLE)   # 0.40s = 96.8% converged at alpha=0.25
+            if not skip_approach:
+                # Arm at object height; extend a1 in APPROACH_STEP increments.
+                print(f"[Grasp] S4 SERVO EXTEND — stop at palm_dist≤{SIDE_STOP_DIST:.2f}m  "
+                      f"step={APPROACH_STEP:.2f}m")
+                a1_servo = A1_SAFE
 
-                palm_now = self._palm_pos(arm)
-                pd       = float(np.linalg.norm(palm_now - obj_world_3d))
-                print(f"[Grasp]   servo a1={a1_servo:.3f}  palm_dist={pd:.3f}  "
-                      f"palm_z={palm_now[2]:.3f}")
-
-                if pd < APPROACH_MIN_PD:
-                    print(f"[Grasp]   EMERGENCY STOP — pd={pd:.3f}")
-                    a1_servo = max(a1_servo - APPROACH_STEP, A1_SAFE)
+                while a1_servo < A1_MAX and not self._cancel:
+                    a1_servo = min(a1_servo + APPROACH_STEP, A1_MAX)
                     self._cmd(arm, h1_locked, h2_cur, a1_servo, theta)
-                    time.sleep(APPROACH_SETTLE); break
+                    time.sleep(APPROACH_SETTLE)
 
-                if pd <= SIDE_STOP_DIST:
-                    print(f"[Grasp]   TARGET REACHED — pd={pd:.3f}"); break
+                    palm_now = self._palm_pos(arm)
+                    pd       = float(np.linalg.norm(palm_now - obj_world_3d))
+                    print(f"[Grasp]   servo a1={a1_servo:.3f}  palm_dist={pd:.3f}  "
+                          f"palm_z={palm_now[2]:.3f}")
 
-            if self._cancel: break
-            self._wait_converge(arm, "servo-settle", min_wait=0.60)
+                    if pd < APPROACH_MIN_PD:
+                        print(f"[Grasp]   EMERGENCY STOP — pd={pd:.3f}")
+                        a1_servo = max(a1_servo - APPROACH_STEP, A1_SAFE)
+                        self._cmd(arm, h1_locked, h2_cur, a1_servo, theta)
+                        time.sleep(APPROACH_SETTLE); break
+
+                    if pd <= SIDE_STOP_DIST:
+                        print(f"[Grasp]   TARGET REACHED — pd={pd:.3f}"); break
+
+                if self._cancel: break
+                self._wait_converge(arm, "servo-settle", min_wait=0.60)
+
+            else:
+                # OMPL pre-approach already positioned the arm; use the joint
+                # state from the OMPL path end.
+                a1_servo = a1_current
+                palm_now = self._palm_pos(arm)
+                pd_now   = float(np.linalg.norm(palm_now - obj_world_3d))
+                print(f"[Grasp] S4 SKIP (OMPL) — palm={palm_now.round(3)}  "
+                      f"obj={obj_world_3d.round(3)}  pd={pd_now:.3f}m")
+                if self._cancel: break
 
             palm_final = self._palm_pos(arm)
             pd_final   = float(np.linalg.norm(palm_final - obj_world_3d))
@@ -871,9 +863,8 @@ class GraspController:
                 self.unfreeze_base(); continue
 
             # ── S5: CLOSE — physical finger contact ───────────────────────────
-            # Arm is STATIONARY.  Fingers ramp closed over T_CLOSE seconds.
-            # MuJoCo generates real contact forces between finger geometry and
-            # the object cylinder.  This is the only step that touches the object.
+            # Arm stationary; fingers ramp closed over T_CLOSE seconds. MuJoCo
+            # generates real contact forces between finger geoms and the object.
             print(f"[Grasp] S5 CLOSE — J1:{J1_OPEN:.2f}→{self._close_j1:.3f}  "
                   f"T={T_CLOSE:.1f}s  (physical contact)")
             t0 = time.time()
@@ -901,17 +892,16 @@ class GraspController:
                 self.unfreeze_base(); continue
 
             # ── S7: ATTACH — spring-force hold, world-frozen phase ────────────
-            # Activated AFTER physical contact confirmed.
-            # body_gravcomp=1.0 + spring K=600 D=60 → overdamped, zero oscillation.
-            # Object stays at its CURRENT position (not teleported).
+            # Activated only after physical contact is confirmed; the object
+            # is held at its current position (not teleported).
             self._attach(obj_idx, arm)
             time.sleep(0.20)
             if self._cancel: self._detach(); break
 
             # ── S8: LIFT — raise arm, spring carries object upward ────────────
-            # h1=h2 → H_CARRY levels the arm and lifts.
-            # World-frozen spring keeps object at grasp position until
-            # _reattach() switches to palm-relative tracking.
+            # h1=h2 → H_CARRY levels the arm and lifts. The world-frozen spring
+            # keeps the object at the grasp position until _reattach() switches
+            # to palm-relative tracking.
             h_carry_cmd = self._h_cmd_for_palm_z(H_CARRY)
             print(f"[Grasp] S8 LIFT — h→{h_carry_cmd:.3f}  (spring holds object)")
             self._cmd(arm, h_carry_cmd, h_carry_cmd, a1_servo, theta)

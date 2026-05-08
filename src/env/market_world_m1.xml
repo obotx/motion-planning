@@ -267,6 +267,10 @@
     <equality>
         <connect name="weld_contact_arm_sites_1" site1="cyl_weld_site_1_1" site2="arm_weld_site_1" solimp="0.95 0.9 0.9 0.5 100" solref="0.00000001 1"/>
         <connect name="weld_contact_arm_sites_2" site1="cyl_weld_site_1_2" site2="arm_weld_site_2" solimp="0.95 0.9 0.9 0.5 100" solref="0.00000001 1"/>
+        <!-- OMPL transport planning: single weld re-pointed at held object via eq_obj2id at runtime.
+             active="false" by default — only enabled in plan_data, never in sim_data. -->
+        <weld name="grasp_left" body1="Gripper_Link1_1" body2="pickup_obj_0"
+              active="false" relpose="0 0 0 1 0 0 0" solref="0.005 1"/>
     </equality>
 
     <keyframe>
