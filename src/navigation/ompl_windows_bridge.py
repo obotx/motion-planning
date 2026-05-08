@@ -1,9 +1,9 @@
 """
-ompl_windows_bridge.py  —  Windows-side OMPL navigator
-========================================================
-1. Calls OMPL RRT* planner in WSL (plan.py) via subprocess
-2. Validates returned path using MuJoCo collision detection (mj_forward + ncon)
-3. Executes validated path in simulation
+Windows-side OMPL navigator.
+
+1. Calls the OMPL RRT* planner (plan.py) via subprocess (native or WSL).
+2. Validates the returned path using MuJoCo collision detection.
+3. Executes the validated path in simulation.
 """
 
 import os, sys
@@ -11,10 +11,14 @@ import subprocess, json, threading, time, math
 import numpy as np
 import mujoco
 
-WAYPOINT_REACH_DIST = 0.60
-GOAL_REACH_DIST     = 0.65
+WAYPOINT_REACH_DIST = 0.25
+GOAL_REACH_DIST     = 0.35
 WAYPOINT_TIMEOUT    = 180.0
-MIN_WAYPOINT_DIST   = 0.40
+WAYPOINT_STALL_TIMEOUT = 12.0
+WAYPOINT_STALL_MIN_IMPROVEMENT = 0.02
+MIN_WAYPOINT_DIST   = 0.25
+STRICT_MAX_COLLISION_STITCH_GAP = 0.75
+FINAL_YAW_TOL       = 0.20   # rad (~11.5 deg) — final-waypoint yaw tolerance.
 
 BRIDGE_MODE = os.environ.get("OMPL_BRIDGE_MODE", "native").lower()
 WSL_PYTHON  = os.environ.get("OMPL_WSL_PYTHON", "/home/user1/ompl_clean/bin/python3")
@@ -32,8 +36,9 @@ LOCAL_PLAN_PY = os.environ.get(
 class MujocoValidator:
     """
     Validates waypoints using MuJoCo native collision detection.
-    Uses dedicated MjData — never touches main sim data.
-    Only checks contacts involving the mobile base body.
+
+    Uses a dedicated MjData (never touches the main sim) and only checks
+    contacts involving the mobile-base body (arm/gripper contacts ignored).
     """
 
     def __init__(self, model, sim_data, base_body_name="base_footprint"):
@@ -44,8 +49,12 @@ class MujocoValidator:
         self.base_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, base_body_name)
         self.base_qposadr = self._find_free_joint_adr()
 
-        # Collect all geom IDs belonging to the base and its direct children
+        # base_footprint itself has no geoms; chassis/wheels live under child
+        # bodies. Arms are also descendants and must be excluded.
         self.base_geom_ids = self._collect_base_geoms()
+        self.last_removed = 0
+        self.last_max_gap = 0.0
+        self.last_goal_dropped = False
         print(f"[MuJoCo Validator] Ready. base_id={self.base_id}, "
               f"base_geoms={len(self.base_geom_ids)}, qposadr={self.base_qposadr}")
 
@@ -59,32 +68,78 @@ class MujocoValidator:
         raise RuntimeError("No free joint found for base body")
 
     def _collect_base_geoms(self):
-        """Collect geom IDs that belong to the base body only (not arms)."""
+        """Collect mobile-base geom IDs while excluding arm/gripper descendants."""
+        arm_roots = {"Arm_1", "Arm_2"}
+
+        def belongs_to_mobile_base(body_id):
+            cur = int(body_id)
+            while cur >= 0:
+                name = mujoco.mj_id2name(
+                    self.model, mujoco.mjtObj.mjOBJ_BODY, cur) or ""
+                if name in arm_roots:
+                    return False
+                if cur == self.base_id:
+                    return True
+                parent = int(self.model.body_parentid[cur])
+                if parent == cur:
+                    break
+                cur = parent
+            return False
+
         geoms = set()
         for g in range(self.model.ngeom):
-            if self.model.geom_bodyid[g] == self.base_id:
+            if belongs_to_mobile_base(self.model.geom_bodyid[g]):
                 geoms.add(g)
         return geoms
 
-    def _set_base_xy(self, x, y):
+    def _is_robot_descendant(self, body_id):
+        cur = int(body_id)
+        while cur >= 0:
+            if cur == self.base_id:
+                return True
+            parent = int(self.model.body_parentid[cur])
+            if parent == cur:
+                break
+            cur = parent
+        return False
+
+    def _is_allowed_base_contact(self, other_geom):
+        geom_name = mujoco.mj_id2name(
+            self.model, mujoco.mjtObj.mjOBJ_GEOM, int(other_geom)) or ""
+        if geom_name == "floor":
+            return True
+        other_body = int(self.model.geom_bodyid[int(other_geom)])
+        return self._is_robot_descendant(other_body)
+
+    def _set_base_pose(self, x, y, yaw=0.0):
+        """Place base at (x, y, yaw) — yaw is rotation about world Z."""
         adr = self.base_qposadr
         self.data.qpos[adr + 0] = x
         self.data.qpos[adr + 1] = y
-        self.data.qpos[adr + 3] = 1.0
+        # Quaternion for rotation about Z by yaw radians
+        self.data.qpos[adr + 3] = math.cos(yaw / 2.0)
         self.data.qpos[adr + 4] = 0.0
         self.data.qpos[adr + 5] = 0.0
-        self.data.qpos[adr + 6] = 0.0
+        self.data.qpos[adr + 6] = math.sin(yaw / 2.0)
 
-    def is_valid(self, x, y):
+    def is_valid(self, x, y, yaw=0.0):
         """
-        mj_forward() + check contacts involving base geoms only.
-        Ignores arm/gripper contacts.
+        Run mj_forward() and check contacts involving base geoms only.
+
+        yaw: robot heading in radians. The chassis is asymmetric (arms extend
+        forward), so a configuration valid at yaw=0 may collide at the actual
+        heading; pass the heading the robot will have at this waypoint.
         """
-        self._set_base_xy(x, y)
+        self._set_base_pose(x, y, yaw)
         mujoco.mj_forward(self.model, self.data)
         for i in range(self.data.ncon):
             c = self.data.contact[i]
-            if c.geom1 in self.base_geom_ids or c.geom2 in self.base_geom_ids:
+            g1 = int(c.geom1)
+            g2 = int(c.geom2)
+            if g1 in self.base_geom_ids or g2 in self.base_geom_ids:
+                other = g2 if g1 in self.base_geom_ids else g1
+                if self._is_allowed_base_contact(other):
+                    continue
                 return False
         return True
 
@@ -92,20 +147,55 @@ class MujocoValidator:
         self.data.qpos[:] = sim_data.qpos[:]
         self.data.qvel[:] = 0.0
 
-    def filter_path(self, path):
-        """Remove waypoints where base is in collision per MuJoCo."""
+    def filter_path(self, path, final_yaw=None):
+        """
+        Remove waypoints where the base is in collision per MuJoCo.
+
+        Yaw at each waypoint is the heading toward the next waypoint (what
+        the navigator commands during motion); for the final waypoint, use
+        final_yaw if provided, else the heading-from-previous direction.
+        """
+        if not path:
+            self.last_removed = 0
+            self.last_max_gap = 0.0
+            self.last_goal_dropped = False
+            return path
         valid = [path[0]]
         removed = 0
-        for pt in path[1:]:
-            if self.is_valid(pt[0], pt[1]):
-                valid.append(pt)
+        self.last_goal_dropped = False
+        for i in range(1, len(path)):
+            wx, wy = path[i]
+            if i < len(path) - 1:
+                nx, ny = path[i + 1]
+                yaw = math.atan2(ny - wy, nx - wx)
+            elif final_yaw is not None:
+                yaw = float(final_yaw)
+            else:
+                px, py = path[i - 1]
+                yaw = math.atan2(wy - py, wx - px)
+            if self.is_valid(wx, wy, yaw=yaw):
+                valid.append((wx, wy))
             else:
                 removed += 1
         if removed > 0:
             print(f"[MuJoCo Validator] Removed {removed} waypoints in collision")
-        # Always keep final goal
+        self.last_removed = removed
+        # Re-append the original goal only if it differs from valid[-1] AND
+        # is itself reachable at the final yaw.
         if valid[-1] != path[-1]:
-            valid.append(path[-1])
+            tail_yaw = float(final_yaw) if final_yaw is not None else (
+                math.atan2(path[-1][1] - path[-2][1],
+                           path[-1][0] - path[-2][0]) if len(path) >= 2 else 0.0)
+            if self.is_valid(path[-1][0], path[-1][1], yaw=tail_yaw):
+                valid.append(path[-1])
+            else:
+                print("[MuJoCo Validator] Dropped final goal because it is in collision")
+                self.last_goal_dropped = True
+        if len(valid) >= 2:
+            self.last_max_gap = max(math.dist(a, b)
+                                    for a, b in zip(valid[:-1], valid[1:]))
+        else:
+            self.last_max_gap = 0.0
         return valid
 
 
@@ -121,6 +211,22 @@ def decimate_path(path, min_dist=MIN_WAYPOINT_DIST):
             result.append(wp)
     result.append(path[-1])
     return result
+
+
+def densify_path(path, max_step=0.20):
+    if not path:
+        return path
+    dense = [path[0]]
+    for p0, p1 in zip(path[:-1], path[1:]):
+        dist = math.dist(p0, p1)
+        steps = max(1, int(math.ceil(dist / max_step)))
+        for k in range(1, steps + 1):
+            t = k / steps
+            dense.append((
+                p0[0] + (p1[0] - p0[0]) * t,
+                p0[1] + (p1[1] - p0[1]) * t,
+            ))
+    return dense
 
 
 def smooth_path(waypoints, passes=3):
@@ -142,9 +248,13 @@ def smooth_path(waypoints, passes=3):
 class InProcessNavigator:
     def __init__(self, sim):
         self.sim          = sim
-        self._cancel_flag = False
-        self._nav_thread  = None
         self.validator    = MujocoValidator(sim.model, sim.data)
+        # Generation token: every navigate_to() increments _nav_gen. Each
+        # background thread captures its own token and self-exits when it
+        # sees a newer token, making cancellation deterministic even when an
+        # old thread is blocked in subprocess.run().
+        self._nav_gen     = 0
+        self._gen_lock    = threading.Lock()
         if BRIDGE_MODE == "wsl":
             try:
                 subprocess.run(["wsl", "echo", "ok"], capture_output=True, timeout=10)
@@ -157,19 +267,37 @@ class InProcessNavigator:
             return [LOCAL_PYTHON, LOCAL_PLAN_PY]
         return ["wsl", WSL_PYTHON, WSL_PLAN_PY]
 
-    def navigate_to(self, goal_xy, on_complete=None):
-        self._cancel_flag = True
-        if self._nav_thread and self._nav_thread.is_alive():
-            self._nav_thread.join(timeout=2.0)
-        self._cancel_flag = False
-        self._nav_thread  = threading.Thread(
-            target=self._run, args=(goal_xy, on_complete), daemon=True)
-        self._nav_thread.start()
+    def navigate_to(self, goal_xy, on_complete=None, goal_tolerance=None,
+                    final_yaw=None, allow_goal_nudge=True):
+        with self._gen_lock:
+            self._nav_gen += 1
+            my_gen = self._nav_gen
+        threading.Thread(
+            target=self._run,
+            args=(my_gen, goal_xy, on_complete, goal_tolerance, final_yaw,
+                  allow_goal_nudge),
+            daemon=True).start()
 
     def cancel(self):
-        self._cancel_flag = True
+        # Bumping the generation token invalidates the running thread.
+        with self._gen_lock:
+            self._nav_gen += 1
 
-    def _run(self, goal_xy, on_complete):
+    def _is_current(self, my_gen):
+        with self._gen_lock:
+            return my_gen == self._nav_gen
+
+    def _run(self, my_gen, goal_xy, on_complete, goal_tolerance, final_yaw,
+             allow_goal_nudge):
+        # Single-shot callback dispatcher (avoid double-fire in error paths).
+        cb_fired = [False]
+        def fire(ok):
+            if cb_fired[0]:
+                return
+            cb_fired[0] = True
+            if on_complete:
+                on_complete(ok)
+
         try:
             x, y, yaw = self.sim.localization()
             payload = json.dumps({
@@ -188,6 +316,12 @@ class InProcessNavigator:
                 self._planner_command(),
                 input=payload, capture_output=True, text=True, timeout=60)
 
+            # If a newer navigate_to was issued while we were blocked in OMPL,
+            # exit silently without firing the callback or driving the base.
+            if not self._is_current(my_gen):
+                print(f"[Nav gen={my_gen}] superseded — exiting")
+                return
+
             path_json = None
             for line in result.stdout.splitlines():
                 line = line.strip()
@@ -197,65 +331,207 @@ class InProcessNavigator:
 
             if path_json is None:
                 print(f"[OMPL] No JSON in output. stderr: {result.stderr[:200]}")
-                if on_complete: on_complete(False)
+                fire(False)
                 return
 
             data = json.loads(path_json)
             if isinstance(data, dict) and "error" in data:
                 print(f"[OMPL] Planner error: {data['error']}")
-                if on_complete: on_complete(False)
+                fire(False)
                 return
 
             raw_path = [(float(pt[0]), float(pt[1])) for pt in data]
             print(f"[OMPL] {len(raw_path)} waypoints from OMPL")
+            if raw_path:
+                # Refuse a path whose start was nudged: the robot is likely
+                # near a keepout and the nudge target may not be OMPL-safe.
+                start_nudge = math.hypot(raw_path[0][0] - float(x),
+                                         raw_path[0][1] - float(y))
+                if start_nudge > 0.10:
+                    print(f"[Nav] REFUSING path: planner nudged start from "
+                          f"({x:.2f},{y:.2f}) to "
+                          f"({raw_path[0][0]:.2f},{raw_path[0][1]:.2f}) "
+                          f"(Δ={start_nudge:.2f}m).")
+                    fire(False)
+                    return
+                # Pick candidates must be reached exactly because arm IK was
+                # pre-screened for the caller's pose.
+                goal_nudge = math.hypot(raw_path[-1][0] - float(goal_xy[0]),
+                                        raw_path[-1][1] - float(goal_xy[1]))
+                if (not allow_goal_nudge) and goal_nudge > 0.10:
+                    print(f"[Nav] REFUSING path: planner nudged goal from "
+                          f"({float(goal_xy[0]):.2f},{float(goal_xy[1]):.2f}) "
+                          f"to ({raw_path[-1][0]:.2f},{raw_path[-1][1]:.2f}) "
+                          f"(Δ={goal_nudge:.2f}m).")
+                    fire(False)
+                    return
 
-            # MuJoCo collision validation
+            # MuJoCo collision validation, with yaw inferred per waypoint.
             self.validator.sync(self.sim.data)
-            validated = self.validator.filter_path(raw_path)
-            print(f"[MuJoCo] {len(validated)} waypoints after collision validation")
+            validated = self.validator.filter_path(raw_path, final_yaw=final_yaw)
+            if not allow_goal_nudge and self.validator.last_goal_dropped:
+                print("[Nav] REFUSING path: collision validation dropped the "
+                      "exact pick/drop goal.")
+                fire(False)
+                return
+            if (not allow_goal_nudge
+                    and self.validator.last_max_gap > STRICT_MAX_COLLISION_STITCH_GAP):
+                print(f"[Nav] REFUSING path: collision validation would stitch "
+                      f"across a {self.validator.last_max_gap:.2f}m gap "
+                      f"(> {STRICT_MAX_COLLISION_STITCH_GAP:.2f}m).")
+                fire(False)
+                return
+            print(f"[MuJoCo] {len(validated)} waypoints after collision validation "
+                  f"(max_gap={self.validator.last_max_gap:.2f}m)")
 
-            # Post-process
-            path = decimate_path(smooth_path(validated))
-            print(f"[Nav] {len(path)} final waypoints")
+            # Prefer the smoothed path, but if smoothing creates a stitch gap
+            # that strict mode is trying to avoid, fall back to the densified
+            # raw-valid waypoints.
+            smooth_candidate = densify_path(smooth_path(validated))
+            smooth_candidate = decimate_path(smooth_candidate)
+            path = self.validator.filter_path(smooth_candidate,
+                                              final_yaw=final_yaw)
+            if (not allow_goal_nudge and
+                    (self.validator.last_goal_dropped or
+                     self.validator.last_max_gap > STRICT_MAX_COLLISION_STITCH_GAP)):
+                reason = (
+                    "dropped exact goal" if self.validator.last_goal_dropped
+                    else f"max_gap={self.validator.last_max_gap:.2f}m"
+                )
+                print(f"[Nav] Smoothed strict path invalid ({reason}); "
+                      "falling back to raw collision-validated path")
+                fallback = decimate_path(densify_path(validated))
+                path = self.validator.filter_path(fallback, final_yaw=final_yaw)
+                if not allow_goal_nudge and self.validator.last_goal_dropped:
+                    print("[Nav] REFUSING path: fallback collision validation "
+                          "dropped the exact pick/drop goal.")
+                    fire(False)
+                    return
+                if (not allow_goal_nudge
+                        and self.validator.last_max_gap > STRICT_MAX_COLLISION_STITCH_GAP):
+                    print(f"[Nav] REFUSING path: fallback collision validation "
+                          f"would stitch across a {self.validator.last_max_gap:.2f}m "
+                          f"gap (> {STRICT_MAX_COLLISION_STITCH_GAP:.2f}m).")
+                    fire(False)
+                    return
+            print(f"[Nav] {len(path)} final waypoints "
+                  f"(max_gap={self.validator.last_max_gap:.2f}m)")
 
             if len(path) < 2:
-                print("[Nav] Path too short after validation — using raw OMPL path")
-                path = decimate_path(smooth_path(raw_path))
+                print("[Nav] No safe path after MuJoCo validation")
+                fire(False)
+                return
 
-            success = self._follow(path, goal_xy)
-            print(f"[Nav] Done — success={success}")
-            if on_complete: on_complete(success)
+            success = self._follow(my_gen, path, goal_xy, goal_tolerance, final_yaw)
+            print(f"[Nav gen={my_gen}] Done — success={success}")
+            if not self._is_current(my_gen):
+                # Superseded mid-_follow; do not invoke caller's callback.
+                return
+            fire(success)
 
         except subprocess.TimeoutExpired:
             print(f"[OMPL] Planner timed out mode={BRIDGE_MODE}")
-            if on_complete: on_complete(False)
+            if self._is_current(my_gen):
+                fire(False)
         except Exception as e:
             print(f"[OMPL] Error: {e}")
-            if on_complete: on_complete(False)
+            if self._is_current(my_gen):
+                fire(False)
 
-    def _follow(self, path, final_goal):
+    def _follow(self, my_gen, path, final_goal, goal_tolerance=None, final_yaw=None):
+        # The path's last waypoint is what the robot is actually driven to.
+        # When plan.py nudges an invalid goal, path[-1] != final_goal — verify
+        # against path[-1] so we don't reject a nav that reached the path end.
+        effective_goal = path[-1] if path else final_goal
         for i, (wx, wy) in enumerate(path):
-            if self._cancel_flag:
+            if not self._is_current(my_gen):
                 return False
             nx, ny = path[i+1] if i+1 < len(path) else final_goal
-            yaw = math.atan2(ny - wy, nx - wx)
+            is_last = (i == len(path) - 1)
+            if is_last and final_yaw is not None:
+                wp_yaw = float(final_yaw)
+            else:
+                wp_yaw = math.atan2(ny - wy, nx - wx)
             with self.sim._target_lock:
-                self.sim.target_base = np.array([wx, wy, yaw])
-            tol = GOAL_REACH_DIST if i == len(path)-1 else WAYPOINT_REACH_DIST
+                self.sim.target_base = np.array([wx, wy, wp_yaw])
+            if is_last and goal_tolerance is not None:
+                tol = float(goal_tolerance)
+            else:
+                tol = GOAL_REACH_DIST if is_last else WAYPOINT_REACH_DIST
             t0  = time.time()
             last_print = 0.0
-            while not self._cancel_flag:
-                cx, cy, _ = self.sim.localization()
-                dist = math.hypot(cx - wx, cy - wy)
+            best_progress = float("inf")
+            last_progress = t0
+            while self._is_current(my_gen):
                 now = time.time()
+                cx, cy, cyaw = self.sim.localization()
+                dist = math.hypot(cx - wx, cy - wy)
+                pos_ok = dist < tol
+                # On the last waypoint, additionally require yaw to converge
+                # within tolerance so we don't exit position-converged while
+                # the base PD is still rotating to final_yaw.
+                yaw_ok = True
+                if is_last and final_yaw is not None:
+                    yaw_err = abs(((cyaw - float(final_yaw) + math.pi)
+                                   % (2 * math.pi)) - math.pi)
+                    yaw_ok = yaw_err < FINAL_YAW_TOL
+                progress = dist
+                if is_last and final_yaw is not None:
+                    # Count yaw convergence as progress so a valid in-place
+                    # rotation does not look like a position stall.
+                    progress += 0.20 * min(float(yaw_err), math.pi)
+                if progress < best_progress - WAYPOINT_STALL_MIN_IMPROVEMENT:
+                    best_progress = progress
+                    last_progress = now
                 if now - last_print > 5.0:
-                    print(f"[Nav] wp{i+1}/{len(path)} dist={dist:.2f}m "
-                          f"pos=({cx:.2f},{cy:.2f}) target=({wx:.2f},{wy:.2f})")
+                    extra = ""
+                    if is_last and final_yaw is not None:
+                        extra = f"  yaw_err={math.degrees(yaw_err):.1f}deg"
+                    print(f"[Nav gen={my_gen}] wp{i+1}/{len(path)} dist={dist:.2f}m "
+                          f"pos=({cx:.2f},{cy:.2f}) target=({wx:.2f},{wy:.2f}){extra}")
                     last_print = now
-                if dist < tol:
+                if pos_ok and yaw_ok:
                     break
+                if now - last_progress > WAYPOINT_STALL_TIMEOUT:
+                    extra = ""
+                    if is_last and final_yaw is not None:
+                        extra = f", yaw_err={math.degrees(yaw_err):.1f}deg"
+                    print(f"[Nav] Waypoint {i+1} stalled at dist={dist:.2f}m"
+                          f"{extra}; no progress for "
+                          f"{WAYPOINT_STALL_TIMEOUT:.0f}s")
+                    return False
                 if now - t0 > WAYPOINT_TIMEOUT:
                     print(f"[Nav] Waypoint {i+1} timed out at dist={dist:.2f}m")
                     return False
                 time.sleep(0.05)
-        return not self._cancel_flag
+        if not self._is_current(my_gen):
+            return False
+        # Verify-on-success: confirm final pose against the path's effective
+        # goal (which may differ from final_goal when plan.py nudged an
+        # invalid goal).
+        cx, cy, cyaw = self.sim.localization()
+        dist = math.hypot(cx - effective_goal[0], cy - effective_goal[1])
+        verify_tol = float(goal_tolerance) if goal_tolerance is not None else GOAL_REACH_DIST
+        if dist > verify_tol + 0.05:
+            print(f"[Nav] verify FAIL: final dist={dist:.3f}m to path-end "
+                  f"({effective_goal[0]:.2f},{effective_goal[1]:.2f}) "
+                  f"> tol={verify_tol:.3f}m+0.05")
+            return False
+        if final_yaw is not None:
+            yaw_err = abs(((cyaw - float(final_yaw) + math.pi) % (2 * math.pi)) - math.pi)
+            if yaw_err > FINAL_YAW_TOL:
+                print(f"[Nav] verify FAIL: yaw_err={math.degrees(yaw_err):.1f}deg "
+                      f"> {math.degrees(FINAL_YAW_TOL):.1f}deg")
+                return False
+            print(f"[Nav] verify OK: final dist={dist:.3f}m  "
+                  f"yaw_err={math.degrees(yaw_err):.1f}deg")
+        else:
+            print(f"[Nav] verify OK: final dist={dist:.3f}m")
+        # If the path was nudged (path[-1] != caller's final_goal), warn.
+        nudge_dist = math.hypot(effective_goal[0] - final_goal[0],
+                                effective_goal[1] - final_goal[1])
+        if nudge_dist > 0.10:
+            print(f"[Nav] note: caller's goal ({final_goal[0]:.2f},{final_goal[1]:.2f}) "
+                  f"was nudged by plan.py to ({effective_goal[0]:.2f},{effective_goal[1]:.2f}) "
+                  f"— Δ={nudge_dist:.2f}m")
+        return True
