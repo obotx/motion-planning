@@ -45,6 +45,11 @@ HOME_Q = [0.5, 0.9, 0.1, 0.0]    # canonical home/rest pose for ARM1 OMPL
 # ARM1 planning state.
 PARK_Q = [1.2, 1.2, 0.1, 0.0]
 
+# Scale applied to the optional kinematic-calibration LUT correction.
+# Measured deflection (free pendulum) is much larger than runtime
+# deflection (actuator-resisted), so we apply a fraction.
+CALIB_SCALE = 0.20
+
 
 class MORPHValidityChecker(ob.StateValidityChecker):
     """
@@ -102,7 +107,8 @@ class MORPHBridge:
         timeout:        default OMPL planning timeout (seconds)
     """
 
-    def __init__(self, xml_path, arm=1, alpha_min_deg=ALPHA_MIN_DEG, timeout=5.0):
+    def __init__(self, xml_path, arm=1, alpha_min_deg=ALPHA_MIN_DEG,
+                 timeout=5.0, use_calibration=False):
         self._timeout = timeout
         self._arm     = arm
 
@@ -126,6 +132,117 @@ class MORPHBridge:
         )
         self._si.setStateValidityChecker(self._checker)
         self._si.setup()
+
+        # Calibration LUT for kinematic-vs-physics deflection.  Off by
+        # default — the planner runs in its original uncorrected mode
+        # unless the caller passes use_calibration=True (or play_m1 is
+        # launched with --use-calib).  Generated offline by
+        # tools/calibrate_arm_kinematics.py.
+        if use_calibration:
+            self._calib = self._load_calibration()
+        else:
+            self._calib = None
+            print("[MORPHBridge] Calibration LUT disabled (default).  Pass "
+                  "use_calibration=True or run play_m1 with --use-calib to "
+                  "enable IK pre-correction.")
+
+    # ── Calibration LUT ──────────────────────────────────────────────────────
+
+    def _load_calibration(self):
+        """Load `data/arm_calibration.npz` if present.  Returns dict of
+        grids + error tensor, or None if file absent / malformed."""
+        import os
+        # Project root is two dirs up from this file (src/navigation/).
+        here = os.path.dirname(os.path.abspath(__file__))
+        root = os.path.abspath(os.path.join(here, "..", ".."))
+        npz_path = os.path.join(root, "data", "arm_calibration.npz")
+        if not os.path.exists(npz_path):
+            print(f"[MORPHBridge] No calibration LUT at {npz_path} — "
+                  "IK runs uncorrected.  Run tools/calibrate_arm_kinematics.py "
+                  "to generate one for tighter physics-vs-IK agreement.")
+            return None
+        try:
+            d = np.load(npz_path)
+            calib = {
+                'h1_grid': np.asarray(d['h1_grid'], dtype=float),
+                'h2_grid': np.asarray(d['h2_grid'], dtype=float),
+                'a1_grid': np.asarray(d['a1_grid'], dtype=float),
+                'error':   np.asarray(d['error'],   dtype=float),
+            }
+            print(f"[MORPHBridge] Loaded calibration LUT {npz_path}  "
+                  f"grid={len(calib['h1_grid'])}×{len(calib['h2_grid'])}×"
+                  f"{len(calib['a1_grid'])}  "
+                  f"max_err_xy={np.linalg.norm(calib['error'][..., :2], axis=-1).max()*100:.1f}cm")
+            return calib
+        except Exception as e:
+            print(f"[MORPHBridge] Failed to load LUT {npz_path}: {e}")
+            return None
+
+    def _calib_error(self, h1, h2, a1, theta):
+        """Compute the world-frame deflection correction for the given
+        arm pose.  Two-step transform:
+
+        1. Trilinear-interpolate the LUT at (h1, h2, a1).  This gives the
+           deflection in the chassis-local frame at theta=0 (calibration
+           reference orientation).
+        2. Rotate by theta around Z (arm Base joint rotates the arm
+           inside the chassis frame).
+        3. Rotate by the actual chassis world rotation (from plan_data)
+           since the IK target is in world frame and plan_data is set
+           up with the runtime chassis pose by `reset_plan_data_for_ik`.
+
+        Returns a 3-vector in world frame to subtract from the IK target.
+        """
+        if self._calib is None:
+            return np.zeros(3, dtype=float)
+        hg = self._calib['h1_grid']
+        kg = self._calib['h2_grid']
+        ag = self._calib['a1_grid']
+        err = self._calib['error']
+
+        def _interp_axis(grid, v):
+            v = float(np.clip(v, grid[0], grid[-1]))
+            i = int(np.searchsorted(grid, v) - 1)
+            i = max(0, min(len(grid) - 2, i))
+            t = (v - grid[i]) / max(1e-9, grid[i + 1] - grid[i])
+            return i, float(t)
+
+        i, ti = _interp_axis(hg, h1)
+        j, tj = _interp_axis(kg, h2)
+        k, tk = _interp_axis(ag, a1)
+        # 8-corner trilinear blend → chassis-local deflection at theta=0
+        out = np.zeros(3, dtype=float)
+        for di, wi in ((0, 1 - ti), (1, ti)):
+            for dj, wj in ((0, 1 - tj), (1, tj)):
+                for dk, wk in ((0, 1 - tk), (1, tk)):
+                    out += wi * wj * wk * err[i + di, j + dj, k + dk]
+
+        # Apply the runtime scale factor — see CALIB_SCALE comment.  The
+        # LUT measures unloaded passive deflection; runtime actuators
+        # resist most of it, so a scale of ~0.2 typically matches reality.
+        out = out * CALIB_SCALE
+
+        # Rotate by theta about Z to account for arm rotation inside
+        # the chassis frame (LUT was recorded at theta=0).
+        c = np.cos(theta)
+        s = np.sin(theta)
+        in_chassis = np.array([
+            c * out[0] - s * out[1],
+            s * out[0] + c * out[1],
+            out[2],
+        ], dtype=float)
+
+        # Rotate by chassis world rotation matrix.  plan_data was set
+        # up with the runtime chassis pose before IK; xmat reflects it.
+        try:
+            chassis_bid = mujoco.mj_name2id(
+                self._model, mujoco.mjtObj.mjOBJ_BODY, "robot")
+            if chassis_bid >= 0:
+                R = self._plan_data.xmat[chassis_bid].reshape(3, 3)
+                return R @ in_chassis
+        except Exception:
+            pass
+        return in_chassis
 
     # ── Map builders ─────────────────────────────────────────────────────────
 
@@ -408,6 +525,73 @@ class MORPHBridge:
         raise RuntimeError(
             f"solve_ik_with_z_lift: pre-grasp unreachable up to "
             f"+{max_lift:.2f}m of z. Last: {last_err}")
+
+    def solve_ik_with_z_lift_link3(self, target_pos, n_seeds=12,
+                                   max_iters=3, tol=0.005):
+        """Z-lift IK aimed at Gripper_Link3_1 (palm) instead of Link1.
+
+        The base solve_ik aims Link1 at the target.  The palm (Link3),
+        where the fingers attach, sits a few centimetres past Link1
+        along the wrist axis — so when the palm is what we care about
+        (i.e. for grasp targeting), aiming Link1 at the requested
+        target lands the palm short of the object.
+
+        This method iteratively compensates: solve IK, measure the
+        runtime Link1→Link3 vector at the resulting pose, subtract it
+        from the target, re-solve.  Two or three passes are usually
+        enough because the offset rotates with theta, and theta barely
+        changes between iterations.
+
+        Returns (q, link3_actual_target).  link3_actual_target is the
+        world XYZ where the palm will actually land (Link1_actual +
+        Link1→Link3 measured at q), accounting for any z-lift the
+        wrapper applied to keep the target reachable.
+        """
+        link1_bid = mujoco.mj_name2id(
+            self._model, mujoco.mjtObj.mjOBJ_BODY, "Gripper_Link1_1")
+        link3_bid = mujoco.mj_name2id(
+            self._model, mujoco.mjtObj.mjOBJ_BODY, "Gripper_Link3_1")
+        if link1_bid < 0 or link3_bid < 0:
+            # Fall back to the regular Link1-aimed IK if either body is
+            # missing from the model (defensive — both are required by
+            # the rest of the pipeline).
+            return self.solve_ik_with_z_lift(target_pos, n_seeds=n_seeds)
+
+        # GRIPPER_STANDOFF_XY already accounts for the rigid Link1→Link3
+        # offset, so we only subtract `calib_corr` (passive-deflection
+        # correction from the LUT, scaled by CALIB_SCALE).
+        original_target = np.asarray(target_pos, dtype=float).copy()
+        adjusted_target = original_target.copy()
+        last_q = None
+        last_link1_actual = None
+        last_calib_corr = np.zeros(3, dtype=float)
+
+        for it in range(max_iters):
+            q, link1_actual = self.solve_ik_with_z_lift(
+                adjusted_target, n_seeds=n_seeds)
+            self._plan_data.qpos[self._qpos_map["ColumnLeft"]]  = q[0]
+            self._plan_data.qpos[self._qpos_map["ColumnRight"]] = q[1]
+            self._plan_data.qpos[self._qpos_map["ArmLeft"]]     = q[2]
+            self._plan_data.qpos[self._qpos_map["Base"]]        = q[3]
+            mujoco.mj_forward(self._model, self._plan_data)
+            calib_corr = self._calib_error(q[0], q[1], q[2], q[3])
+            new_adjusted = original_target - calib_corr
+            residual = float(np.linalg.norm(new_adjusted - adjusted_target))
+            adjusted_target = new_adjusted
+            last_q = q
+            last_link1_actual = np.asarray(link1_actual, dtype=float)
+            last_calib_corr = calib_corr
+            if residual < tol:
+                break
+
+        # Reported actual-target: where Link3 (palm) will physically
+        # land = Link1_actual + rigid Link1→Link3 offset + calib_corr.
+        link3_minus_link1 = (self._plan_data.xpos[link3_bid].copy()
+                             - self._plan_data.xpos[link1_bid].copy())
+        link3_actual_target = (last_link1_actual
+                               + link3_minus_link1
+                               + last_calib_corr)
+        return last_q, link3_actual_target
 
     def solve_ik_robust(self, target_pos, n_seeds=12, z_perturbs=None):
         """

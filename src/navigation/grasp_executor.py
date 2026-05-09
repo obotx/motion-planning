@@ -53,14 +53,14 @@ CARRY_A1              = 0.10
 # placed GRIPPER_STANDOFF_XY behind the object by design.
 GRIP_DEVIATION_TOLERANCE = 0.08
 # Margin above the expected standoff for the obj-grip XY check.
-GRIP_OBJ_XY_TOLERANCE = 0.05
+GRIP_OBJ_XY_TOLERANCE = 0.03
 
 # Place verification: drop_xyz must be within PLACE_XY_TOLERANCE of the
 # shelf target (XY) and within 5cm vertically.
 PLACE_XY_TOLERANCE    = 0.12
 
 # Geometry guards.
-MIN_PICK_WRIST_Z      = 0.44    # minimum wrist Z target for the pick descent
+MIN_PICK_WRIST_Z      = 0.38    # minimum wrist Z target for the pick descent
 MAX_PICK_H_DIFF       = 0.18    # max |h2 - h1| for an accepted IK solution
 MIN_PICK_A1           = 0.16    # visual guard: avoid folding gripper into body
 # Snap to a fixed offset when the recorded grasp_offset is too large
@@ -84,7 +84,7 @@ GRIPPER_PIN_HOLD_POS  =  0.00   # legacy relaxed hold; superseded by size-aware 
 #   close_ctrl = FINGER_CLOSE_MAX - FINGER_CLOSE_PER_M * radius
 # clamped to [FINGER_CLOSE_FLOOR, FINGER_CLOSE_MAX].
 FINGER_CLOSE_MAX      = 0.20    # max close ctrl (smallest object)
-FINGER_CLOSE_FLOOR    = 0.12    # min close ctrl across all object sizes
+FINGER_CLOSE_FLOOR    = 0.15    # min close ctrl across all object sizes
 FINGER_CLOSE_PER_M    = 4.0     # ctrl backs off this fast as radius grows
 
 # Smooth-attach interpolation: when the object pin switches from
@@ -324,6 +324,10 @@ class GraspExecutor:
         # Active pin callback (function reference, registered with sim)
         self._active_pin_fn = None
         self._cancel = False
+
+        # Pre-close diagnostics captured on gate rejection; consumed by
+        # play_m1's closed-loop base correction.
+        self.last_grasp_failure_info = None
 
         # ARM1 qpos map (already built by arm_bridge — alias for clarity)
         self._qmap = arm_bridge.qpos_map
@@ -812,6 +816,19 @@ class GraspExecutor:
             time.sleep(SMOOTH_GRIPPER_STEP_S)
         time.sleep(hold_seconds)
 
+        # End-of-close summary — log which fingers physically contacted
+        # the object.  No contact ⇒ object held by pin only.
+        if contact_stop_enabled and pos >= 0.0:
+            labels = ['c', 'b', 'a']
+            contacts = [lbl for lbl, frz in zip(labels, finger_frozen) if frz]
+            if contacts:
+                print(f"[Exec] close summary: contacted={contacts} "
+                      f"({len(contacts)}/3 fingers)")
+            else:
+                print("[Exec] close summary: NO finger contact during close — "
+                      "fingers closed in air, object held by pin only "
+                      "(visual grip will look loose)")
+
     # ── Reading current arm config ──────────────────────────────────────
 
     def _current_arm_q(self):
@@ -854,6 +871,9 @@ class GraspExecutor:
                 on_complete(ok)
 
         success = False
+        # Clear any stale diagnostics from a previous attempt so the
+        # next failure (if any) reflects only this pick.
+        self.last_grasp_failure_info = None
         try:
             print(f"\n[Exec] PICK obj_{obj_idx} @ {obj_world.round(3)}")
 
@@ -900,8 +920,12 @@ class GraspExecutor:
                 print("[Exec] using screened PRE_GRASP_Q from candidate filter")
             else:
                 try:
+                    # Aim Link1 (wrist) at pre_grasp_target.  GRIPPER_STANDOFF_XY
+                    # (5cm) is tuned so the rigid Link1→Link3 chain offset puts
+                    # the palm at the object for closure.
                     PRE_GRASP_Q, actual_pre_target = \
-                        self.arm_bridge.solve_ik_with_z_lift(pre_grasp_target)
+                        self.arm_bridge.solve_ik_with_z_lift(
+                            pre_grasp_target)
                 except RuntimeError as e:
                     print(f"[Exec] PRE_GRASP_Q IK FAIL: {e}")
                     self._clear_held_state()
@@ -1010,6 +1034,14 @@ class GraspExecutor:
                       f"ik_dev={ik_dev:.3f}m, obj-grip xy={obj_grip_xy:.3f}m — "
                       f"abandoning visually bad candidate, "
                       f"play_m1 will retry next base pose")
+                self.last_grasp_failure_info = {
+                    'gripper_xy': grip_xyz_pre[:2].copy(),
+                    'obj_xy': obj_xyz_pre[:2].copy(),
+                    'ik_target_xy': pre_grasp_target[:2].copy(),
+                    'ik_dev': float(ik_dev),
+                    'obj_grip_xy': float(obj_grip_xy),
+                    'expected_obj_grip_xy': float(expected_obj_grip_xy),
+                }
                 current_q = self._current_arm_q()
                 retry_q = [CARRY_H1, CARRY_H2, CARRY_A1, current_q[3]]
                 print("[Exec] [5.6] retract arm before candidate retry")

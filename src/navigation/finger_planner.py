@@ -175,4 +175,32 @@ class FingerBridge:
         for i in range(path.getStateCount()):
             state = path.getState(i)
             waypoints.append([float(state[j]) for j in range(FINGER_DOF)])
+
+        # Per-joint monotonic filter: clamp intermediate waypoints so
+        # no joint moves opposite the goal direction (RRTConnect can
+        # otherwise produce paths where a finger curls backward briefly).
+        # Start and goal are preserved exactly.
+        if len(waypoints) >= 2:
+            sign = [
+                1.0 if q_goal[j] > q_start[j] else
+                (-1.0 if q_goal[j] < q_start[j] else 0.0)
+                for j in range(FINGER_DOF)
+            ]
+            for i in range(1, len(waypoints) - 1):
+                for j in range(FINGER_DOF):
+                    if sign[j] == 0.0:
+                        # Joint not moving — pin to start value.
+                        waypoints[i][j] = q_start[j]
+                        continue
+                    prev = waypoints[i - 1][j]
+                    cur  = waypoints[i][j]
+                    if sign[j] > 0.0 and cur < prev:
+                        waypoints[i][j] = prev
+                    elif sign[j] < 0.0 and cur > prev:
+                        waypoints[i][j] = prev
+                    # Also clamp so the path doesn't overshoot the goal.
+                    if sign[j] > 0.0 and waypoints[i][j] > q_goal[j]:
+                        waypoints[i][j] = q_goal[j]
+                    elif sign[j] < 0.0 and waypoints[i][j] < q_goal[j]:
+                        waypoints[i][j] = q_goal[j]
         return waypoints

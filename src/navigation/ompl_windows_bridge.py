@@ -55,8 +55,86 @@ class MujocoValidator:
         self.last_removed = 0
         self.last_max_gap = 0.0
         self.last_goal_dropped = False
+        self.last_segment_invalid = False
+        self.skip_segment_validation = False  # set by relaxed fallback
+
+        # Per-floor-object clearance check: every pickup_obj_* body in the
+        # model is treated as a circular obstacle for the chassis during
+        # nav.  The selected pick target / held object are temporarily
+        # exempted via set_exempt_objects() so the chassis is allowed to
+        # approach to standoff or carry distance.
+        self.pickup_obj_ids = self._collect_pickup_objects()
+        self.exempt_obj_ids = set()
+        # Chassis-vs-floor-object clearance: rejection threshold is
+        # chassis_radius + obj_radius + margin.  Tight enough that
+        # dense object spawns still leave corridors for OMPL paths.
+        self.chassis_clearance_radius = 0.20
+        self.obj_clearance_margin     = 0.02
+        if self.pickup_obj_ids:
+            print(f"[MuJoCo Validator] Tracking {len(self.pickup_obj_ids)} "
+                  f"floor-object obstacles for nav clearance.")
+
         print(f"[MuJoCo Validator] Ready. base_id={self.base_id}, "
               f"base_geoms={len(self.base_geom_ids)}, qposadr={self.base_qposadr}")
+
+    def _collect_pickup_objects(self):
+        """Find all pickup_obj_* bodies in the model and return their body IDs."""
+        ids = []
+        for bid in range(self.model.nbody):
+            name = mujoco.mj_id2name(
+                self.model, mujoco.mjtObj.mjOBJ_BODY, bid) or ""
+            if name.startswith("pickup_obj_"):
+                ids.append(int(bid))
+        return ids
+
+    def set_exempt_objects(self, body_ids):
+        """
+        Exempt the given pickup-object body IDs from the nav-clearance
+        check (e.g. the selected pick target during approach, or the
+        held object during transport).  Pass an empty iterable to clear.
+        """
+        if body_ids is None:
+            self.exempt_obj_ids = set()
+        else:
+            self.exempt_obj_ids = set(int(b) for b in body_ids)
+
+    def set_exempt_all_except(self, keep_obstacle_bid):
+        """Relaxed-clearance fallback: exempt every floor object except
+        the one passed (the selected pick target stays a hard obstacle
+        so the chassis cannot drive through it).
+        """
+        keep = int(keep_obstacle_bid)
+        self.exempt_obj_ids = {
+            bid for bid in self.pickup_obj_ids if bid != keep
+        }
+
+    def _object_radius_xy(self, body_id):
+        """Best-effort outer radius of a pickup object's geoms (cylinder)."""
+        max_r = 0.0
+        for g in range(self.model.ngeom):
+            if int(self.model.geom_bodyid[g]) == int(body_id):
+                r = float(self.model.geom_size[g, 0])
+                if r > max_r:
+                    max_r = r
+        return max_r
+
+    def _clear_of_floor_objects(self, x, y):
+        """True if (x, y) is far enough from every non-exempt pickup object."""
+        if not self.pickup_obj_ids:
+            return True
+        for bid in self.pickup_obj_ids:
+            if bid in self.exempt_obj_ids:
+                continue
+            ox = float(self.data.xpos[bid, 0])
+            oy = float(self.data.xpos[bid, 1])
+            min_dist = (self.chassis_clearance_radius
+                        + self._object_radius_xy(bid)
+                        + self.obj_clearance_margin)
+            dx = x - ox
+            dy = y - oy
+            if (dx * dx + dy * dy) < (min_dist * min_dist):
+                return False
+        return True
 
     def _find_free_joint_adr(self):
         for j in range(self.model.njnt):
@@ -125,6 +203,8 @@ class MujocoValidator:
     def is_valid(self, x, y, yaw=0.0):
         """
         Run mj_forward() and check contacts involving base geoms only.
+        Also enforce a chassis-radius clearance against every non-exempt
+        pickup object so curved nav paths cannot graze floor objects.
 
         yaw: robot heading in radians. The chassis is asymmetric (arms extend
         forward), so a configuration valid at yaw=0 may collide at the actual
@@ -141,6 +221,12 @@ class MujocoValidator:
                 if self._is_allowed_base_contact(other):
                     continue
                 return False
+        # Independent floor-object clearance: contact-based check above can
+        # miss objects that are close in XY but not yet AABB-overlapping
+        # at this yaw, so we additionally reject any pose within the
+        # chassis-clearance radius of any non-exempt pickup object.
+        if not self._clear_of_floor_objects(x, y):
+            return False
         return True
 
     def sync(self, sim_data):
@@ -196,6 +282,29 @@ class MujocoValidator:
                                     for a, b in zip(valid[:-1], valid[1:]))
         else:
             self.last_max_gap = 0.0
+        # Segment validation: sample at 20cm spacing between consecutive
+        # kept waypoints.  Skipped in relaxed-clearance fallback.
+        self.last_segment_invalid = False
+        if self.skip_segment_validation:
+            return valid
+        SEG_SAMPLE_SPACING = 0.20
+        for i in range(len(valid) - 1):
+            ax, ay = valid[i]
+            bx, by = valid[i + 1]
+            seg_len = math.hypot(bx - ax, by - ay)
+            if seg_len < SEG_SAMPLE_SPACING:
+                continue
+            seg_yaw = math.atan2(by - ay, bx - ax)
+            n_samples = max(1, int(seg_len / SEG_SAMPLE_SPACING))
+            for k in range(1, n_samples):
+                t = k / n_samples
+                sx = ax + t * (bx - ax)
+                sy = ay + t * (by - ay)
+                if not self.is_valid(sx, sy, yaw=seg_yaw):
+                    self.last_segment_invalid = True
+                    break
+            if self.last_segment_invalid:
+                break
         return valid
 
 
@@ -375,14 +484,13 @@ class InProcessNavigator:
                 fire(False)
                 return
             if (not allow_goal_nudge
-                    and self.validator.last_max_gap > STRICT_MAX_COLLISION_STITCH_GAP):
-                print(f"[Nav] REFUSING path: collision validation would stitch "
-                      f"across a {self.validator.last_max_gap:.2f}m gap "
-                      f"(> {STRICT_MAX_COLLISION_STITCH_GAP:.2f}m).")
+                    and self.validator.last_segment_invalid):
+                print("[Nav] REFUSING path: a sampled segment between "
+                      "kept waypoints fails collision check.")
                 fire(False)
                 return
             print(f"[MuJoCo] {len(validated)} waypoints after collision validation "
-                  f"(max_gap={self.validator.last_max_gap:.2f}m)")
+                  f"(max_gap={self.validator.last_max_gap:.2f}m, segments_clear=True)")
 
             # Prefer the smoothed path, but if smoothing creates a stitch gap
             # that strict mode is trying to avoid, fall back to the densified
@@ -393,10 +501,10 @@ class InProcessNavigator:
                                               final_yaw=final_yaw)
             if (not allow_goal_nudge and
                     (self.validator.last_goal_dropped or
-                     self.validator.last_max_gap > STRICT_MAX_COLLISION_STITCH_GAP)):
+                     self.validator.last_segment_invalid)):
                 reason = (
                     "dropped exact goal" if self.validator.last_goal_dropped
-                    else f"max_gap={self.validator.last_max_gap:.2f}m"
+                    else "a sampled segment fails collision check"
                 )
                 print(f"[Nav] Smoothed strict path invalid ({reason}); "
                       "falling back to raw collision-validated path")
@@ -408,10 +516,9 @@ class InProcessNavigator:
                     fire(False)
                     return
                 if (not allow_goal_nudge
-                        and self.validator.last_max_gap > STRICT_MAX_COLLISION_STITCH_GAP):
-                    print(f"[Nav] REFUSING path: fallback collision validation "
-                          f"would stitch across a {self.validator.last_max_gap:.2f}m "
-                          f"gap (> {STRICT_MAX_COLLISION_STITCH_GAP:.2f}m).")
+                        and self.validator.last_segment_invalid):
+                    print("[Nav] REFUSING path: fallback validation found "
+                          "a segment between kept waypoints in collision.")
                     fire(False)
                     return
             print(f"[Nav] {len(path)} final waypoints "
