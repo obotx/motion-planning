@@ -9,6 +9,7 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
+import argparse
 import threading
 import time
 import math
@@ -94,10 +95,14 @@ SPAWN_EDGE_MARGIN = OBJ_RADIUS_RANGE[1] + 0.05
 SPAWN_FLOOR_CLEARANCE = 0.005
 SPAWN_ROBOT_KEEP_CENTER = np.array([3.70, -6.00])
 SPAWN_ROBOT_KEEP_RADIUS = 1.15
-# Open-floor zones used for object spawning, between the south rack band
-# and the shelf navigation keepout.
+# Open-floor zones used for object spawning.  Distributed across the scene
+# instead of a single south-aisle band so objects appear in multiple regions
+# of the market.  Margins are conservative around the shelf rack
+# (x=2.5..8.05, y=-5.2..-3.1) and the world walls.
 SPAWN_ZONES = (
-    ((0.75, 6.60), (-6.85, -5.95)),
+    ((0.75, 7.25), (-7.50, -5.50)),  # south aisle (below the rack)
+    ((0.75, 7.25), (-3.00, -0.40)),  # north aisle (above the rack)
+    ((0.40, 2.20), (-5.10, -3.40)),  # west strip (between west wall and rack)
 )
 SPAWN_EXTRA_KEEP_RECTS = (
     (0.65, 8.00, -8.00, -6.85),      # far-south rack/footer band
@@ -115,8 +120,8 @@ PICK_NAV_OBJECT_CLEARANCE = 0.40      # selected-object corridor guard
 PICK_MAX_H_DIFF     = 0.18           # max h2-h1 tilt allowed for pick candidates
 PICK_MIN_A1         = 0.16           # visual guard: avoid gripper folding into body
 PICK_A1_FIXED_REACH_OFFSET = 0.32    # base-to-wrist reach present even at a1≈0
-PICK_GOAL_X_RANGE   = (0.75, 6.60)   # pick nav goal x bounds
-PICK_GOAL_Y_RANGE   = (-7.65, -3.65) # pick nav goal y bounds
+PICK_GOAL_X_RANGE   = (0.40, 7.25)   # pick nav goal x bounds (full floor minus wall margin)
+PICK_GOAL_Y_RANGE   = (-7.50, -0.40) # pick nav goal y bounds (full floor minus wall margin)
 PICK_NAV_GOAL_TOL   = 0.06           # base nav goal tolerance for pick
 PICK_CANDIDATE_STANDOFFS = (0.75, 0.78, 0.82)  # candidate standoff distances
 PICK_CANDIDATE_DUP_TOL = 0.02        # dedup tolerance for candidate XY
@@ -126,9 +131,15 @@ PICK_FINE_ALIGN_MIN_SAFE_DIST = 0.70  # min base-object distance during fine-ali
 PICK_FINE_ALIGN_DIST_TOL = 0.025     # fine-align distance tolerance
 PICK_FINE_ALIGN_MAX_STEP = 0.08      # max single-step nudge during fine-align
 PICK_FINE_ALIGN_TIMEOUT = 1.5        # fine-align convergence timeout (s)
-PICK_LOCAL_RETRY_STEPS = (0.06, 0.04, 0.025)  # inward nudge steps for grasp retry
 PICK_LOCAL_RETRY_MIN_DIST = PICK_FINE_ALIGN_MIN_SAFE_DIST
 PICK_LOCAL_RETRY_TIMEOUT = 1.5       # local retry convergence timeout (s)
+# Closed-loop base-correction retry: translate the base by the residual
+# gripper-vs-IK-target error.  Scales fall back to smaller corrections
+# if the validator rejects the full move (e.g. would clip a wall).
+PICK_LOCAL_RETRY_SCALES   = (1.0, 0.7, 0.5, 0.3)
+PICK_LOCAL_RETRY_MIN_ERR  = 0.015    # skip retry if residual < 1.5cm
+PICK_LOCAL_RETRY_MAX_ERR  = 0.25     # cap retry magnitude to 25cm
+PICK_LOCAL_RETRY_MAX_ATTEMPTS = 5    # closed-loop retries per cycle
 PICK_CANDIDATE_ANGLE_OFFSETS = (
     0.0,
     math.radians(35.0), math.radians(-35.0),
@@ -138,7 +149,7 @@ PICK_CANDIDATE_ANGLE_OFFSETS = (
 )
 PICK_VIRTUAL_PLAN_TIMEOUT = 2.0
 # Cap on virtual screening successes before stopping the candidate scan.
-MAX_VIRTUAL_SCREEN_SUCCESSES = 3
+MAX_VIRTUAL_SCREEN_SUCCESSES = 5
 
 # Place-phase configuration: after grasp + lift, the robot navigates to a
 # safe aisle point near the assigned shelf slot and parks the object on the
@@ -363,8 +374,60 @@ def compute_pick_standoff(robot_xy, obj_xy, standoff=PICK_BASE_STANDOFF):
     return float(target[0]), float(target[1])
 
 
+def _segment_intersects_rect(p1, p2, x0, x1, y0, y1):
+    """True if the XY segment (p1→p2) crosses the axis-aligned rectangle.
+
+    Liang–Barsky clip: parametrize the segment as p1 + t*(p2-p1) for
+    t∈[0,1] and clip against each rectangle edge.  If the clipped
+    interval is non-empty, the segment intersects the rectangle.
+    """
+    dx = p2[0] - p1[0]
+    dy = p2[1] - p1[1]
+    p = (-dx, dx, -dy, dy)
+    q = (p1[0] - x0, x1 - p1[0], p1[1] - y0, y1 - p1[1])
+    t_lo, t_hi = 0.0, 1.0
+    for pi, qi in zip(p, q):
+        if abs(pi) < 1e-12:
+            if qi < 0:
+                return False  # parallel and outside slab
+            continue
+        t = qi / pi
+        if pi < 0:
+            if t > t_hi:
+                return False
+            if t > t_lo:
+                t_lo = t
+        else:
+            if t < t_lo:
+                return False
+            if t < t_hi:
+                t_hi = t
+    return t_lo <= t_hi
+
+
+def _same_floor_side(p1, p2, margin=0.05):
+    """True if a straight line p1→p2 stays clear of every rack rect."""
+    for (x0, x1, y0, y1) in OBSTACLE_RECTS:
+        if _segment_intersects_rect(
+                p1, p2, x0 - margin, x1 + margin, y0 - margin, y1 + margin):
+            return False
+    return True
+
+
 def generate_pick_standoff_candidates(robot_xy, obj_xy):
-    """Ordered base candidates; first is current-side standoff, later ones reposition."""
+    """Ordered base candidates around the object.
+
+    Ordering rules:
+      * Tier 1 — same-side as the object: a straight line from the
+        candidate to the object does not cross the rack.  These have a
+        clean OMPL corridor and rarely fail nav.
+      * Tier 2 — opposite side of the rack from the object: only used
+        as a last resort because OMPL has to detour around the rack.
+    Within each tier the original generation order is preserved
+    (smallest standoff first, then forward → orbit angles).  The first
+    candidate is still anchored to the robot's current side so the
+    most-likely-good pose is tried first.
+    """
     robot = np.array(robot_xy[:2], dtype=float)
     obj = np.array(obj_xy[:2], dtype=float)
     away = robot - obj
@@ -374,7 +437,7 @@ def generate_pick_standoff_candidates(robot_xy, obj_xy):
     else:
         base_angle = math.atan2(float(away[1]), float(away[0]))
 
-    out = []
+    raw = []
     for dist in PICK_CANDIDATE_STANDOFFS:
         for offset in PICK_CANDIDATE_ANGLE_OFFSETS:
             ang = base_angle + offset
@@ -382,9 +445,12 @@ def generate_pick_standoff_candidates(robot_xy, obj_xy):
             target[0] = np.clip(target[0], PICK_GOAL_X_RANGE[0], PICK_GOAL_X_RANGE[1])
             target[1] = np.clip(target[1], PICK_GOAL_Y_RANGE[0], PICK_GOAL_Y_RANGE[1])
             cand = (float(target[0]), float(target[1]))
-            if all(math.hypot(cand[0] - old[0], cand[1] - old[1]) > PICK_CANDIDATE_DUP_TOL for old in out):
-                out.append(cand)
-    return out
+            if all(math.hypot(cand[0] - old[0], cand[1] - old[1]) > PICK_CANDIDATE_DUP_TOL for old in raw):
+                raw.append(cand)
+
+    same_side = [c for c in raw if _same_floor_side(c, obj)]
+    cross_side = [c for c in raw if not _same_floor_side(c, obj)]
+    return same_side + cross_side
 
 
 def pick_candidate_yaw(goal_xy, obj_xy):
@@ -577,12 +643,46 @@ class Joystick:
 # ---------------------------------------------------------------------------
 
 def main():
+    parser = argparse.ArgumentParser(description="MORPH-I M1 pick-and-place GUI.")
+    parser.add_argument(
+        "--record", action="store_true",
+        help="Capture the simulation window to mp4 in output_videos/ for "
+             "the entire session (start to close).")
+    parser.add_argument(
+        "--record-fps", type=int, default=30,
+        help="Frame rate for the recorded mp4 (default: 30).")
+    parser.add_argument(
+        "--use-calib", action="store_true",
+        help="Apply the kinematic calibration LUT (data/arm_calibration.npz) "
+             "to pre-correct IK targets for passive-joint deflection.  Off "
+             "by default — system runs the original uncorrected IK.  "
+             "Requires running tools/calibrate_arm_kinematics.py first.")
+    args, _unknown = parser.parse_known_args()
+
     if not glfw.init():
         raise RuntimeError("GLFW init failed")
 
     xml_path = os.path.abspath(
         os.path.join(os.path.dirname(__file__), '..', 'env', 'market_world_m1.xml'))
     sim = ParallelRobot(xml_path, run_mode="glfw", record=False)
+
+    # OMPL bridges + MuJoCo init blocks the main thread for a few seconds.
+    # Drain GLFW events between heavy init stages so the WM doesn't flag
+    # the window as "not responding".
+    def _pump_events():
+        try:
+            glfw.poll_events()
+        except Exception:
+            pass
+
+    _pump_events()
+
+    # Optional screen recorder (off by default).  Started below after the
+    # GLFW window + GL context exist; stopped at the end of main().
+    screen_rec = None
+    if args.record:
+        from gui.screen_recorder import ScreenRecorder
+        screen_rec = ScreenRecorder(fps=args.record_fps)
 
     # Restrict the 'press 3' collision overlay to arm-chain primitives.
     _setup_pick_collision_overlay(sim.model)
@@ -603,11 +703,18 @@ def main():
     sim.direct_arm_commands[0:4] = list(STARTUP_Q_ARM1)
     sim.direct_arm_commands[4:8] = list(STARTUP_Q_ARM2)
     mujoco.mj_forward(sim.model, sim.data)
+    _pump_events()
 
-    # Navigator, OMPL arm bridge, and grasp executor.
+    # Navigator, OMPL arm bridge, and grasp executor.  Each of these
+    # initializes its own OMPL state space + RRT-Connect planner, which
+    # can take a few seconds; pump GLFW events between them so the WM
+    # does not show the "not responding" dialog.
     nav        = InProcessNavigator(sim)
-    arm_bridge = MORPHBridge(xml_path, arm=1)
+    _pump_events()
+    arm_bridge = MORPHBridge(xml_path, arm=1, use_calibration=args.use_calib)
+    _pump_events()
     grasp_exec = GraspExecutor(sim, arm_bridge)
+    _pump_events()
 
     def _get_current_arm_q(data):
         """Read ARM1 actual joint positions from sim data (not commanded values)."""
@@ -635,7 +742,29 @@ def main():
     _pick_candidate_idx    = [0]
     _pick_candidate_obj_xy = [None]
     _pick_replan_count     = [0]
-    _pick_local_retry_used = [False]
+    _pick_local_retry_used = [0]   # number of local-retry attempts so far
+    _cycle_start_time      = [None]   # set at MOVE press, used by metrics log
+    # Per-cycle nav-cascade state (reset on MOVE press).
+    _relaxed_clearance     = [False]   # exempt non-selected floor objs
+    _any_grasp_attempted   = [False]   # tracks if any candidate reached grasp
+
+    def _emit_cycle_metrics(status, obj_idx, slot_idx):
+        """One-line per-cycle summary suitable for grepping or client review."""
+        start = _cycle_start_time[0]
+        if start is None:
+            duration_s = 0.0
+        else:
+            duration_s = max(0.0, time.time() - start)
+        cand_total = len(_pick_candidates[0]) if _pick_candidates[0] else 0
+        cand_used  = _pick_candidate_idx[0] + 1 if cand_total else 0
+        print(
+            f"[METRICS] obj={obj_idx} slot={slot_idx} "
+            f"status={status} "
+            f"candidates_used={cand_used}/{cand_total} "
+            f"replans={_pick_replan_count[0]} "
+            f"local_retries={_pick_local_retry_used[0]} "
+            f"duration={duration_s:.1f}s")
+        _cycle_start_time[0] = None
 
     def _candidate_xy(candidate):
         return np.array(candidate["xy"] if isinstance(candidate, dict) else candidate,
@@ -683,6 +812,17 @@ def main():
             return []
         raw = generate_pick_standoff_candidates(robot_xy, obj_world[:2])
         nav.validator.sync(sim.data)
+        # Exempt the selected pick target from the floor-clearance check
+        # during candidate validation — the candidate sits at standoff
+        # distance from the target by construction, so it would otherwise
+        # always reject.
+        try:
+            sel_bid = mujoco.mj_name2id(
+                sim.model, mujoco.mjtObj.mjOBJ_BODY, f"pickup_obj_{obj_idx}")
+            nav.validator.set_exempt_objects(
+                [sel_bid] if sel_bid >= 0 else [])
+        except Exception:
+            pass
         valid = []
         for cand in raw:
             yaw = pick_candidate_yaw(cand, obj_world[:2])
@@ -720,7 +860,8 @@ def main():
                         obj_radius=get_object_radius(sim.model, obj_idx))
                     pre_grasp_pos[2] = max(pre_grasp_pos[2], MIN_PICK_WRIST_Z)
                     q_pre, actual_pre_target = \
-                        arm_bridge.solve_ik_with_z_lift(pre_grasp_pos, n_seeds=8)
+                        arm_bridge.solve_ik_with_z_lift(
+                            pre_grasp_pos, n_seeds=8)
                     h_diff = abs(float(q_pre[1]) - float(q_pre[0]))
                     if h_diff > PICK_MAX_H_DIFF:
                         print(f"[PICK] Reject base candidate high tilt: "
@@ -745,12 +886,46 @@ def main():
                         PICK_MIN_A1, 0.60))
                     a1_under = max(0.0, expected_a1 - a1)
                     a1_over = max(0.0, a1 - expected_a1)
-                    quality = h_diff * 2.0 + a1_under * 4.0 + a1_over * 0.5
+                    # Palm-orientation tiebreaker: world XY direction
+                    # from palm to thumb (finger A) dotted with the
+                    # approach direction.  Higher align → thumb on the
+                    # object side, fingers on the opposite side (1+2
+                    # gripper grips cleanly this way).
+                    palm_align = 0.0
+                    try:
+                        palm_bid = mujoco.mj_name2id(
+                            arm_bridge.model, mujoco.mjtObj.mjOBJ_BODY,
+                            "Gripper_Link3_1")
+                        thumb_bid = mujoco.mj_name2id(
+                            arm_bridge.model, mujoco.mjtObj.mjOBJ_BODY,
+                            "finger_a_link_1_1")
+                        if palm_bid >= 0 and thumb_bid >= 0:
+                            mujoco.mj_forward(
+                                arm_bridge.model, arm_bridge.planning_data)
+                            palm_xy = arm_bridge.planning_data.xpos[palm_bid][:2]
+                            thumb_xy = arm_bridge.planning_data.xpos[thumb_bid][:2]
+                            tx = float(thumb_xy[0] - palm_xy[0])
+                            ty = float(thumb_xy[1] - palm_xy[1])
+                            tn = (tx * tx + ty * ty) ** 0.5
+                            if tn > 1e-6:
+                                ax = obj_world[0] - cand[0]
+                                ay = obj_world[1] - cand[1]
+                                an = (ax * ax + ay * ay) ** 0.5
+                                if an > 1e-6:
+                                    palm_align = (
+                                        (tx / tn) * (ax / an)
+                                      + (ty / tn) * (ay / an))
+                    except Exception:
+                        pass
+                    ORIENT_BONUS_K = 0.02  # ≤ 2cm "h_diff equivalent" tiebreaker
+                    quality = (h_diff * 2.0 + a1_under * 4.0 + a1_over * 0.5
+                               - ORIENT_BONUS_K * palm_align)
                     print(f"[PICK] Candidate OK: ({cand[0]:.2f},{cand[1]:.2f}) "
                           f"yaw={math.degrees(yaw):.1f}° path_wps={len(path)} "
                           f"base_obj={base_obj_dist:.3f}m "
                           f"exp_a1={expected_a1:.3f} "
                           f"h2-h1={h_diff:.3f} a1={a1:.3f} "
+                          f"align={palm_align:+.2f} "
                           f"score={quality:.3f}")
                     valid.append((
                         quality, cand, h_diff, a1, base_obj_dist, expected_a1,
@@ -788,7 +963,7 @@ def main():
         goal_xy = _candidate_xy(candidate)
         move_in_progress_flag[0] = True
         grasp_in_progress_flag[0] = False
-        _pick_local_retry_used[0] = False
+        _pick_local_retry_used[0] = 0
         # Only park the arm before base motion after an actual grasp/arm
         # attempt.  A pure "navigation failed" retry has not moved the arm yet;
         # parking there looked like the arm was moving while the base was stuck.
@@ -809,6 +984,24 @@ def main():
         obj_idx = _current_obj_idx[0]
         obj_world = get_object_world_pos(sim.model, sim.data, obj_idx)
         final_yaw = pick_candidate_yaw(goal_xy, obj_world[:2])
+        # Exempt the selected pick target from floor-object clearance —
+        # the chassis is supposed to approach it to standoff distance.
+        # All other floor objects remain hard obstacles so the nav path
+        # can't graze them.
+        try:
+            sel_bid = mujoco.mj_name2id(
+                sim.model, mujoco.mjtObj.mjOBJ_BODY, f"pickup_obj_{obj_idx}")
+            if sel_bid >= 0:
+                if _relaxed_clearance[0]:
+                    # Fallback mode: only the selected target stays as
+                    # a hard floor-object obstacle; all others exempted.
+                    nav.validator.set_exempt_all_except(sel_bid)
+                else:
+                    # Default mode: only the selected target is exempted
+                    # (the chassis is supposed to approach it to standoff).
+                    nav.validator.set_exempt_objects([sel_bid])
+        except Exception:
+            pass
         nav.navigate_to(goal_xy, on_complete=_on_nav_complete,
                         goal_tolerance=PICK_NAV_GOAL_TOL,
                         final_yaw=final_yaw,
@@ -831,7 +1024,10 @@ def main():
                       f"(< {PICK_RETRY_OBJ_PATH_CLEARANCE:.2f}m clearance)")
             next_idx += 1
         if next_idx >= len(_pick_candidates[0]):
-            if _pick_replan_count[0] < 1:
+            # Strict replan from current pose: only fires if at least one
+            # candidate reached grasp (uniformly nav-failed cycles skip
+            # straight to relaxed fallback below).
+            if _pick_replan_count[0] < 1 and _any_grasp_attempted[0]:
                 _pick_replan_count[0] += 1
                 print(f"[PICK] No more base candidates after {reason}; "
                       "recomputing once from current robot pose")
@@ -842,9 +1038,31 @@ def main():
                     _start_pick_nav(_pick_candidates[0][0],
                                     f"{reason}; replanned from current pose")
                     return True
+            # Relaxed-clearance fallback: exempt non-selected floor objects
+            # and skip segment-sampling.  Rack/wall waypoint contacts are
+            # still rejected.
+            if _pick_replan_count[0] < 2 and not _relaxed_clearance[0]:
+                _pick_replan_count[0] += 1
+                _relaxed_clearance[0] = True
+                nav.validator.skip_segment_validation = True
+                print(f"[PICK] Strict clearance failed all candidates after "
+                      f"{reason}; falling back to relaxed clearance "
+                      "(only selected object guards floor-object distance; "
+                      "rack/walls still hard obstacles; "
+                      "segment-sampling disabled)")
+                _pick_candidates[0] = _filtered_pick_candidates(obj_world)
+                _pick_candidate_obj_xy[0] = obj_world[:2].copy()
+                _pick_candidate_idx[0] = 0
+                if _pick_candidates[0]:
+                    _start_pick_nav(_pick_candidates[0][0],
+                                    f"{reason}; relaxed-clearance fallback")
+                    return True
             print(f"[PICK] No more base candidates after {reason}; aborting pick")
             move_in_progress_flag[0] = False
             grasp_in_progress_flag[0] = False
+            _emit_cycle_metrics(
+                "aborted_no_candidates",
+                _current_obj_idx[0], _current_shelf_idx[0])
             return False
         _pick_candidate_idx[0] = next_idx
         _start_pick_nav(_pick_candidates[0][next_idx], reason)
@@ -915,46 +1133,78 @@ def main():
         return True
 
     def _local_radial_retry_after_grasp_fail(obj_world):
-        """Try small toward-object nudges before switching to a new orbit side."""
-        if _pick_local_retry_used[0]:
+        """Closed-loop base correction after a pre-close gate rejection.
+
+        Translates the base by the gripper-vs-IK-target residual error
+        (chassis yaw held fixed so the gripper moves by the same vector).
+        Up to PICK_LOCAL_RETRY_MAX_ATTEMPTS attempts per cycle.
+        """
+        attempts = _pick_local_retry_used[0]
+        if attempts >= PICK_LOCAL_RETRY_MAX_ATTEMPTS:
+            print(f"[PICK] Local retry exhausted "
+                  f"({attempts}/{PICK_LOCAL_RETRY_MAX_ATTEMPTS} attempts)")
             return False
+        info = getattr(grasp_exec, 'last_grasp_failure_info', None)
+        if info is None:
+            print("[PICK] Local retry skipped: no grasp_failure_info "
+                  "(failure was not from pre-close gate)")
+            return False
+
         loc = sim.localization()
-        obj_xy = np.array(obj_world[:2], dtype=float)
         base_xy = np.array(loc[:2], dtype=float)
-        cur_dist = float(np.linalg.norm(base_xy - obj_xy))
-        if cur_dist < 1e-6:
-            return False
+        cur_yaw = float(loc[2])
+        obj_xy  = np.array(obj_world[:2], dtype=float)
+        gripper_actual_xy = np.array(info['gripper_xy'], dtype=float)
+        ik_target_xy      = np.array(info['ik_target_xy'], dtype=float)
 
-        if cur_dist <= PICK_LOCAL_RETRY_MIN_DIST + 1e-3:
-            print(f"[PICK] Local retry skipped: base-object dist "
-                  f"{cur_dist:.3f}m already at safety floor")
+        # Residual: how much the gripper undershot/overshot the IK
+        # target.  Translating the base by +err moves the gripper to
+        # the IK target (which sits GRIPPER_STANDOFF_XY behind the
+        # object — exactly where it should be for grasp closure).
+        err_vec = ik_target_xy - gripper_actual_xy
+        err_mag = float(np.linalg.norm(err_vec))
+        if err_mag < PICK_LOCAL_RETRY_MIN_ERR:
+            print(f"[PICK] Local retry skipped: residual {err_mag*100:.1f}cm "
+                  f"below {PICK_LOCAL_RETRY_MIN_ERR*100:.1f}cm threshold")
             return False
-        direction = (base_xy - obj_xy) / cur_dist
+        if err_mag > PICK_LOCAL_RETRY_MAX_ERR:
+            err_vec = err_vec * (PICK_LOCAL_RETRY_MAX_ERR / err_mag)
+            err_mag = PICK_LOCAL_RETRY_MAX_ERR
+            print(f"[PICK] Local retry: residual capped at "
+                  f"{PICK_LOCAL_RETRY_MAX_ERR*100:.1f}cm")
+
         nav.validator.sync(sim.data)
-
-        target_dist = None
         target_xy = None
-        target_yaw = None
-        for retry_step in PICK_LOCAL_RETRY_STEPS:
-            cand_dist = max(PICK_LOCAL_RETRY_MIN_DIST, cur_dist - retry_step)
-            if cand_dist >= cur_dist - 1e-3:
+        target_yaw = cur_yaw   # KEEP CURRENT YAW — rigid arm in base frame
+        chosen_scale = None
+        for scale in PICK_LOCAL_RETRY_SCALES:
+            cand_xy = base_xy + err_vec * scale
+            # Keep the chassis a safe distance from the object so the
+            # arm has room to descend without the base bumping the
+            # cylinder.
+            cand_dist = float(np.linalg.norm(cand_xy - obj_xy))
+            if cand_dist < PICK_LOCAL_RETRY_MIN_DIST:
                 continue
-            cand_xy = obj_xy + direction * cand_dist
-            cand_yaw = pick_candidate_yaw(cand_xy, obj_xy)
             if nav.validator.is_valid(float(cand_xy[0]), float(cand_xy[1]),
-                                      yaw=cand_yaw):
-                target_dist = cand_dist
+                                      yaw=cur_yaw):
                 target_xy = cand_xy
-                target_yaw = cand_yaw
+                chosen_scale = scale
                 break
 
         if target_xy is None:
-            print(f"[PICK] Local retry skipped: no valid inward target "
-                  f"from {cur_dist:.3f}m using steps {PICK_LOCAL_RETRY_STEPS}")
+            print(f"[PICK] Local retry skipped: no valid pose at any scale "
+                  f"of err={err_mag*100:.1f}cm "
+                  f"(dir=({err_vec[0]:+.3f},{err_vec[1]:+.3f}))")
             return False
-        print(f"[PICK] Local retry: small radial nudge "
-              f"{cur_dist:.3f}m → {target_dist:.3f}m before changing side")
-        _pick_local_retry_used[0] = True
+
+        applied = err_mag * chosen_scale
+        print(f"[PICK] Local retry #{attempts + 1}/"
+              f"{PICK_LOCAL_RETRY_MAX_ATTEMPTS}: gripper-target residual "
+              f"{err_mag*100:.1f}cm  applied {applied*100:.1f}cm "
+              f"({chosen_scale*100:.0f}%)  "
+              f"base ({base_xy[0]:.2f},{base_xy[1]:.2f}) → "
+              f"({target_xy[0]:.2f},{target_xy[1]:.2f})  yaw fixed")
+        _pick_local_retry_used[0] = attempts + 1
         move_in_progress_flag[0] = True
         with sim._target_lock:
             sim.target_base = np.array([target_xy[0], target_xy[1], target_yaw])
@@ -966,6 +1216,7 @@ def main():
             time.sleep(0.05)
         move_in_progress_flag[0] = False
         grasp_in_progress_flag[0] = True
+        _any_grasp_attempted[0] = True
         grasp_exec.pick(
             _current_obj_idx[0], obj_world, on_complete=_on_grasp_complete)
         return True
@@ -1019,6 +1270,7 @@ def main():
             print("[GUI] No safe pick candidate left after base-object distance check")
             return
         grasp_in_progress_flag[0] = True
+        _any_grasp_attempted[0] = True
 
         # Hand off to GraspExecutor (open -> approach -> descent -> close ->
         # pin-to-gripper). _on_grasp_complete starts base->shelf navigation.
@@ -1084,6 +1336,16 @@ def main():
             goal_tol = None
             final_yaw = None
             print(f"[NAV] Navigating to shelf standoff {standoff}")
+        # Exempt the held object from floor-clearance check during
+        # transport — it's pinned to the gripper and moves with the
+        # robot, so static-position distance to it is meaningless.
+        # Other floor objects must still be cleared by the chassis.
+        try:
+            held_bid = grasp_exec._held_obj_bid
+            if held_bid is not None:
+                nav.validator.set_exempt_objects([int(held_bid)])
+        except Exception:
+            pass
         nav.navigate_to(standoff, on_complete=_on_shelf_nav_complete,
                         goal_tolerance=goal_tol, final_yaw=final_yaw,
                         allow_goal_nudge=not USE_APPROXIMATE_DROP)
@@ -1112,6 +1374,11 @@ def main():
             print(f"[GUI] {label} complete — success={place_ok}")
             if place_ok:
                 print("[GUI] Pick-and-place cycle complete!")
+                _emit_cycle_metrics(
+                    "success", _current_obj_idx[0], _current_shelf_idx[0])
+            else:
+                _emit_cycle_metrics(
+                    "place_failed", _current_obj_idx[0], _current_shelf_idx[0])
 
         if USE_APPROXIMATE_DROP:
             print("[GUI] Approximate drop — releasing near assigned slot")
@@ -1128,6 +1395,10 @@ def main():
         glfw.make_context_current(sim.window)
     imgui.create_context()
     impl = GlfwRenderer(sim.window, attach_callbacks=False)
+
+    # Start the optional screen recorder once the GL context is live.
+    if screen_rec is not None:
+        screen_rec.start(label="play_m1_session")
 
     obj_geom_ids  = get_object_geom_ids(sim.model)
     obj_rgba_orig = {}
@@ -1164,6 +1435,11 @@ def main():
     move_status     = ""
     collision_debug = False
     key3_was_down   = False
+
+    # Final event pump before the render loop — drains anything that
+    # accumulated during the late ImGui / scene setup so the very first
+    # iteration of the main loop is responsive immediately.
+    _pump_events()
 
     while not glfw.window_should_close(sim.window):
         glfw.poll_events()
@@ -1545,12 +1821,17 @@ def main():
                 obj_world   = get_object_world_pos(sim.model, sim.data, selected_object)
                 _pick_candidate_obj_xy[0] = obj_world[:2].copy()
                 _pick_replan_count[0] = 0
-                _pick_local_retry_used[0] = False
+                _pick_local_retry_used[0] = 0
+                _relaxed_clearance[0] = False  # start each cycle in strict mode
+                _any_grasp_attempted[0] = False
+                nav.validator.skip_segment_validation = False
                 _pick_candidates[0] = _filtered_pick_candidates(obj_world)
+                _cycle_start_time[0] = time.time()
                 if not _pick_candidates[0]:
                     move_status = (f"Obj-{selected_object} unreachable from safe pick standoffs; "
                                    "no robot motion started")
                     print(f"[MOVE] {move_status}")
+                    _emit_cycle_metrics("no_candidates", selected_object, selected_shelf)
                 else:
                     _pick_candidate_idx[0] = 0
                     goal_xy = _candidate_xy(_pick_candidates[0][0])
@@ -1574,6 +1855,9 @@ def main():
                 move_in_progress_flag[0]  = False
                 grasp_in_progress_flag[0] = False
                 move_status = "Cancelled."
+                _emit_cycle_metrics(
+                    "cancelled",
+                    _current_obj_idx[0], _current_shelf_idx[0])
         elif holding_object:
             held = grasp_exec._held_obj_idx
             imgui.text_colored(f"● Holding Obj-{held}", 0.3, 1.0, 0.5, 1.0)
@@ -1588,8 +1872,14 @@ def main():
         imgui.end()
         imgui.render()
         impl.render(imgui.get_draw_data())
+        # Capture before swap_buffers so the readback sees the just-rendered
+        # frame.  No-op when --record is not set.
+        if screen_rec is not None:
+            screen_rec.capture_frame(sim.window)
         glfw.swap_buffers(sim.window)
 
+    if screen_rec is not None:
+        screen_rec.stop()
     impl.shutdown()
     glfw.terminate()
 

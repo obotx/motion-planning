@@ -12,9 +12,8 @@
   <img alt="Docker" src="https://img.shields.io/badge/docker-supported-2496ED?logo=docker&logoColor=white">
 </p>
 
-<p align="center">
-  https://github.com/user-attachments/assets/42763aa0-9ef5-449a-b3e7-d32c80e5af17
-</p>
+https://github.com/user-attachments/assets/42763aa0-9ef5-449a-b3e7-d32c80e5af17
+
 <p align="center"><em>▶ Full GUI walkthrough — object selection, MOVE button, OMPL base navigation, OMPL arm grasp, and shelf-side delivery.</em></p>
 
 ---
@@ -59,6 +58,7 @@
   - [GUI Panel](#gui-panel)
   - [3D Camera Controls](#3d-camera-controls)
 - [Troubleshooting](#-troubleshooting)
+- [FAQ](#-faq)
 - [Scope &amp; Roadmap](#-scope--roadmap)
 - [Acknowledgements](#-acknowledgements)
 
@@ -163,20 +163,17 @@ Once the GUI is open, follow this exact sequence to see the autonomous cycle end
 
 ## 🎥 Video Demos
 
-<table>
-  <tr>
-    <td align="center" width="50%">
-      <strong>1. Perspective view (GUI)</strong><br>
-      https://github.com/user-attachments/assets/dde71c04-72fd-4ab9-8e5d-97656738ded6
-      <br><em>Full recording: navigate, grasp, transport, deliver.</em>
-    </td>
-    <td align="center" width="50%">
-      <strong>2. Top-down view</strong><br>
-      https://github.com/user-attachments/assets/034b1e6d-49c2-4bee-a92e-144ae6dffd88
-      <br><em>Clear view of the planned path through obstacles.</em>
-    </td>
-  </tr>
-</table>
+### 1. Perspective view (GUI)
+
+https://github.com/user-attachments/assets/dde71c04-72fd-4ab9-8e5d-97656738ded6
+
+*Full recording: navigate, grasp, transport, deliver.*
+
+### 2. Top-down view
+
+https://github.com/user-attachments/assets/034b1e6d-49c2-4bee-a92e-144ae6dffd88
+
+*Clear view of the planned path through obstacles.*
 
 ### Step-by-step preview
 
@@ -185,6 +182,15 @@ Once the GUI is open, follow this exact sequence to see the autonomous cycle end
 | **1. Select object & slot** | <img src="assets/m1_object_selection.png" alt="M1 object selection controls" width="280"> | Object highlighted yellow, slot ring green, dropdowns visible in the PICK & PLACE panel. |
 | **2. Navigate** | <img src="assets/m1_ompl_object_navigation.png" alt="M1 OMPL navigation scene" width="280"> | Base drives along the OMPL path to a validated stand-off pose next to the object. Status: `MOVING`. |
 | **3. Grasp & deliver** | <img src="assets/m1_grasp_prototype_status.png" alt="M1 grasp status" width="280"> | ARM1 follows its OMPL-planned approach, the OMPL-planned finger trajectory closes the gripper around the object (`● Holding Obj-X`), then the base drives to the shelf-side aisle to release. |
+
+### Additional pickup runs
+
+Independent end-to-end pickup cycles across different objects and spawn layouts:
+
+- [`assets/demo_m1_pickup_run_1.mp4`](assets/demo_m1_pickup_run_1.mp4)
+- [`assets/demo_m1_pickup_run_2.mp4`](assets/demo_m1_pickup_run_2.mp4)
+- [`assets/demo_m1_pickup_run_3.mp4`](assets/demo_m1_pickup_run_3.mp4)
+- [`assets/demo_m1_pickup_with_retry.mp4`](assets/demo_m1_pickup_with_retry.mp4) — first grasp attempt is rejected by the pre-close gate; the retry chain (closed-loop base correction → next candidate) recovers and the cycle completes successfully. Useful illustration of the retry behaviour described in the [FAQ](#how-does-the-retry-strategy-work).
 
 ---
 
@@ -455,6 +461,60 @@ MuJoCo's number keys toggle geom-group visibility — useful for inspecting what
 | `MOVE` does nothing | OMPL unavailable or planning failed | Run the smoke test. Check terminal for `[OMPL]` errors |
 | Robot does not move after pressing MOVE | Target unreachable from current pose | Click `Respawn Objects` and try again |
 | Grasp fails / object slips | Object too close to chassis or pre-grasp pose rejected by arm collision check | The GUI auto-tries the next stand-off candidate; if all fail, `Respawn Objects` |
+
+---
+
+## ❓ FAQ
+
+### Are valid arm/finger states pre-computed and stored, or sampled at runtime?
+
+Sampled at runtime, using **RRT-Connect** with MuJoCo as the state validity checker. The combined arm + gripper configuration space is 15-dimensional (4-DOF arm + 11-DOF gripper) — too large to enumerate exhaustively. For each plan call:
+
+1. The planner samples joint configurations on demand from the OMPL state space.
+2. Each sample is validated by writing it to `data.qpos`, calling `mj_forward`, and inspecting `data.ncon` for prohibited contacts.
+3. A custom validity layer allows expected contacts (gripper–object during the carry phase) while rejecting prohibited ones (robot self-collision, arm vs. shelf, etc.).
+
+Typical planning times: ~50–500 ms per arm plan, ~50–200 ms per finger plan.
+
+A discretized valid-state library — coarse offline pre-sampling followed by runtime filtering — is a valid additive optimization for use cases that need very fast planning across many objects in sequence. It can sit on top of the existing pipeline as a warm-start cache without restructuring anything.
+
+### Can the available states be visualized?
+
+The full configuration space is continuous and 15-dimensional, so it cannot be enumerated visually as a whole. Several useful subsets can be visualized as debug add-ons:
+
+- **RRT tree from a single planning run** — the actual states the planner explored to reach a goal. Most useful for understanding why a particular plan succeeded or failed.
+- **Coarse joint-space sweep of the 4-DOF arm** — at 10° per joint, ~10⁵ samples, manageable to render offline as a reachable-pose cloud.
+- **Workspace reachability map** — the Cartesian volume the gripper can reach, sampled across joint configurations. Standard tool for confirming arm reach.
+
+These are straightforward to add as a separate visualization module on top of the existing planner.
+
+### What is the typical pick success rate?
+
+In testing across randomized spawn layouts, roughly **70–80 % of pick attempts complete on the first 1–2 base-pose candidates**, and the **end-to-end success rate with the full retry chain enabled is around 90 %**. The remaining ~10 % are spawn configurations where the object lands in a tight corner against the rack or in a corridor that genuinely cannot be navigated even after the relaxed-clearance fallback — in those cases the pipeline aborts cleanly with a "no feasible candidate" log instead of executing an unsafe grasp.
+
+Most of the residual failures are not a planner issue: the minimum reachable wrist Z on this parallel manipulator is around **0.38 m**, while floor pickup objects sit at **z ≈ 0.07–0.20 m**. The wrist physically cannot descend to the object's level, so the gripper closes a few cm above the cylinder and the carry pose holds the object via the weld + pin attachment described in [How It Works](#-how-it-works). For floor pickup with this arm, that is the practical ceiling without changing the manipulator kinematics.
+
+You may sometimes see the **first grasp attempt show a larger-than-expected gripper-to-object distance** before the system retries. This is the pre-close gate firing — not a bad grasp executing. The parallel manipulator has a passive `RotationLeftJoint` that deflects under load, so the IK solver (which works against a static model) under-predicts the runtime pose by a few cm, especially at low column heights. The gate catches the discrepancy and a closed-loop base correction is applied before the next attempt.
+
+### How does the retry strategy work?
+
+Four layers, in order from cheapest to most expensive:
+
+1. **Closed-loop base correction** — when the pre-close gate rejects, the executor reports the residual XY error between the gripper and the IK target. The base translates by exactly that error vector (yaw held fixed) and the close is retried, up to **5 attempts per cycle**. Because the arm pose is rigid in the base frame and yaw is locked, translating the base by the residual translates the gripper by the same amount. The closed-loop converges quickly when the IK error is geometric.
+2. **Next pre-screened candidate** — at the start of each pick, the system generates up to **5 base-pose candidates** ranked by arm-quality score (tilt, reach) and palm-orientation alignment. If candidate 1 fails grasp, candidate 2 is tried, etc. Each attempt computes a fresh OMPL plan from the current arm/base state.
+3. **Re-scan from the current pose** — if all initial candidates fail, candidate generation is re-run from the current robot position rather than the original starting pose, which often yields a different valid set.
+4. **Relaxed-clearance navigation fallback** — if every candidate has been refused by the strict floor-object clearance check (dense object spawns can box the robot in), the validator switches to a relaxed mode that exempts all non-selected floor objects. **The selected pick target stays protected, and rack/walls remain hard obstacles** in both modes — only the chassis-vs-other-floor-object distance check is relaxed. The system retries the same candidates with the loosened clearance.
+
+After the retry chain is exhausted, the pick is abandoned with a clear log instead of looping forever.
+
+### Why does replanning from the current state often succeed where the previous attempt failed?
+
+Two reasons:
+
+- **Different geometry per candidate.** Each base candidate has a different yaw and a different IK solution, so runtime tracking error on this parallel manipulator depends on the specific joint configuration. A different geometric pose can track substantially better because the passive joints carry less load at that configuration.
+- **Live state, not stale plan.** The replan is computed from the current physical robot state after retract, not the original idealized starting pose. PD control has settled, the arm's actual kinematic state matches what the new plan assumes, and tracking is cleaner.
+
+When none of the candidates work, the system aborts honestly rather than spinning.
 
 ---
 

@@ -4,7 +4,7 @@ from ompl import geometric as og
 
 FLOOR_X      = (0.0, 8.0)
 FLOOR_Y      = (-8.0, 0.0)
-ROBOT_RADIUS = 0.55   # inflation radius to keep robot clear of shelf edges
+ROBOT_RADIUS = 0.65   # inflation radius; covers chassis's widest yaw profile
 
 OBSTACLE_RECTS = [
     (2.5,  8.05, -5.2, -3.1),   # shelf
