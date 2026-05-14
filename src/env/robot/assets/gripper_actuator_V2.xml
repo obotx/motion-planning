@@ -2,13 +2,13 @@
     <actuator>
 
         <!-- === ARM 1 FINGER ACTUATORS === -->
-        <position joint="finger_c_joint_1_1" name="finger_c_joint_1_1" ctrlrange="-1 1.2218" kp="100"/>
+        <position joint="finger_c_joint_1_1" name="finger_c_joint_1_1" ctrlrange="-2.0 1.2218" kp="100"/>
         <position joint="finger_c_joint_2_1" name="finger_c_joint_2_1" ctrlrange="0 1.5708" kp="10"/>
         <position joint="finger_c_joint_3_1" name="finger_c_joint_3_1" ctrlrange="-1.2217 -0.0523" kp="10"/>
-        <position joint="finger_b_joint_1_1" name="finger_b_joint_1_1" ctrlrange="-1 1.2218" kp="100"/>
+        <position joint="finger_b_joint_1_1" name="finger_b_joint_1_1" ctrlrange="-2.0 1.2218" kp="100"/>
         <position joint="finger_b_joint_2_1" name="finger_b_joint_2_1" ctrlrange="0 1.5708" kp="10"/>
         <position joint="finger_b_joint_3_1" name="finger_b_joint_3_1" ctrlrange="-1.2217 -0.0523" kp="10"/>
-        <position joint="finger_a_joint_1_1" name="finger_a_joint_1_1" ctrlrange="-1 1.2218" kp="100"/>
+        <position joint="finger_a_joint_1_1" name="finger_a_joint_1_1" ctrlrange="-1.5 1.2218" kp="100"/>
         <position joint="finger_a_joint_2_1" name="finger_a_joint_2_1" ctrlrange="0 1.5708" kp="10"/>
         <position joint="finger_a_joint_3_1" name="finger_a_joint_3_1" ctrlrange="-1.2217 -0.0523" kp="10"/>
         <position joint="palm_finger_c_joint_1" name="palm_finger_c_joint_1" ctrlrange="-0.1784 0.192" kp="10"/>
@@ -20,13 +20,13 @@
         <position name="HandBearing_1" joint="HandBearingJoint_1" ctrlrange="-1.57 1.57" kp="127"/>
 
         <!-- === ARM 2 FINGER ACTUATORS === -->
-        <position joint="finger_c_joint_1_2" name="finger_c_joint_1_2" ctrlrange="-1 1.2218" kp="100"/>
+        <position joint="finger_c_joint_1_2" name="finger_c_joint_1_2" ctrlrange="-2.0 1.2218" kp="100"/>
         <position joint="finger_c_joint_2_2" name="finger_c_joint_2_2" ctrlrange="0 1.5708" kp="10"/>
         <position joint="finger_c_joint_3_2" name="finger_c_joint_3_2" ctrlrange="-1.2217 -0.0523" kp="10"/>
-        <position joint="finger_b_joint_1_2" name="finger_b_joint_1_2" ctrlrange="-1 1.2218" kp="100"/>
+        <position joint="finger_b_joint_1_2" name="finger_b_joint_1_2" ctrlrange="-2.0 1.2218" kp="100"/>
         <position joint="finger_b_joint_2_2" name="finger_b_joint_2_2" ctrlrange="0 1.5708" kp="10"/>
         <position joint="finger_b_joint_3_2" name="finger_b_joint_3_2" ctrlrange="-1.2217 -0.0523" kp="10"/>
-        <position joint="finger_a_joint_1_2" name="finger_a_joint_1_2" ctrlrange="-1 1.2218" kp="100"/>
+        <position joint="finger_a_joint_1_2" name="finger_a_joint_1_2" ctrlrange="-1.5 1.2218" kp="100"/>
         <position joint="finger_a_joint_2_2" name="finger_a_joint_2_2" ctrlrange="0 1.5708" kp="10"/>
         <position joint="finger_a_joint_3_2" name="finger_a_joint_3_2" ctrlrange="-1.2217 -0.0523" kp="10"/>
         <position joint="palm_finger_c_joint_2" name="palm_finger_c_joint_2" ctrlrange="-0.1784 0.192" kp="10"/>

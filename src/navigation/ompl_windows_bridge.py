@@ -14,8 +14,15 @@ import mujoco
 WAYPOINT_REACH_DIST = 0.25
 GOAL_REACH_DIST     = 0.35
 WAYPOINT_TIMEOUT    = 180.0
-WAYPOINT_STALL_TIMEOUT = 12.0
+# Stall detection — when the chassis hasn't progressed within this
+# window the PID is saturated against an obstacle and additional
+# waiting will not help.
+WAYPOINT_STALL_TIMEOUT = 5.0
 WAYPOINT_STALL_MIN_IMPROVEMENT = 0.02
+# Stall recovery — back the chassis along the reverse-approach by this
+# distance so the next plan attempt sees a collision-free start pose.
+WAYPOINT_STALL_BACKUP_DIST = 0.50
+WAYPOINT_STALL_BACKUP_TIMEOUT = 4.0
 MIN_WAYPOINT_DIST   = 0.25
 STRICT_MAX_COLLISION_STITCH_GAP = 0.75
 FINAL_YAW_TOL       = 0.20   # rad (~11.5 deg) — final-waypoint yaw tolerance.
@@ -606,6 +613,54 @@ class InProcessNavigator:
                     print(f"[Nav] Waypoint {i+1} stalled at dist={dist:.2f}m"
                           f"{extra}; no progress for "
                           f"{WAYPOINT_STALL_TIMEOUT:.0f}s")
+                    # Stall rescue — drive the chassis back along the
+                    # reverse-approach direction so it exits any
+                    # constraint region it is wedged against.  Without
+                    # this the next plan attempt sees the chassis in a
+                    # clearance-violating pose and the planner refuses.
+                    try:
+                        _bx, _by, _byaw = self.sim.localization()
+                        # reverse-approach unit = from waypoint toward
+                        # current pos (= direction chassis was coming
+                        # from).  If degenerate (very small distance),
+                        # use chassis yaw to back straight rearward.
+                        _vx = _bx - wx
+                        _vy = _by - wy
+                        _vn = math.hypot(_vx, _vy)
+                        if _vn < 1e-3:
+                            _ux = -math.cos(_byaw)
+                            _uy = -math.sin(_byaw)
+                        else:
+                            _ux = _vx / _vn
+                            _uy = _vy / _vn
+                        _backup_x = _bx + _ux * WAYPOINT_STALL_BACKUP_DIST
+                        _backup_y = _by + _uy * WAYPOINT_STALL_BACKUP_DIST
+                        print(f"[Nav] Stall rescue: backing chassis "
+                              f"{WAYPOINT_STALL_BACKUP_DIST*100:.0f}cm "
+                              f"along reverse-approach "
+                              f"({_bx:.2f},{_by:.2f}) → "
+                              f"({_backup_x:.2f},{_backup_y:.2f}) "
+                              f"to exit collision region before failing")
+                        with self.sim._target_lock:
+                            self.sim.target_base = np.array(
+                                [_backup_x, _backup_y, _byaw])
+                        _bk_t0 = time.time()
+                        _bk_tol = 0.10  # 10 cm — coarse, just need to escape
+                        while time.time() - _bk_t0 < WAYPOINT_STALL_BACKUP_TIMEOUT:
+                            if not self._is_current(my_gen):
+                                break
+                            _cx, _cy, _ = self.sim.localization()
+                            if math.hypot(_cx - _backup_x,
+                                          _cy - _backup_y) <= _bk_tol:
+                                break
+                            time.sleep(0.05)
+                        _fx, _fy, _ = self.sim.localization()
+                        print(f"[Nav] Stall rescue done: chassis at "
+                              f"({_fx:.2f},{_fy:.2f}) — moved "
+                              f"{math.hypot(_fx - _bx, _fy - _by)*100:.0f}cm "
+                              f"in {time.time() - _bk_t0:.1f}s")
+                    except Exception as _bk_e:
+                        print(f"[Nav] Stall rescue skipped: {_bk_e}")
                     return False
                 if now - t0 > WAYPOINT_TIMEOUT:
                     print(f"[Nav] Waypoint {i+1} timed out at dist={dist:.2f}m")

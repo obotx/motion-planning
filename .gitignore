@@ -8,5 +8,7 @@ __pycache__/
 output_videos/
 *.log
 *.mp4.tmp
+RUN_LOG.txt
+MUJOCO_LOG.TXT
 
 .env

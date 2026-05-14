@@ -189,6 +189,18 @@ class ParallelRobot:
             self.viewport = mujoco.MjrRect(0, 0, 1200, 900)
             self.scene = mujoco.MjvScene(self.model, maxgeom=500)
             self.opt = mujoco.MjvOption()
+            # Contact-point visualization off by default — most contacts
+            # at runtime are wheels and object-floor pairs, which is
+            # visual noise.  Press `C` at runtime to toggle on for
+            # debugging.  Other viz flags: F (forces), T (transparency),
+            # J (joints), 1..5 (toggle geom groups).
+            self.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT] = False
+            # Shrink contact-point discs (default 0.3 is enormous for
+            # finger-scale geoms — yields huge yellow disks that obscure
+            # the gripper).  Set to ~5mm so contacts read as small dots.
+            self.model.vis.scale.contactwidth  = 0.01
+            self.model.vis.scale.contactheight = 0.005
+            self.model.vis.scale.forcewidth    = 0.01
 
             glfw.set_key_callback(self.window, self.on_key)
             # glfw.set_cursor_pos_callback(self.window, self._cursor_pos_callback)
@@ -730,11 +742,41 @@ class ParallelRobot:
         if key == glfw.KEY_ESCAPE:
             glfw.set_window_should_close(self.window, True)
             return
-        
+
         if key == glfw.KEY_ENTER:
             self.reset()
             self.gripper_ctrl = 0.0
             return
+
+        # Visualization toggles — each key flips a MjvOption flag.
+        if key == glfw.KEY_C:           # contact points
+            i = mujoco.mjtVisFlag.mjVIS_CONTACTPOINT
+            self.opt.flags[i] = not self.opt.flags[i]
+            print(f"[viz] contact points = {bool(self.opt.flags[i])}")
+            return
+        if key == glfw.KEY_F:           # contact force arrows
+            i = mujoco.mjtVisFlag.mjVIS_CONTACTFORCE
+            self.opt.flags[i] = not self.opt.flags[i]
+            print(f"[viz] contact forces = {bool(self.opt.flags[i])}")
+            return
+        if key == glfw.KEY_T:           # transparency (see through meshes)
+            i = mujoco.mjtVisFlag.mjVIS_TRANSPARENT
+            self.opt.flags[i] = not self.opt.flags[i]
+            print(f"[viz] transparency = {bool(self.opt.flags[i])}")
+            return
+        if key == glfw.KEY_J:           # joint frames
+            i = mujoco.mjtVisFlag.mjVIS_JOINT
+            self.opt.flags[i] = not self.opt.flags[i]
+            print(f"[viz] joints = {bool(self.opt.flags[i])}")
+            return
+        # Number keys 1..5 toggle geom groups
+        for digit, gk in enumerate((glfw.KEY_1, glfw.KEY_2, glfw.KEY_3,
+                                     glfw.KEY_4, glfw.KEY_5), start=1):
+            if key == gk:
+                self.opt.geomgroup[digit] = not self.opt.geomgroup[digit]
+                print(f"[viz] geomgroup[{digit}] = "
+                      f"{bool(self.opt.geomgroup[digit])}")
+                return
 
     def _cursor_pos_callback(self, window, xpos, ypos):
         if self.camera.type != mujoco.mjtCamera.mjCAMERA_FREE:

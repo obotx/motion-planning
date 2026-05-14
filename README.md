@@ -28,7 +28,7 @@ https://github.com/user-attachments/assets/42763aa0-9ef5-449a-b3e7-d32c80e5af17
     </td>
     <td align="center" width="33%">
       <strong>🦾 Arm pickup — OMPL planned</strong><br><br>
-      <sub>4-DOF parallel-manipulator planner (<code>H1, H2, A1, TH</code>) with per-state MuJoCo collision checks. Solves the <code>HOME → pre-grasp</code> approach and the transport paths — the pickup motion itself is <em>planned</em>, not scripted.</sub>
+      <sub>8-DOF parallel-manipulator planner (<code>H1, H2, A1, TH</code> + <code>HandBearing, gripper_z/x/y_rotation</code>) with per-state MuJoCo collision checks. Solves the <code>HOME → pre-grasp</code> approach, the wrist orientation, and the transport paths together — the pickup motion itself is <em>planned</em>, not scripted.</sub>
     </td>
     <td align="center" width="33%">
       <strong>✊ Fingers — OMPL planned</strong><br><br>
@@ -253,7 +253,7 @@ sequenceDiagram
 | `navigation/plan.py` | Base OMPL planner. Builds the `(x, y, yaw)` collision-aware search space; returns base waypoints. |
 | `navigation/ompl_windows_bridge.py` | Base-planner bridge. Native Linux mode + a remote-WSL mode (`OMPL_BRIDGE_MODE` env var). |
 | `navigation/ompl_navigator.py` | Base waypoint follower. Drives the mecanum base along the planned path; reports progress. |
-| `navigation/arm_planner.py` | **4-DOF arm OMPL planner** (`MORPHBridge`). Per-state MuJoCo collision checks; `plan(start_q, goal_q)` and `solve_ik(world_pos)` produce the pickup approach trajectory — the motion is solved by the planner, not authored by hand. |
+| `navigation/arm_planner.py` | **8-DOF arm OMPL planner** (`MORPHBridge`) — 4 arm slides (`H1, H2, A1, TH`) plus 4 wrist orientation joints (`HandBearing, gripper_z/x/y_rotation`). Per-state MuJoCo collision checks; `plan(start_q, goal_q)` and `solve_ik(world_pos, wrist_goal=…)` produce the pickup approach trajectory and the gripper orientation together — both are solved by the planner, not authored by hand. |
 | `navigation/finger_planner.py` | **Gripper finger OMPL planner** (`FingerBridge`). RRT-Connect over the 11-DOF gripper joint space; the open- and close-around-object trajectories are produced by the planner instead of being configured manually. |
 | `navigation/grasp_executor.py` | Pick & place orchestrator. Sequences open → OMPL approach → linear descent → close → weld + pin → OMPL transport → release → OMPL retract. |
 
@@ -270,7 +270,8 @@ motion-planning/
 ├── docker/                         # reproducible Docker setup → docker/README.md
 ├── assets/                         # GUI screenshots and demo videos
 ├── tools/
-│   └── smoke_test.py               # imports + XML load sanity check
+│   ├── smoke_test.py               # imports + XML load sanity check
+│   └── inspect_collisions.py       # contact-pair / allowed-set diagnostic
 └── src/
     ├── gui/
     │   └── play_m1.py              # main GUI / pipeline orchestrator
@@ -278,7 +279,7 @@ motion-planning/
     │   ├── plan.py                 # base OMPL planner
     │   ├── ompl_windows_bridge.py  # native + WSL bridge
     │   ├── ompl_navigator.py       # base waypoint follower
-    │   ├── arm_planner.py          # 4-DOF arm OMPL planner
+    │   ├── arm_planner.py          # 8-DOF arm + wrist OMPL planner
     │   ├── finger_planner.py       # gripper finger OMPL planner
     │   └── grasp_executor.py       # pick & place orchestrator
     ├── simulations/
@@ -309,7 +310,7 @@ A 4-wheeled omnidirectional mobile base carrying dual independent parallel manip
 | Component | Description |
 | --- | --- |
 | **Mobile Base** | 4-wheel omnidirectional (mecanum) drive — moves in any direction without turning first. |
-| **Left Arm (ARM1)** | Parallel manipulator: 2 prismatic columns (`H1`, `H2`), 1 horizontal extension (`A1`), 1 revolute base joint (`TH`). |
+| **Left Arm (ARM1)** | Parallel manipulator: 2 prismatic columns (`H1`, `H2`), 1 horizontal extension (`A1`), 1 revolute base joint (`TH`), plus 4 wrist orientation joints (`HandBearing`, `gripper_z/x/y_rotation`). |
 | **Right Arm (ARM2)** | Same configuration as ARM1, independently controlled. |
 | **Grippers** | Two 3-finger grippers (one per arm), each controllable from 0 % open to 100 % closed. |
 
@@ -320,7 +321,11 @@ A 4-wheeled omnidirectional mobile base carrying dual independent parallel manip
 | `H1` | Prismatic | 0 – 1.5 m | Height of left vertical column |
 | `H2` | Prismatic | 0 – 1.5 m | Height of right vertical column |
 | `A1` | Prismatic | 0 – 0.7 m | Horizontal arm extension |
-| `TH` | Revolute | −90° – 90° | Yaw rotation of entire arm assembly |
+| `TH` | Revolute | ±180° | Yaw rotation of entire arm assembly |
+| `HandBearing` | Revolute | ±90° | Wrist pitch — tilts the gripper between top-down and side-grip orientations |
+| `gripper_z_rotation` | Revolute | ±180° | Palm roll about the wrist axis |
+| `gripper_x_rotation` | Revolute | ±46° | Wrist X tilt — fine alignment with object orientation |
+| `gripper_y_rotation` | Revolute | ±46° | Wrist Y tilt — fine alignment with object orientation |
 
 > **Note:** For the autonomous cycle, only **ARM1** is driven by the planner; **ARM2** is parked at a safe pose. Both arms remain available for manual control via the GUI sliders.
 
@@ -468,7 +473,7 @@ MuJoCo's number keys toggle geom-group visibility — useful for inspecting what
 
 ### Are valid arm/finger states pre-computed and stored, or sampled at runtime?
 
-Sampled at runtime, using **RRT-Connect** with MuJoCo as the state validity checker. The combined arm + gripper configuration space is 15-dimensional (4-DOF arm + 11-DOF gripper) — too large to enumerate exhaustively. For each plan call:
+Sampled at runtime, using **RRT-Connect** with MuJoCo as the state validity checker. The combined arm + gripper configuration space is 19-dimensional (8-DOF arm + 11-DOF gripper) — too large to enumerate exhaustively. For each plan call:
 
 1. The planner samples joint configurations on demand from the OMPL state space.
 2. Each sample is validated by writing it to `data.qpos`, calling `mj_forward`, and inspecting `data.ncon` for prohibited contacts.
@@ -480,10 +485,10 @@ A discretized valid-state library — coarse offline pre-sampling followed by ru
 
 ### Can the available states be visualized?
 
-The full configuration space is continuous and 15-dimensional, so it cannot be enumerated visually as a whole. Several useful subsets can be visualized as debug add-ons:
+The full configuration space is continuous and 19-dimensional, so it cannot be enumerated visually as a whole. Several useful subsets can be visualized as debug add-ons:
 
 - **RRT tree from a single planning run** — the actual states the planner explored to reach a goal. Most useful for understanding why a particular plan succeeded or failed.
-- **Coarse joint-space sweep of the 4-DOF arm** — at 10° per joint, ~10⁵ samples, manageable to render offline as a reachable-pose cloud.
+- **Coarse joint-space sweep of the 8-DOF arm** — at 10° per joint, ~10⁹ samples, too dense to render fully but per-DOF projections are manageable as reachable-pose clouds.
 - **Workspace reachability map** — the Cartesian volume the gripper can reach, sampled across joint configurations. Standard tool for confirming arm reach.
 
 These are straightforward to add as a separate visualization module on top of the existing planner.
@@ -492,7 +497,7 @@ These are straightforward to add as a separate visualization module on top of th
 
 In testing across randomized spawn layouts, roughly **70–80 % of pick attempts complete on the first 1–2 base-pose candidates**, and the **end-to-end success rate with the full retry chain enabled is around 90 %**. The remaining ~10 % are spawn configurations where the object lands in a tight corner against the rack or in a corridor that genuinely cannot be navigated even after the relaxed-clearance fallback — in those cases the pipeline aborts cleanly with a "no feasible candidate" log instead of executing an unsafe grasp.
 
-Most of the residual failures are not a planner issue: the minimum reachable wrist Z on this parallel manipulator is around **0.38 m**, while floor pickup objects sit at **z ≈ 0.07–0.20 m**. The wrist physically cannot descend to the object's level, so the gripper closes a few cm above the cylinder and the carry pose holds the object via the weld + pin attachment described in [How It Works](#-how-it-works). For floor pickup with this arm, that is the practical ceiling without changing the manipulator kinematics.
+Residual failures are typically a function of spawn geometry rather than the planner: the object lands in a tight corner against the rack/keepout zones, or the chassis-clearance check refuses every base candidate because the floor is crowded with other objects. The relaxed-clearance fallback (see retry strategy) handles most of the crowded-floor case; the genuinely unreachable spawns abort cleanly with a "no feasible candidate" log instead of executing an unsafe grasp.
 
 You may sometimes see the **first grasp attempt show a larger-than-expected gripper-to-object distance** before the system retries. This is the pre-close gate firing — not a bad grasp executing. The parallel manipulator has a passive `RotationLeftJoint` that deflects under load, so the IK solver (which works against a static model) under-predicts the runtime pose by a few cm, especially at low column heights. The gate catches the discrepancy and a closed-loop base correction is applied before the next attempt.
 
@@ -528,7 +533,7 @@ When none of the candidates work, the system aborts honestly rather than spinnin
 | Shelf slot selection (delivery target) | ✅ Implemented |
 | OMPL collision-aware base path planning | ✅ Implemented |
 | Waypoint-following base navigation | ✅ Implemented |
-| OMPL 4-DOF arm planning (grasp + transport) | ✅ Implemented |
+| OMPL 8-DOF arm + wrist planning (grasp + transport) | ✅ Implemented |
 | OMPL gripper finger planning (open / close) | ✅ Implemented |
 | Autonomous grasp with pin + weld hold | ✅ Implemented |
 | Autonomous shelf-side delivery (release at the slot's aisle column) | ✅ Implemented |
@@ -537,7 +542,7 @@ When none of the candidates work, the system aborts honestly rather than spinnin
 | Precise on-shelf placement onto the slot surface | 🔶 In progress — current cycle releases at the slot's aisle column |
 | ROS 2 / MoveIt2 integration | ❌ Out of scope for this repository |
 
-> **What is OMPL?** *Open Motion Planning Library* — a widely-used open-source library for computing collision-free paths for robots. This project uses OMPL at three levels: the mobile base, the 4-DOF arm, and the gripper fingers — each with its own collision-aware state space.
+> **What is OMPL?** *Open Motion Planning Library* — a widely-used open-source library for computing collision-free paths for robots. This project uses OMPL at three levels: the mobile base, the 8-DOF arm + wrist, and the gripper fingers — each with its own collision-aware state space.
 
 ---
 
