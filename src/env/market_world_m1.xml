@@ -97,68 +97,74 @@
             Positions are initialized here but will be overridden by play_m1.py
             on startup with random floor positions.
             Each object is a labeled cylinder with a distinct color.
-            NOTE: adjust z so objects rest on floor (floor z=0, cylinder half-height=0.075).
+            Cylinder half-height 0.13 (= 26 cm tall) matches the wrist Z
+            envelope of the MORPH-I arm: with the wrist parked near
+            z = 0.38 m, a 26 cm cylinder has its top at ≈ 0.26 m so the
+            fingers reach the cylinder body cleanly without over-extending
+            h1/h2 (which would fight the passive RotationLeftJoint and
+            blow the pre-close XY gate).  Body z = half_height so the
+            cylinder bottom rests on the floor at world z = 0.
         -->
 
         <!-- Object 0: Red -->
-        <body name="pickup_obj_0" pos="3.0 -7.0 0.075">
+        <body name="pickup_obj_0" pos="3.0 -7.0 0.13">
             <joint type="free"/>
-            <geom type="cylinder" size="0.04 0.075" rgba="0.9 0.1 0.1 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
-            <geom type="cylinder" size="0.035 0.076" rgba="1.0 0.8 0.8 1" contype="0" conaffinity="0"/>
+            <geom type="cylinder" size="0.04 0.13" rgba="0.9 0.1 0.1 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
+            <geom type="cylinder" size="0.035 0.131" rgba="1.0 0.8 0.8 1" contype="0" conaffinity="0"/>
         </body>
 
         <!-- Object 1: Orange -->
-        <body name="pickup_obj_1" pos="3.5 -7.0 0.075">
+        <body name="pickup_obj_1" pos="3.5 -7.0 0.13">
             <joint type="free"/>
-            <geom type="cylinder" size="0.04 0.075" rgba="0.9 0.5 0.0 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
+            <geom type="cylinder" size="0.04 0.13" rgba="0.9 0.5 0.0 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
         </body>
 
         <!-- Object 2: Yellow -->
-        <body name="pickup_obj_2" pos="4.0 -7.0 0.075">
+        <body name="pickup_obj_2" pos="4.0 -7.0 0.13">
             <joint type="free"/>
-            <geom type="cylinder" size="0.04 0.075" rgba="0.9 0.9 0.0 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
+            <geom type="cylinder" size="0.04 0.13" rgba="0.9 0.9 0.0 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
         </body>
 
         <!-- Object 3: Green -->
-        <body name="pickup_obj_3" pos="4.5 -7.0 0.075">
+        <body name="pickup_obj_3" pos="4.5 -7.0 0.13">
             <joint type="free"/>
-            <geom type="cylinder" size="0.04 0.075" rgba="0.1 0.8 0.1 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
+            <geom type="cylinder" size="0.04 0.13" rgba="0.1 0.8 0.1 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
         </body>
 
         <!-- Object 4: Cyan -->
-        <body name="pickup_obj_4" pos="5.0 -7.0 0.075">
+        <body name="pickup_obj_4" pos="5.0 -7.0 0.13">
             <joint type="free"/>
-            <geom type="cylinder" size="0.04 0.075" rgba="0.0 0.8 0.9 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
+            <geom type="cylinder" size="0.04 0.13" rgba="0.0 0.8 0.9 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
         </body>
 
         <!-- Object 5: Blue -->
-        <body name="pickup_obj_5" pos="5.5 -7.0 0.075">
+        <body name="pickup_obj_5" pos="5.5 -7.0 0.13">
             <joint type="free"/>
-            <geom type="cylinder" size="0.04 0.075" rgba="0.1 0.2 0.9 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
+            <geom type="cylinder" size="0.04 0.13" rgba="0.1 0.2 0.9 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
         </body>
 
         <!-- Object 6: Purple -->
-        <body name="pickup_obj_6" pos="3.0 -6.5 0.075">
+        <body name="pickup_obj_6" pos="3.0 -6.5 0.13">
             <joint type="free"/>
-            <geom type="cylinder" size="0.04 0.075" rgba="0.6 0.0 0.8 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
+            <geom type="cylinder" size="0.04 0.13" rgba="0.6 0.0 0.8 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
         </body>
 
         <!-- Object 7: Pink -->
-        <body name="pickup_obj_7" pos="3.5 -6.5 0.075">
+        <body name="pickup_obj_7" pos="3.5 -6.5 0.13">
             <joint type="free"/>
-            <geom type="cylinder" size="0.04 0.075" rgba="0.9 0.3 0.6 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
+            <geom type="cylinder" size="0.04 0.13" rgba="0.9 0.3 0.6 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
         </body>
 
         <!-- Object 8: White -->
-        <body name="pickup_obj_8" pos="4.0 -6.5 0.075">
+        <body name="pickup_obj_8" pos="4.0 -6.5 0.13">
             <joint type="free"/>
-            <geom type="cylinder" size="0.04 0.075" rgba="0.95 0.95 0.95 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
+            <geom type="cylinder" size="0.04 0.13" rgba="0.95 0.95 0.95 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
         </body>
 
         <!-- Object 9: Brown -->
-        <body name="pickup_obj_9" pos="4.5 -6.5 0.075">
+        <body name="pickup_obj_9" pos="4.5 -6.5 0.13">
             <joint type="free"/>
-            <geom type="cylinder" size="0.04 0.075" rgba="0.5 0.25 0.0 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
+            <geom type="cylinder" size="0.04 0.13" rgba="0.5 0.25 0.0 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
         </body>
 
         <!-- ===================== SHELF SLOT MARKERS (10 sites on racks) ===================== -->
@@ -219,6 +225,27 @@
         <exclude body1="Rotation_Link_Right_1" body2="Contact_Cylinder_1_2"/>
         <exclude body1="Hand_Bearing_1" body2="Contact_Cylinder_2_1"/>
         <exclude body1="Hand_Bearing_1" body2="base"/>
+        <!-- Side-grip thumb-vs-chassis excludes.  In a wide-open
+             pre-grasp pose the thumb (finger_a) projects back over
+             the chassis upper structure; excluding the pair removes
+             phantom contacts that would otherwise reject valid IK
+             solutions.  Arm-2 mirrors. -->
+        <exclude body1="finger_a_link_1_1" body2="base"/>
+        <exclude body1="finger_a_link_2_1" body2="base"/>
+        <exclude body1="finger_a_link_3_1" body2="base"/>
+        <exclude body1="finger_a_link_1_2" body2="base"/>
+        <exclude body1="finger_a_link_2_2" body2="base"/>
+        <exclude body1="finger_a_link_3_2" body2="base"/>
+        <!-- The side fingers (b, c) and palm can also enter chassis
+             envelope at extreme orientations — proactive excludes. -->
+        <exclude body1="finger_b_link_3_1" body2="base"/>
+        <exclude body1="finger_c_link_3_1" body2="base"/>
+        <exclude body1="finger_b_link_3_2" body2="base"/>
+        <exclude body1="finger_c_link_3_2" body2="base"/>
+        <exclude body1="Gripper_Link1_1" body2="base"/>
+        <exclude body1="Gripper_Link1_2" body2="base"/>
+        <exclude body1="Gripper_Link3_1" body2="base"/>
+        <exclude body1="Gripper_Link3_2" body2="base"/>
         <exclude body1="Contact_Cylinder_2_1" body2="Arm_Left_1"/>
         <exclude body1="Contact_Cylinder_2_1" body2="Arm_Right_1"/>
         <exclude body1="Bearing_Column_Right_2" body2="Arm_Right_1"/>
@@ -262,6 +289,94 @@
         <exclude body1="Bearing_Column_Right_2" body2="Rotation_Link_Right_2"/>
         <exclude body1="Bearing_Column_Right_2" body2="Contact_Cylinder_2_2"/>
         <exclude body1="Rotation_Link_Right_2" body2="Contact_Cylinder_2_2"/>
+        <!-- Targeted finger-vs-arm/palm excludes.  Without these,
+             persistent interpenetration between the palm body and
+             the side fingers' proximal links, and between the
+             Arm_Left structural link and each finger, prevents the
+             close phase from completing.  Each pair below was
+             validated against contact-scan data. -->
+        <exclude body1="Gripper_Link3_1" body2="finger_b_link_1_1"/>
+        <exclude body1="Gripper_Link3_1" body2="finger_c_link_1_1"/>
+        <exclude body1="Arm_Left_1" body2="finger_c_link_0_1"/>
+        <exclude body1="Arm_Left_1" body2="finger_c_link_1_1"/>
+        <exclude body1="Arm_Left_1" body2="finger_c_link_2_1"/>
+        <exclude body1="Arm_Left_1" body2="finger_b_link_0_1"/>
+        <exclude body1="Arm_Left_1" body2="finger_b_link_1_1"/>
+        <exclude body1="Arm_Left_1" body2="finger_b_link_2_1"/>
+        <exclude body1="Arm_Left_1" body2="finger_b_link_3_1"/>
+        <!-- Arm_Left_1 ↔ thumb link_1: exclude to prevent the arm
+             body from pushing the thumb past its commanded open
+             position during the close stroke. -->
+        <exclude body1="Arm_Left_1" body2="finger_a_link_1_1"/>
+        <exclude body1="Arm_Left_1" body2="finger_a_link_1_2"/>
+        <!-- Thumb-vs-arm/palm excludes for the wide-open thumb pose.
+             At deep open angles the thumb links clip through the palm
+             bodies and the arm link; these excludes let the joints
+             follow the commanded ctrl cleanly. -->
+        <exclude body1="Arm_Left_1" body2="finger_a_link_2_1"/>
+        <exclude body1="Arm_Left_1" body2="finger_a_link_2_2"/>
+        <exclude body1="Arm_Left_1" body2="finger_a_link_3_1"/>
+        <exclude body1="Arm_Left_1" body2="finger_a_link_3_2"/>
+        <exclude body1="Gripper_Link1_1" body2="finger_a_link_2_1"/>
+        <exclude body1="Gripper_Link1_2" body2="finger_a_link_2_2"/>
+        <exclude body1="Gripper_Link1_1" body2="finger_a_link_3_1"/>
+        <exclude body1="Gripper_Link1_2" body2="finger_a_link_3_2"/>
+        <exclude body1="Gripper_Link2_1" body2="finger_a_link_2_1"/>
+        <exclude body1="Gripper_Link2_2" body2="finger_a_link_2_2"/>
+        <exclude body1="Gripper_Link2_1" body2="finger_a_link_3_1"/>
+        <exclude body1="Gripper_Link2_2" body2="finger_a_link_3_2"/>
+        <exclude body1="Gripper_Link3_1" body2="finger_a_link_2_1"/>
+        <exclude body1="Gripper_Link3_2" body2="finger_a_link_2_2"/>
+        <exclude body1="Gripper_Link3_1" body2="finger_a_link_3_1"/>
+        <exclude body1="Gripper_Link3_2" body2="finger_a_link_3_2"/>
+        <exclude body1="finger_a_link_1_1" body2="finger_a_link_3_1"/>
+        <exclude body1="finger_a_link_1_2" body2="finger_a_link_3_2"/>
+        <!-- Thumb-vs-side-finger excludes.  In the wide-open thumb
+             pose, thumb link_2/3 can clip the side fingers' link_2/3;
+             the close stroke then pushes the side fingers' joints
+             past their declared ranges.  Excluding the pairs avoids
+             the cascade. -->
+        <exclude body1="finger_a_link_2_1" body2="finger_b_link_2_1"/>
+        <exclude body1="finger_a_link_2_2" body2="finger_b_link_2_2"/>
+        <exclude body1="finger_a_link_2_1" body2="finger_b_link_3_1"/>
+        <exclude body1="finger_a_link_2_2" body2="finger_b_link_3_2"/>
+        <exclude body1="finger_a_link_3_1" body2="finger_b_link_2_1"/>
+        <exclude body1="finger_a_link_3_2" body2="finger_b_link_2_2"/>
+        <exclude body1="finger_a_link_3_1" body2="finger_b_link_3_1"/>
+        <exclude body1="finger_a_link_3_2" body2="finger_b_link_3_2"/>
+        <exclude body1="finger_a_link_2_1" body2="finger_c_link_2_1"/>
+        <exclude body1="finger_a_link_2_2" body2="finger_c_link_2_2"/>
+        <exclude body1="finger_a_link_2_1" body2="finger_c_link_3_1"/>
+        <exclude body1="finger_a_link_2_2" body2="finger_c_link_3_2"/>
+        <exclude body1="finger_a_link_3_1" body2="finger_c_link_2_1"/>
+        <exclude body1="finger_a_link_3_2" body2="finger_c_link_2_2"/>
+        <exclude body1="finger_a_link_3_1" body2="finger_c_link_3_1"/>
+        <exclude body1="finger_a_link_3_2" body2="finger_c_link_3_2"/>
+        <!-- Additional thumb-vs-side-finger and palm-vs-finger
+             excludes — same rationale as above, defensive coverage
+             for poses that would otherwise push joints past their
+             declared ranges. -->
+        <!-- Thumb link_2/3 ↔ side fingers' link_1 -->
+        <exclude body1="finger_a_link_2_1" body2="finger_b_link_1_1"/>
+        <exclude body1="finger_a_link_2_2" body2="finger_b_link_1_2"/>
+        <exclude body1="finger_a_link_2_1" body2="finger_c_link_1_1"/>
+        <exclude body1="finger_a_link_2_2" body2="finger_c_link_1_2"/>
+        <exclude body1="finger_a_link_3_1" body2="finger_b_link_1_1"/>
+        <exclude body1="finger_a_link_3_2" body2="finger_b_link_1_2"/>
+        <exclude body1="finger_a_link_3_1" body2="finger_c_link_1_1"/>
+        <exclude body1="finger_a_link_3_2" body2="finger_c_link_1_2"/>
+        <!-- Palm Gripper_Link2 ↔ thumb link_1 (Arm_Left already done) -->
+        <exclude body1="Gripper_Link2_1" body2="finger_a_link_1_1"/>
+        <exclude body1="Gripper_Link2_2" body2="finger_a_link_1_2"/>
+        <!-- Palm Gripper_Link3 ↔ side fingers' link_2 and link_3 -->
+        <exclude body1="Gripper_Link3_1" body2="finger_b_link_2_1"/>
+        <exclude body1="Gripper_Link3_2" body2="finger_b_link_2_2"/>
+        <exclude body1="Gripper_Link3_1" body2="finger_b_link_3_1"/>
+        <exclude body1="Gripper_Link3_2" body2="finger_b_link_3_2"/>
+        <exclude body1="Gripper_Link3_1" body2="finger_c_link_2_1"/>
+        <exclude body1="Gripper_Link3_2" body2="finger_c_link_2_2"/>
+        <exclude body1="Gripper_Link3_1" body2="finger_c_link_3_1"/>
+        <exclude body1="Gripper_Link3_2" body2="finger_c_link_3_2"/>
     </contact>
 
     <equality>
@@ -283,11 +398,11 @@
                     -0.000000 0.011144 -0.003036 -0.000000 0.005260 -0.000000 -0.000000 0.000000 0.000000
                     0.000000 0.000000 0.000000 0.000000 0.000000 0.003243 -0.000719 -0.000000 0.005268 0.000000
                     0.000000 0.000000 0.000000 -0.000000 -0.000000 -0.000000 0.000000 0.004240 -0.000006
-                    0.000000 0.000000 0.000003 0.301637 0.000444 0.199967 -0.199507 0.001890 0.005077
-                    -0.000001 0.002825 -0.000000 0.000000 0.044532 0.000527 -0.043003 0.000000 0.044532
+                    0.000000 0.000000 0.000003 0.301637 0.000444 0.179000 0.049500 0.001890 -0.052300
+                    -0.000001 0.049500 -0.000000 -0.052300 0.049500 0.000527 -0.052300 0.000000 0.044532
                     0.000527 -0.043003 0.040673 -0.000438 -0.043145 0.301904 0.002334 0.000003 0.301637
-                    0.000444 0.199967 -0.199507 0.001890 0.005077 -0.000001 0.002824 -0.000000 0.000000 0.044532
-                    0.000527 -0.043003 0.000000 0.044532 0.000527 -0.043003 0.040673 -0.000438 -0.043145 0.301904
+                    0.000444 0.179000 0.049500 0.001890 -0.052300 -0.000001 0.049500 -0.000000 -0.052300 0.049500
+                    0.000527 -0.052300 0.000000 0.044532 0.000527 -0.043003 0.040673 -0.000438 -0.043145 0.301904
                     0.002334"
             qvel="  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
                     0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0

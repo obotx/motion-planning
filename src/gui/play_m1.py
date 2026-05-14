@@ -9,6 +9,59 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
+# ──────────────────────────────────────────────────────────────────
+# Tee all stdout / stderr to RUN_LOG.txt at the project root.
+# - File is TRUNCATED at startup → only contains the latest run.
+# - Output still appears live on the console.
+# Lets the assistant inspect the full log from one file when the
+# terminal scrollback truncates it.
+# ──────────────────────────────────────────────────────────────────
+_project_root = os.path.dirname(os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__))))
+_run_log_path = os.path.join(_project_root, "RUN_LOG.txt")
+
+class _Tee:
+    """Write-through tee — duplicates output to multiple streams.
+
+    Flushes only on line boundaries (or explicit `flush()`) so write-
+    heavy logging doesn't bottleneck on per-write fsync.  Python's
+    atexit cleanup guarantees the final flush on shutdown.
+    """
+    def __init__(self, *streams):
+        self._streams = streams
+    def write(self, data):
+        ends_with_newline = bool(data) and data[-1] == '\n'
+        for s in self._streams:
+            try:
+                s.write(data)
+                if ends_with_newline:
+                    s.flush()
+            except Exception:
+                pass
+    def flush(self):
+        for s in self._streams:
+            try:
+                s.flush()
+            except Exception:
+                pass
+    def isatty(self):
+        # Some libs check isatty(); return the underlying console's
+        # value so colors etc. work normally.
+        try:
+            return self._streams[0].isatty()
+        except Exception:
+            return False
+
+try:
+    _run_log_fh = open(_run_log_path, "w", buffering=1, encoding="utf-8")
+    _orig_stdout = sys.stdout
+    _orig_stderr = sys.stderr
+    sys.stdout = _Tee(_orig_stdout, _run_log_fh)
+    sys.stderr = _Tee(_orig_stderr, _run_log_fh)
+    print(f"[RUN_LOG] tee-ing stdout/stderr to {_run_log_path}")
+except Exception as _e:
+    print(f"[RUN_LOG] failed to open log file ({_e}); console output only")
+
 import argparse
 import threading
 import time
@@ -25,8 +78,10 @@ from modules.pubsub import IPCPubSub
 from navigation.ompl_windows_bridge import InProcessNavigator
 from navigation.grasp_executor import (
     GraspExecutor, compute_grasp_targets, reset_plan_data_for_ik,
+    compute_wrist_goal_for_obj,
     MIN_PICK_WRIST_Z, GRIPPER_STANDOFF_XY,
-    CARRY_H1, CARRY_H2, CARRY_A1)
+    CARRY_H1, CARRY_H2, CARRY_A1,
+    FAST_PICKUP_MODE)
 from navigation.arm_planner import MORPHBridge, HOME_Q
 from navigation.plan import OBSTACLE_RECTS, ROBOT_RADIUS as NAV_ROBOT_RADIUS
 
@@ -90,9 +145,17 @@ OBJECT_Z           = 0.075
 MIN_OBJ_SEPARATION = 0.42
 
 OBJ_RADIUS_RANGE = (0.040, 0.055)  # cylinder radius range (within DELTO M3 grasp envelope)
-OBJ_HEIGHT_RANGE = (0.11, 0.14)    # cylinder half-height range
+# Half-height 0.11-0.14 keeps the cylinder within the gripper's vertical
+# reach envelope.  Taller cylinders tip due to thin aspect ratio.
+OBJ_HEIGHT_RANGE = (0.11, 0.14)    # cylinder half-height range — proven achievable
 SPAWN_EDGE_MARGIN = OBJ_RADIUS_RANGE[1] + 0.05
-SPAWN_FLOOR_CLEARANCE = 0.005
+SPAWN_FLOOR_CLEARANCE = 0.010
+# Number of physics steps to settle objects on the floor right after
+# randomize_object_positions runs, before the GUI starts rendering.
+# Burns off the SPAWN_FLOOR_CLEARANCE drop and any residual contact
+# penetration so the user never sees objects clipping the floor or
+# wobbling on the first frame of a recording.
+SPAWN_SETTLE_STEPS = 200
 SPAWN_ROBOT_KEEP_CENTER = np.array([3.70, -6.00])
 SPAWN_ROBOT_KEEP_RADIUS = 1.15
 # Open-floor zones used for object spawning.  Distributed across the scene
@@ -113,17 +176,39 @@ WAYPOINT_REACH_DIST = 0.50
 GOAL_REACH_DIST     = 0.55
 WAYPOINT_TIMEOUT    = 180.0
 
-PICK_BASE_STANDOFF  = 0.78           # nominal base standoff distance from object
+PICK_BASE_STANDOFF       = 0.78      # base standoff for DIAGONAL/TOP-DOWN
+                                     # picks — arm reaches mostly vertical.
+PICK_BASE_STANDOFF_SIDE  = 0.55      # base standoff for SIDE-GRIP picks —
+                                     # closer so the horizontal IK family
+                                     # satisfying the wrist orientation goal
+                                     # can also reach the object.
 MIN_PICK_BASE_OBJ_DIST = NAV_ROBOT_RADIUS + OBJ_RADIUS_RANGE[1]  # chassis-safety floor
 PICK_RETRY_OBJ_PATH_CLEARANCE = 0.40  # min path clearance from selected object on retry
 PICK_NAV_OBJECT_CLEARANCE = 0.40      # selected-object corridor guard
-PICK_MAX_H_DIFF     = 0.18           # max h2-h1 tilt allowed for pick candidates
+PICK_MAX_H_DIFF          = 0.08      # max h2-h1 tilt for DIAGONAL/TOP-DOWN
+                                     # picks (high tilt + top-down wrist
+                                     # causes the thumb to sweep the obj).
+PICK_MAX_H_DIFF_SIDE     = 0.35      # max h2-h1 tilt for SIDE-GRIP picks
+                                     # (wider window — wrist_X compensates
+                                     # for boom angle, so larger tilt is
+                                     # geometrically usable).
 PICK_MIN_A1         = 0.16           # visual guard: avoid gripper folding into body
 PICK_A1_FIXED_REACH_OFFSET = 0.32    # base-to-wrist reach present even at a1≈0
 PICK_GOAL_X_RANGE   = (0.40, 7.25)   # pick nav goal x bounds (full floor minus wall margin)
 PICK_GOAL_Y_RANGE   = (-7.50, -0.40) # pick nav goal y bounds (full floor minus wall margin)
 PICK_NAV_GOAL_TOL   = 0.06           # base nav goal tolerance for pick
-PICK_CANDIDATE_STANDOFFS = (0.75, 0.78, 0.82)  # candidate standoff distances
+PICK_CANDIDATE_STANDOFFS = (0.75, 0.78, 0.82)  # candidate standoff distances.
+                                                # Shared across pick modes;
+                                                # side-grip adds a post-nav
+                                                # forward push (see
+                                                # SIDE_FORWARD_PUSH_TARGET).
+SIDE_FORWARD_PUSH_TARGET = 0.64  # final chassis-to-obj distance for
+                                 # SIDE-GRIP mode after nav + fine-align.
+                                 # Nav stops at the safe-margin standoff,
+                                 # then a short straight-line push drives
+                                 # the chassis to this distance so the
+                                 # arm's horizontal reach lands at the
+                                 # object's middle.
 PICK_CANDIDATE_DUP_TOL = 0.02        # dedup tolerance for candidate XY
 PICK_FINE_ALIGN_VISUAL_DIST = 0.75   # max distance for inward fine-align trim
 PICK_FINE_ALIGN_PRESERVE_H_DIFF = 0.08  # preserve screened radius if hΔ below this
@@ -132,6 +217,11 @@ PICK_FINE_ALIGN_DIST_TOL = 0.025     # fine-align distance tolerance
 PICK_FINE_ALIGN_MAX_STEP = 0.08      # max single-step nudge during fine-align
 PICK_FINE_ALIGN_TIMEOUT = 1.5        # fine-align convergence timeout (s)
 PICK_LOCAL_RETRY_MIN_DIST = PICK_FINE_ALIGN_MIN_SAFE_DIST
+# During a pick attempt the chassis is intentionally close to the target
+# (post-push at SIDE_FORWARD_PUSH_TARGET ≈ 0.64 m), so the 0.70 m nav min
+# would reject every local-retry candidate.  Use a smaller pick-specific
+# floor that still leaves a reach buffer.
+PICK_LOCAL_RETRY_MIN_DIST_PICK = 0.40
 PICK_LOCAL_RETRY_TIMEOUT = 1.5       # local retry convergence timeout (s)
 # Closed-loop base-correction retry: translate the base by the residual
 # gripper-vs-IK-target error.  Scales fall back to smaller corrections
@@ -147,9 +237,13 @@ PICK_CANDIDATE_ANGLE_OFFSETS = (
     math.radians(110.0), math.radians(-110.0),
     math.pi,
 )
-PICK_VIRTUAL_PLAN_TIMEOUT = 2.0
+PICK_VIRTUAL_PLAN_TIMEOUT = 1.0
 # Cap on virtual screening successes before stopping the candidate scan.
-MAX_VIRTUAL_SCREEN_SUCCESSES = 5
+# Reduced 5 → 3 to cut pre-nav screening latency from ~2s to ~0.6s.
+# Three feasible candidates is plenty for the retry loop; the failure
+# rate of the top-ranked candidate is well under 30%.
+MAX_VIRTUAL_SCREEN_SUCCESSES = 3
+FAST_PICK_MAX_VIRTUAL_SCREEN_SUCCESSES = 1
 
 # Place-phase configuration: after grasp + lift, the robot navigates to a
 # safe aisle point near the assigned shelf slot and parks the object on the
@@ -206,6 +300,11 @@ def _is_in_spawn_zone(x, y, margin=0.0):
 
 
 def random_floor_positions(n, rng):
+    # Floor for the relaxed-separation fallback: two cylinders never touch
+    # even at worst-case radii.  Prevents two objects from spawning on top
+    # of each other (which produces strong contact ejection and the
+    # "objects shaking / half in the ground" effect on the first frame).
+    min_safe_sep = 2.0 * OBJ_RADIUS_RANGE[1] + 0.03
     positions = []
     for idx in range(n):
         # Cycle through known-open floor zones so objects are distributed
@@ -225,19 +324,28 @@ def random_floor_positions(n, rng):
                     break
             if placed:
                 break
-        else:
-            # Fallback: keep retrying across the same safe zones with relaxed
-            # separation before ever allowing a rack/edge violation.
-            for _ in range(1000):
-                zone = SPAWN_ZONES[int(rng.integers(0, len(SPAWN_ZONES)))]
-                x, y = _sample_spawn_zone(zone, rng)
-                if not _is_inside_spawn_keepout(x, y):
-                    positions.append(np.array([x, y]))
-                    break
-            else:
-                # Last resort still stays in a known-open zone.
-                zone = SPAWN_ZONES[idx % len(SPAWN_ZONES)]
-                positions.append(np.array(_sample_spawn_zone(zone, rng)))
+        if placed:
+            continue
+        # Fallback: relax separation toward `min_safe_sep`, never below it,
+        # so two objects can never start the simulation overlapping.
+        candidate = None
+        for _ in range(2000):
+            zone = SPAWN_ZONES[int(rng.integers(0, len(SPAWN_ZONES)))]
+            x, y = _sample_spawn_zone(zone, rng)
+            if _is_inside_spawn_keepout(x, y):
+                continue
+            cand = np.array([x, y])
+            if all(np.linalg.norm(cand - p) >= min_safe_sep for p in positions):
+                positions.append(cand)
+                placed = True
+                break
+            candidate = cand
+        if not placed:
+            print(f"[INIT] WARN: object {idx} could not satisfy spacing; "
+                  f"using best safe-zone candidate (>=2 obj radii apart)")
+            positions.append(candidate if candidate is not None
+                              else np.array(_sample_spawn_zone(
+                                  SPAWN_ZONES[idx % len(SPAWN_ZONES)], rng)))
     return np.array(positions)
 
 
@@ -251,24 +359,27 @@ def get_object_qpos_slice(model, body_name):
 
 def randomize_object_positions(model, data, rng):
     xy = random_floor_positions(NUM_OBJECTS, rng)
+    body_ids = []
     for i in range(NUM_OBJECTS):
         qs = get_object_qpos_slice(model, f"pickup_obj_{i}")
         if qs is None:
             continue
-        radius = rng.uniform(*OBJ_RADIUS_RANGE)
-        height = rng.uniform(*OBJ_HEIGHT_RANGE)
         body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, f"pickup_obj_{i}")
-        # Resize every geom on the body so decorative geoms match the
-        # collision geom's sampled (radius, height).
+        body_ids.append(body_id)
+        # Sample size in the achievable range (see OBJ_*_RANGE).  The
+        # body_mass / body_inertia values are computed at XML load and
+        # are not updated on resize; this is acceptable because the pin
+        # closure owns held-object physics during transport.
+        radius = rng.uniform(*OBJ_RADIUS_RANGE)
+        half_height = rng.uniform(*OBJ_HEIGHT_RANGE)
         for g in range(model.ngeom):
-            if model.geom_bodyid[g] == body_id:
-                # MuJoCo cylinders use [radius, half-height] for geom_size.
-                model.geom_size[g, 0] = radius
-                model.geom_size[g, 1] = height
-        # Spawn body origin at z = height + clearance so the cylinder bottom
-        # sits just above the floor and settles cleanly.
+            if int(model.geom_bodyid[g]) != int(body_id):
+                continue
+            # MuJoCo cylinders use [radius, half-height] for geom_size.
+            model.geom_size[g, 0] = radius
+            model.geom_size[g, 1] = half_height
         data.qpos[qs:qs+3]   = [xy[i, 0], xy[i, 1],
-                                height + SPAWN_FLOOR_CLEARANCE]
+                                half_height + SPAWN_FLOOR_CLEARANCE]
         data.qpos[qs+3]      = 1.0
         data.qpos[qs+4:qs+7] = 0.0
         # Clear any residual velocity from previous holds/perturbations.
@@ -277,7 +388,60 @@ def randomize_object_positions(model, data, rng):
             dofadr = int(model.jnt_dofadr[jntadr])
             data.qvel[dofadr:dofadr + 6] = 0.0
     mujoco.mj_forward(model, data)
-    print(f"[INIT] Randomized {NUM_OBJECTS} objects with random sizes.")
+
+    # Settle the objects on the floor before the GUI starts rendering.
+    # Without this, the user sees the SPAWN_FLOOR_CLEARANCE drop play out
+    # in the first frames of any recording (visible as objects "shaking"
+    # at t=0).  Stepping with the existing actuator state (PD targets at
+    # the home pose set by sim.reset("home")) keeps the robot still while
+    # the cylinders drop the few mm and come to rest.
+    for _ in range(SPAWN_SETTLE_STEPS):
+        mujoco.mj_step(model, data)
+    # Zero qvel on every pickup object after settling so any residual
+    # micro-velocity from the contact impulse is gone.
+    for body_id in body_ids:
+        jntadr = model.body_jntadr[body_id]
+        if jntadr >= 0:
+            dofadr = int(model.jnt_dofadr[jntadr])
+            data.qvel[dofadr:dofadr + 6] = 0.0
+    mujoco.mj_forward(model, data)
+    # Post-settle floor-clearance correction.  MuJoCo's contact solver
+    # can leave 1-5 mm of residual penetration after spawn settle which
+    # reads as visible clipping at startup.  For each pickup obj, snap
+    # the body z back up to (half-height + floor) if it dipped below.
+    fixed_count = 0
+    for body_id in body_ids:
+        jntadr = model.body_jntadr[body_id]
+        if jntadr < 0:
+            continue
+        qs = int(model.jnt_qposadr[jntadr])
+        # Find max geom half-height for this body.
+        max_half_h = 0.0
+        for g in range(model.ngeom):
+            if int(model.geom_bodyid[g]) != int(body_id):
+                continue
+            # Cylinder size = (radius, half_height); also handles
+            # the inner-tint cosmetic geom.
+            _gh = float(model.geom_size[g, 1])
+            if _gh > max_half_h:
+                max_half_h = _gh
+        if max_half_h <= 0.0:
+            continue
+        expected_z = max_half_h
+        cur_z = float(data.qpos[qs + 2])
+        if cur_z < expected_z - 0.001:
+            data.qpos[qs + 2] = expected_z
+            dofadr = int(model.jnt_dofadr[jntadr])
+            data.qvel[dofadr:dofadr + 6] = 0.0
+            fixed_count += 1
+            print(f"[INIT] floor-clearance fix: obj at body {body_id} "
+                  f"clipped (z={cur_z:.4f} < expected={expected_z:.4f}); "
+                  f"snapped up by {(expected_z - cur_z)*1000:.1f} mm")
+    if fixed_count > 0:
+        mujoco.mj_forward(model, data)
+    print(f"[INIT] Randomized {NUM_OBJECTS} objects (settled on floor)."
+          + (f"  [{fixed_count} floor-clip corrections]"
+             if fixed_count else ""))
 
 
 def get_object_world_pos(model, data, obj_idx):
@@ -311,6 +475,16 @@ _ARM_BODY_PREFIXES = (
     "Gripper_Link", "Rotation",
 )
 
+# Bodies that hold the gripper-fingertip collision pads.  Group 3 visualisation
+# focuses on these (the actual contact surfaces between gripper and obj) — the
+# big arm-chain proxies (long invisible slabs on Arm_Left for fast OMPL
+# collision checks) get pushed to group 4 so they don't drown out the finger
+# geometry when the user presses '3'.
+_GRIPPER_BODY_PREFIXES = (
+    "finger_a_link", "finger_b_link", "finger_c_link",
+    "Gripper_Link3",   # palm
+)
+
 # MuJoCo geom-group convention used here:
 #   group 3 — collision overlay (toggled by pressing '3')
 #   group 4 — hidden non-arm collision proxies (toggled by pressing '4')
@@ -324,39 +498,84 @@ def _is_arm_body(body_name):
     return any(body_name.startswith(p) for p in _ARM_BODY_PREFIXES)
 
 
-def _setup_pick_collision_overlay(sim_model):
-    """Reorganize geom groups so 'press 3' shows only arm-chain collision proxies.
+def _is_gripper_body(body_name):
+    """Bodies that host the fingertip pad collision geoms + the palm."""
+    if not body_name:
+        return False
+    return any(body_name.startswith(p) for p in _GRIPPER_BODY_PREFIXES)
 
-    Hidden arm-chain collision proxies (contype=1, alpha~0) are moved into
-    group 3 and colored translucent green; other group-3 geoms (wheel
-    contact spheres, base padding) are moved to group 4. Idempotent.
+
+def _setup_pick_collision_overlay(sim_model):
+    """Reorganize geom groups so 'press 3' toggles ONLY the small
+    fingertip pad-box collision shapes (the high-friction grip pads).
+    The visual gripper mesh stays in its default group so it's always
+    visible — pressing 3 only adds/removes the pad-box overlay on top.
+
+    Strategy:
+      group 3 (toggle '3') = small pad-box collision shapes on the
+                             finger links — these are the actual
+                             grip surfaces; useful for verifying
+                             where contact happens.
+      group 4 (toggle '4') = big invisible arm-chain proxies (the
+                             long slabs on Arm_Left used by OMPL for
+                             fast collision checks).  Hidden by
+                             default; press '4' to inspect.
+
+    Detection of pad boxes: geom_type == mjGEOM_BOX (6) on a finger
+    body, with mass=0 (the `pad_box1`/`pad_box2` default class sets
+    mass=0).  Visual finger meshes (type=mesh) are LEFT in their
+    original group so the gripper body stays visible.
     """
-    arm_overlay   = 0
-    moved_out     = 0
+    MJGEOM_BOX = 6
+    pad_overlay      = 0
+    arm_proxy_hidden = 0
+    moved_out        = 0
     for i in range(sim_model.ngeom):
         bid = int(sim_model.geom_bodyid[i])
         body_name = mujoco.mj_id2name(sim_model, mujoco.mjtObj.mjOBJ_BODY, bid) or ""
         is_collision = int(sim_model.geom_contype[i]) != 0
         is_invisible = float(sim_model.geom_rgba[i, 3]) < 0.01
         in_overlay   = int(sim_model.geom_group[i]) == _OVERLAY_GROUP
+        is_box       = int(sim_model.geom_type[i]) == MJGEOM_BOX
+        # Pad boxes are small (max half-extent ~2.5 cm); the only other
+        # boxes on the gripper are the arm-chain proxy slabs (half-extents
+        # 0.41 × 0.02 × 0.04) which are large.  Detect pad boxes by max
+        # half-extent < 0.03 m.
+        try:
+            sz = sim_model.geom_size[i]
+            max_half = float(max(abs(sz[0]), abs(sz[1]), abs(sz[2])))
+        except Exception:
+            max_half = 1.0
+        is_pad_size = max_half < 0.03
 
-        # 1) Hidden arm-chain collision proxies → overlay group 3, green.
-        if _is_arm_body(body_name) and is_collision and is_invisible:
+        # 1) Pad-box collision shapes on finger bodies → group 3.
+        if _is_gripper_body(body_name) and is_collision and is_box \
+                and is_pad_size:
             sim_model.geom_group[i] = _OVERLAY_GROUP
-            sim_model.geom_rgba[i] = [0.0, 1.0, 0.0, 0.35]
-            arm_overlay += 1
+            pad_overlay += 1
             continue
 
-        # 2) Non-arm geoms left over in group 3 → move to group 4.
-        if in_overlay and not _is_arm_body(body_name):
+        # 2) Big arm-chain invisible proxies → group 4 (hidden by
+        #    default, user can press '4' to inspect).
+        if _is_arm_body(body_name) and is_collision and is_invisible:
+            sim_model.geom_group[i] = _HIDDEN_GROUP
+            sim_model.geom_rgba[i] = [0.0, 1.0, 0.0, 0.35]
+            arm_proxy_hidden += 1
+            continue
+
+        # 3) Non-arm, non-gripper geoms left over in group 3 → group 4.
+        if in_overlay and not _is_arm_body(body_name) \
+                and not _is_gripper_body(body_name):
             sim_model.geom_group[i] = _HIDDEN_GROUP
             moved_out += 1
             continue
 
     print(f"[overlay] Pick collision overlay ready: "
-          f"{arm_overlay} arm-chain collision proxies in group 3 "
-          f"(press '3' to toggle), "
-          f"{moved_out} non-arm geoms moved to group 4 (press '4' to inspect).")
+          f"{pad_overlay} fingertip pad-box collision shapes in group 3 "
+          f"(press '3' to toggle); "
+          f"{arm_proxy_hidden} arm-chain proxies moved to group 4 "
+          f"(press '4' to inspect); "
+          f"{moved_out} other non-arm geoms moved to group 4.")
 
 
 def compute_pick_standoff(robot_xy, obj_xy, standoff=PICK_BASE_STANDOFF):
@@ -414,19 +633,23 @@ def _same_floor_side(p1, p2, margin=0.05):
     return True
 
 
-def generate_pick_standoff_candidates(robot_xy, obj_xy):
+def generate_pick_standoff_candidates(robot_xy, obj_xy, side_grip=False):
     """Ordered base candidates around the object.
 
+    Uses the standard PICK_CANDIDATE_STANDOFFS for ALL grip modes
+    (0.75-0.82 m) so OMPL nav keeps its full chassis-safety margins.
+    Side-grip closes the remaining gap via a dedicated post-nav
+    forward-push step (see `_side_grip_approach_push`) that drives
+    the chassis to `SIDE_FORWARD_PUSH_TARGET` ≈ 0.52 m.
+
+    `side_grip` parameter is retained for API symmetry but currently
+    has no effect on candidate generation — the close approach is
+    deferred until after nav + fine-align.
+
     Ordering rules:
-      * Tier 1 — same-side as the object: a straight line from the
-        candidate to the object does not cross the rack.  These have a
-        clean OMPL corridor and rarely fail nav.
-      * Tier 2 — opposite side of the rack from the object: only used
-        as a last resort because OMPL has to detour around the rack.
-    Within each tier the original generation order is preserved
-    (smallest standoff first, then forward → orbit angles).  The first
-    candidate is still anchored to the robot's current side so the
-    most-likely-good pose is tried first.
+      * Tier 1 — same-side as the object: straight-line candidate-to-
+        obj does not cross the rack.  Clean OMPL corridor.
+      * Tier 2 — opposite side of the rack: only as last resort.
     """
     robot = np.array(robot_xy[:2], dtype=float)
     obj = np.array(obj_xy[:2], dtype=float)
@@ -437,8 +660,9 @@ def generate_pick_standoff_candidates(robot_xy, obj_xy):
     else:
         base_angle = math.atan2(float(away[1]), float(away[0]))
 
+    standoffs = PICK_CANDIDATE_STANDOFFS
     raw = []
-    for dist in PICK_CANDIDATE_STANDOFFS:
+    for dist in standoffs:
         for offset in PICK_CANDIDATE_ANGLE_OFFSETS:
             ang = base_angle + offset
             target = obj + np.array([math.cos(ang), math.sin(ang)]) * dist
@@ -657,7 +881,29 @@ def main():
              "to pre-correct IK targets for passive-joint deflection.  Off "
              "by default — system runs the original uncorrected IK.  "
              "Requires running tools/calibrate_arm_kinematics.py first.")
+    parser.add_argument(
+        "--fast-pickup", default=False, action=argparse.BooleanOptionalAction,
+        help="Enable FAST_PICKUP_MODE: relaxes the strict pre-close "
+             "gates so pin closure can complete pickup on otherwise-"
+             "rejected geometries.  Default False (realistic mode).  "
+             "Use --fast-pickup for demo-speed gate-bypass.")
     args, _unknown = parser.parse_known_args()
+
+    # Propagate the FAST_PICKUP_MODE flag from CLI into both modules
+    # that read it.  grasp_executor.FAST_PICKUP_MODE is read inside
+    # executor methods (gate cascade, pin install, contact soften, etc.).
+    # play_m1's own local FAST_PICKUP_MODE is bound at import time and
+    # used in pre-nav candidate screening — rebinding `globals()` after
+    # argparse keeps both views consistent.
+    try:
+        import navigation.grasp_executor as _grasp_mod
+        _grasp_mod.FAST_PICKUP_MODE = bool(args.fast_pickup)
+    except Exception as _e:
+        print(f"[CFG] WARN: could not update grasp_executor.FAST_PICKUP_MODE: {_e}")
+    globals()['FAST_PICKUP_MODE'] = bool(args.fast_pickup)
+    print(f"[CFG] FAST_PICKUP_MODE = {bool(args.fast_pickup)}  "
+          f"(--fast-pickup / --no-fast-pickup to override; "
+          f"default False — realistic non-FAST is the production default)")
 
     if not glfw.init():
         raise RuntimeError("GLFW init failed")
@@ -743,6 +989,8 @@ def main():
     _pick_candidate_obj_xy = [None]
     _pick_replan_count     = [0]
     _pick_local_retry_used = [0]   # number of local-retry attempts so far
+    _pick_prev_max_far = [None]    # tracked across attempts for early-bail on worsening reach
+    _pick_prev_failure_sig = [None]  # tracked across attempts for early-bail on identical failure pattern
     _cycle_start_time      = [None]   # set at MOVE press, used by metrics log
     # Per-cycle nav-cascade state (reset on MOVE press).
     _relaxed_clearance     = [False]   # exempt non-selected floor objs
@@ -802,6 +1050,7 @@ def main():
         return None
 
     def _filtered_pick_candidates(obj_world):
+        scan_t0 = time.time()
         robot_xy = sim.localization()[:2]
         obj_idx = _current_obj_idx[0]
         if (not _is_in_spawn_zone(float(obj_world[0]), float(obj_world[1]), margin=0.25)
@@ -810,138 +1059,367 @@ def main():
                   f"({obj_world[0]:.2f},{obj_world[1]:.2f}); "
                   f"respawn objects or select another object")
             return []
-        raw = generate_pick_standoff_candidates(robot_xy, obj_world[:2])
+        # Compute the per-object wrist goal FIRST — both the candidate
+        # standoff distance and the per-candidate IK probe depend on it.
+        # Side-grip (palm horizontal) needs the base parked closer
+        # (~0.55 m) because the arm uses ~30 cm of horizontal reach to
+        # land the palm at obj middle.  Top-down/diagonal uses the
+        # original 0.78 m standoff.
+        sel_bid = -1
+        try:
+            sel_bid = mujoco.mj_name2id(
+                sim.model, mujoco.mjtObj.mjOBJ_BODY, f"pickup_obj_{obj_idx}")
+        except Exception:
+            pass
+        wrist_goal = (compute_wrist_goal_for_obj(sim.model, sel_bid)
+                      if sel_bid >= 0 else None)
+        side_grip = (abs(float(wrist_goal[0])) < 0.20
+                     if wrist_goal is not None else False)
+        if side_grip:
+            print(f"[PICK] mode=SIDE → nav standoff {PICK_CANDIDATE_STANDOFFS} "
+                  f"+ post-nav forward push to {SIDE_FORWARD_PUSH_TARGET:.2f}m")
+        else:
+            print(f"[PICK] mode=TOPDOWN/DIAGONAL → nav standoff "
+                  f"{PICK_CANDIDATE_STANDOFFS}")
+
+        raw = generate_pick_standoff_candidates(
+            robot_xy, obj_world[:2], side_grip=side_grip)
+        if side_grip:
+            # Yaw-diversified candidate ordering: bucket raw by approach
+            # yaw (20° buckets), sort within each bucket by nav distance,
+            # then round-robin interleave so the first candidates
+            # evaluated span distinct approach angles.  This gives the
+            # retry chain genuinely different wrist orientations to try
+            # when the first yaw's geometry produces a wz mismatch.
+            # When only one yaw is geometrically feasible (object boxed
+            # in by other obstacles), the ordering degrades to the
+            # previous nav-distance sort with no functional change.
+            _yaw_buckets = {}
+            for _c in raw:
+                _y = math.atan2(
+                    float(obj_world[1]) - float(_c[1]),
+                    float(obj_world[0]) - float(_c[0]))
+                _b = int(math.floor(math.degrees(_y) / 20.0))
+                _yaw_buckets.setdefault(_b, []).append(_c)
+            # Sort within each bucket by nav distance from robot.
+            for _b in _yaw_buckets:
+                _yaw_buckets[_b].sort(
+                    key=lambda c: math.hypot(
+                        float(c[0]) - float(robot_xy[0]),
+                        float(c[1]) - float(robot_xy[1])))
+            # Round-robin: pick one from each bucket, then second from
+            # each, until all buckets are drained.
+            _bucket_keys = list(_yaw_buckets.keys())
+            _interleaved = []
+            while any(_yaw_buckets[_k] for _k in _bucket_keys):
+                for _k in _bucket_keys:
+                    if _yaw_buckets[_k]:
+                        _interleaved.append(_yaw_buckets[_k].pop(0))
+            raw = _interleaved
+            if FAST_PICKUP_MODE:
+                max_screen_successes = FAST_PICK_MAX_VIRTUAL_SCREEN_SUCCESSES
+                print(f"[PICK] FAST side-grip: nav-first screening "
+                      f"(stop after {max_screen_successes} feasible "
+                      f"candidate; skip arm-path check)")
+            else:
+                max_screen_successes = MAX_VIRTUAL_SCREEN_SUCCESSES
+                print(f"[PICK] non-FAST side-grip: nav-first screening "
+                      f"(stop after {max_screen_successes} feasible "
+                      f"candidates; keep arm-path check)")
+        else:
+            max_screen_successes = MAX_VIRTUAL_SCREEN_SUCCESSES
         nav.validator.sync(sim.data)
         # Exempt the selected pick target from the floor-clearance check
         # during candidate validation — the candidate sits at standoff
         # distance from the target by construction, so it would otherwise
         # always reject.
+        # Two-pass candidate screening with a relaxed-clearance fallback:
+        #   PASS 1 (strict):   selected obj exempt; all other pickup objs
+        #                      treated as hard chassis-clearance obstacles.
+        #   PASS 2 (fallback): exempt all pickup objs from the chassis
+        #                      soft-buffer.  Fires only when PASS 1 returns
+        #                      zero candidates (the target is hemmed in by
+        #                      other objects).  Runtime physics still
+        #                      prevents penetration; only the planning-time
+        #                      clearance is relaxed.
+        strict_exempt  = [sel_bid] if sel_bid >= 0 else []
+        all_pickup     = list(getattr(nav.validator, 'pickup_obj_ids', []))
+        relaxed_exempt = all_pickup if all_pickup else strict_exempt
+        valid = []
+        _relaxed_attempted = False
+        while True:
+            if _relaxed_attempted:
+                print(f"[PICK] Fallback: relaxing unselected-obj "
+                      f"clearance (0 strict candidates; exempting "
+                      f"all {len(relaxed_exempt)} pickup obj(s) from "
+                      f"chassis soft-buffer for this scan)")
+                try:
+                    nav.validator.set_exempt_objects(relaxed_exempt)
+                except Exception:
+                    pass
+            else:
+                try:
+                    nav.validator.set_exempt_objects(strict_exempt)
+                except Exception:
+                    pass
+            for cand in raw:
+                yaw = pick_candidate_yaw(cand, obj_world[:2])
+                # Reject candidates inside the inflated OBSTACLE_RECTS keepout
+                # so screening matches what the nav planner will accept at runtime.
+                in_nav_keepout = False
+                for (x0, x1, y0, y1) in OBSTACLE_RECTS:
+                    if (x0 - NAV_ROBOT_RADIUS) <= cand[0] <= (x1 + NAV_ROBOT_RADIUS) \
+                            and (y0 - NAV_ROBOT_RADIUS) <= cand[1] <= (y1 + NAV_ROBOT_RADIUS):
+                        in_nav_keepout = True
+                        break
+                if in_nav_keepout:
+                    print(f"[PICK] Reject base candidate in nav keepout: "
+                          f"({cand[0]:.2f},{cand[1]:.2f}) — would be nudged by plan.py")
+                    continue
+                blocker = _pickup_object_corridor_blocker(
+                    np.array(robot_xy, dtype=float), np.array(cand, dtype=float),
+                    PICK_NAV_OBJECT_CLEARANCE, obj_indices=(obj_idx,))
+                if blocker is not None:
+                    block_idx, block_dist = blocker
+                    print(f"[PICK] Reject base candidate object corridor: "
+                          f"({cand[0]:.2f},{cand[1]:.2f}) path passes "
+                          f"{block_dist:.2f}m from selected Obj-{block_idx} "
+                          f"(< {PICK_NAV_OBJECT_CLEARANCE:.2f}m)")
+                    continue
+                # Yaw-aware base validity: the asymmetric chassis collision
+                # depends on the yaw the robot will hold at the candidate.
+                if nav.validator.is_valid(cand[0], cand[1], yaw=yaw):
+                    try:
+                        # Reset plan_data so screening uses the same target-clamp
+                        # and strict-IK that GraspExecutor.pick() will use at runtime.
+                        reset_plan_data_for_ik(arm_bridge, base_xy=cand, base_yaw=yaw)
+                        _, pre_grasp_pos = compute_grasp_targets(
+                            cand, obj_world,
+                            obj_radius=get_object_radius(sim.model, obj_idx),
+                            side_approach=side_grip)
+                        pre_grasp_pos[2] = max(pre_grasp_pos[2], MIN_PICK_WRIST_Z)
+                        # Mirror the executor's IK call so screening matches
+                        # runtime.  Side-grip: palm target + per-DOF wrist
+                        # weights (HB free, wx/wz/wy locked).  Other modes:
+                        # wrist (Link1) target + scalar wrist weight.
+                        if side_grip:
+                            ik_target_body  = "Gripper_Link3_1"
+                            ik_wrist_weight = (0.10, 3.0, 3.0, 3.0)
+                        else:
+                            ik_target_body  = "Gripper_Link1_1"
+                            ik_wrist_weight = 5.0
+                        # Screening uses fewer seeds (4 vs default 8) to cut
+                        # main-thread blocking from ~250ms/candidate to ~120ms.
+                        # Side-grip-push mode IGNORES this screened q anyway
+                        # — the executor re-solves IK from the virtual post-
+                        # push chassis position.  So a less-precise screening
+                        # solution is still good enough for go/no-go.
+                        q_pre, actual_pre_target = \
+                            arm_bridge.solve_ik_with_z_lift(
+                                pre_grasp_pos, n_seeds=4,
+                                wrist_goal=wrist_goal,
+                                wrist_weight=ik_wrist_weight,
+                                target_body=ik_target_body)
+                        h_diff = abs(float(q_pre[1]) - float(q_pre[0]))
+                        # Side-grip uses arm tilt as a reach DOF (boom drops
+                        # to bring palm to obj height; wrist_X compensates).
+                        # Diagonal/top-down keeps the legacy tight cap.
+                        h_diff_cap = (PICK_MAX_H_DIFF_SIDE if side_grip
+                                      else PICK_MAX_H_DIFF)
+                        if h_diff > h_diff_cap:
+                            print(f"[PICK] Reject base candidate high tilt: "
+                                  f"({cand[0]:.2f},{cand[1]:.2f}) "
+                                  f"h2-h1={h_diff:.3f}m > {h_diff_cap:.2f}m "
+                                  f"(mode={'SIDE' if side_grip else 'TOPDOWN'})")
+                            continue
+                        if float(q_pre[2]) < PICK_MIN_A1:
+                            print(f"[PICK] Reject base candidate arm too retracted: "
+                                  f"({cand[0]:.2f},{cand[1]:.2f}) "
+                                  f"a1={float(q_pre[2]):.3f}m < {PICK_MIN_A1:.2f}m")
+                            continue
+                        if FAST_PICKUP_MODE and side_grip:
+                            path_wps = "fast-skip"
+                        else:
+                            path = arm_bridge.plan(
+                                HOME_Q, q_pre,
+                                timeout=PICK_VIRTUAL_PLAN_TIMEOUT)
+                            if path is None:
+                                print(f"[PICK] Reject base candidate no arm path: ({cand[0]:.2f},{cand[1]:.2f})")
+                                continue
+                            path_wps = len(path)
+                        a1 = float(q_pre[2])
+                        base_obj_dist = float(np.linalg.norm(
+                            np.array(cand, dtype=float) - obj_world[:2]))
+                        target_reach = max(0.0, base_obj_dist - GRIPPER_STANDOFF_XY)
+                        expected_a1 = float(np.clip(
+                            target_reach - PICK_A1_FIXED_REACH_OFFSET,
+                            PICK_MIN_A1, 0.60))
+                        a1_under = max(0.0, expected_a1 - a1)
+                        a1_over = max(0.0, a1 - expected_a1)
+                        # Palm-orientation tiebreaker: world XY direction
+                        # from palm to thumb (finger A) dotted with the
+                        # approach direction.  Higher align → thumb on the
+                        # object side, fingers on the opposite side (1+2
+                        # gripper grips cleanly this way).
+                        palm_align = 0.0
+                        try:
+                            palm_bid = mujoco.mj_name2id(
+                                arm_bridge.model, mujoco.mjtObj.mjOBJ_BODY,
+                                "Gripper_Link3_1")
+                            thumb_bid = mujoco.mj_name2id(
+                                arm_bridge.model, mujoco.mjtObj.mjOBJ_BODY,
+                                "finger_a_link_1_1")
+                            if palm_bid >= 0 and thumb_bid >= 0:
+                                mujoco.mj_forward(
+                                    arm_bridge.model, arm_bridge.planning_data)
+                                palm_xy = arm_bridge.planning_data.xpos[palm_bid][:2]
+                                thumb_xy = arm_bridge.planning_data.xpos[thumb_bid][:2]
+                                tx = float(thumb_xy[0] - palm_xy[0])
+                                ty = float(thumb_xy[1] - palm_xy[1])
+                                tn = (tx * tx + ty * ty) ** 0.5
+                                if tn > 1e-6:
+                                    ax = obj_world[0] - cand[0]
+                                    ay = obj_world[1] - cand[1]
+                                    an = (ax * ax + ay * ay) ** 0.5
+                                    if an > 1e-6:
+                                        palm_align = (
+                                            (tx / tn) * (ax / an)
+                                          + (ty / tn) * (ay / an))
+                        except Exception:
+                            pass
+                        # Predictive per-finger reach scoring.  Read
+                        # fingertip world XY for a/b/c at the FK pose,
+                        # compute per-finger distances and the predicted
+                        # carry_gap, and score candidates so the one
+                        # most likely to grasp cleanly is tried first.
+                        d_thumb_pred = 0.0
+                        d_b_pred = 0.0
+                        d_c_pred = 0.0
+                        max_finger_far = 0.0
+                        carry_gap_pred = 0.0
+                        arm_obj_predicted_overlap = False
+                        try:
+                            _m = arm_bridge.model
+                            _pd = arm_bridge.planning_data
+                            _t_bid = mujoco.mj_name2id(
+                                _m, mujoco.mjtObj.mjOBJ_BODY,
+                                "finger_a_link_3_1")
+                            _b_bid_f = mujoco.mj_name2id(
+                                _m, mujoco.mjtObj.mjOBJ_BODY,
+                                "finger_b_link_3_1")
+                            _c_bid_f = mujoco.mj_name2id(
+                                _m, mujoco.mjtObj.mjOBJ_BODY,
+                                "finger_c_link_3_1")
+                            _obj_xy = np.asarray(
+                                obj_world[:2], dtype=float)
+                            if _t_bid >= 0 and _b_bid_f >= 0 and _c_bid_f >= 0:
+                                _t_xy = _pd.xpos[_t_bid][:2].copy()
+                                _b_xy = _pd.xpos[_b_bid_f][:2].copy()
+                                _c_xy = _pd.xpos[_c_bid_f][:2].copy()
+                                d_thumb_pred = float(np.linalg.norm(
+                                    _t_xy - _obj_xy))
+                                d_b_pred = float(np.linalg.norm(
+                                    _b_xy - _obj_xy))
+                                d_c_pred = float(np.linalg.norm(
+                                    _c_xy - _obj_xy))
+                                max_finger_far = max(
+                                    d_thumb_pred, d_b_pred, d_c_pred)
+                                _bc_xy = 0.5 * (_b_xy + _c_xy)
+                                _pinch_xy = 0.5 * (_t_xy + _bc_xy)
+                                carry_gap_pred = float(np.linalg.norm(
+                                    _pinch_xy - _obj_xy))
+                        except Exception:
+                            pass
+                        # Predicted arm-vs-obj clearance: check planning
+                        # contacts after FK.  If any arm body (non-finger)
+                        # is overlapping obj at the IK pose, reject
+                        # this candidate — close would damage obj.
+                        try:
+                            obj_bid_pred = mujoco.mj_name2id(
+                                arm_bridge.model, mujoco.mjtObj.mjOBJ_BODY,
+                                f"pickup_obj_{obj_idx}")
+                            if obj_bid_pred >= 0:
+                                _pd2 = arm_bridge.planning_data
+                                for _i in range(int(_pd2.ncon)):
+                                    _c_obj = _pd2.contact[_i]
+                                    _g1 = int(_c_obj.geom1)
+                                    _g2 = int(_c_obj.geom2)
+                                    _bod1 = int(arm_bridge.model.geom_bodyid[_g1])
+                                    _bod2 = int(arm_bridge.model.geom_bodyid[_g2])
+                                    if ((_bod1 == obj_bid_pred
+                                         and _bod2 != _t_bid
+                                         and _bod2 != _b_bid_f
+                                         and _bod2 != _c_bid_f)
+                                            or (_bod2 == obj_bid_pred
+                                                and _bod1 != _t_bid
+                                                and _bod1 != _b_bid_f
+                                                and _bod1 != _c_bid_f)):
+                                        if float(_c_obj.dist) < -0.005:
+                                            arm_obj_predicted_overlap = True
+                                            break
+                        except Exception:
+                            pass
+                        if arm_obj_predicted_overlap:
+                            print(f"[PICK] Reject base candidate predicted "
+                                  f"arm-vs-obj clip: "
+                                  f"({cand[0]:.2f},{cand[1]:.2f})")
+                            continue
+                        # Composite quality score (lower = better):
+                        #   max_finger_far × 10   ← worst-side reach
+                        #                          (the deciding factor)
+                        #   carry_gap_pred × 5    ← pinch alignment
+                        #   h_diff × 2            ← arm tilt cost
+                        #   a1_under × 4          ← arm too short
+                        #   a1_over × 0.5         ← arm too long (mild)
+                        #   −0.02 × palm_align    ← orientation tiebreaker
+                        ORIENT_BONUS_K = 0.02
+                        quality = (max_finger_far * 10.0
+                                   + carry_gap_pred * 5.0
+                                   + h_diff * 2.0
+                                   + a1_under * 4.0
+                                   + a1_over * 0.5
+                                   - ORIENT_BONUS_K * palm_align)
+                        _pass_tag = " (relaxed)" if _relaxed_attempted else ""
+                        print(f"[PICK] Candidate OK{_pass_tag}: ({cand[0]:.2f},{cand[1]:.2f}) "
+                              f"yaw={math.degrees(yaw):.1f}° path_wps={path_wps} "
+                              f"base_obj={base_obj_dist:.3f}m "
+                              f"exp_a1={expected_a1:.3f} "
+                              f"h2-h1={h_diff:.3f} a1={a1:.3f} "
+                              f"d_th={d_thumb_pred*100:.1f}cm "
+                              f"d_b={d_b_pred*100:.1f}cm "
+                              f"d_c={d_c_pred*100:.1f}cm "
+                              f"max_far={max_finger_far*100:.1f}cm "
+                              f"carry={carry_gap_pred*100:.1f}cm "
+                              f"align={palm_align:+.2f} "
+                              f"score={quality:.3f}")
+                        valid.append((
+                            quality, cand, h_diff, a1, base_obj_dist, expected_a1,
+                            [float(v) for v in q_pre],
+                            np.array(actual_pre_target, dtype=float),
+                        ))
+                        if len(valid) >= max_screen_successes:
+                            print(f"[PICK] {len(valid)} feasible candidates found — stopping scan")
+                            break
+                    except Exception as e:
+                        print(f"[PICK] Reject base candidate no virtual reach: "
+                              f"({cand[0]:.2f},{cand[1]:.2f}) reason={e}")
+                else:
+                    print(f"[PICK] Reject base candidate in collision: ({cand[0]:.2f},{cand[1]:.2f})")
+            # End of inner for loop — decide whether to retry with relaxed.
+            if valid or _relaxed_attempted:
+                break
+            _relaxed_attempted = True
+        # Restore the strict exempt set for any subsequent nav-path
+        # validation (`filter_path`, etc.) so the chassis still avoids
+        # unselected objs during transit.
         try:
-            sel_bid = mujoco.mj_name2id(
-                sim.model, mujoco.mjtObj.mjOBJ_BODY, f"pickup_obj_{obj_idx}")
-            nav.validator.set_exempt_objects(
-                [sel_bid] if sel_bid >= 0 else [])
+            nav.validator.set_exempt_objects(strict_exempt)
         except Exception:
             pass
-        valid = []
-        for cand in raw:
-            yaw = pick_candidate_yaw(cand, obj_world[:2])
-            # Reject candidates inside the inflated OBSTACLE_RECTS keepout
-            # so screening matches what the nav planner will accept at runtime.
-            in_nav_keepout = False
-            for (x0, x1, y0, y1) in OBSTACLE_RECTS:
-                if (x0 - NAV_ROBOT_RADIUS) <= cand[0] <= (x1 + NAV_ROBOT_RADIUS) \
-                        and (y0 - NAV_ROBOT_RADIUS) <= cand[1] <= (y1 + NAV_ROBOT_RADIUS):
-                    in_nav_keepout = True
-                    break
-            if in_nav_keepout:
-                print(f"[PICK] Reject base candidate in nav keepout: "
-                      f"({cand[0]:.2f},{cand[1]:.2f}) — would be nudged by plan.py")
-                continue
-            blocker = _pickup_object_corridor_blocker(
-                np.array(robot_xy, dtype=float), np.array(cand, dtype=float),
-                PICK_NAV_OBJECT_CLEARANCE, obj_indices=(obj_idx,))
-            if blocker is not None:
-                block_idx, block_dist = blocker
-                print(f"[PICK] Reject base candidate object corridor: "
-                      f"({cand[0]:.2f},{cand[1]:.2f}) path passes "
-                      f"{block_dist:.2f}m from selected Obj-{block_idx} "
-                      f"(< {PICK_NAV_OBJECT_CLEARANCE:.2f}m)")
-                continue
-            # Yaw-aware base validity: the asymmetric chassis collision
-            # depends on the yaw the robot will hold at the candidate.
-            if nav.validator.is_valid(cand[0], cand[1], yaw=yaw):
-                try:
-                    # Reset plan_data so screening uses the same target-clamp
-                    # and strict-IK that GraspExecutor.pick() will use at runtime.
-                    reset_plan_data_for_ik(arm_bridge, base_xy=cand, base_yaw=yaw)
-                    _, pre_grasp_pos = compute_grasp_targets(
-                        cand, obj_world,
-                        obj_radius=get_object_radius(sim.model, obj_idx))
-                    pre_grasp_pos[2] = max(pre_grasp_pos[2], MIN_PICK_WRIST_Z)
-                    q_pre, actual_pre_target = \
-                        arm_bridge.solve_ik_with_z_lift(
-                            pre_grasp_pos, n_seeds=8)
-                    h_diff = abs(float(q_pre[1]) - float(q_pre[0]))
-                    if h_diff > PICK_MAX_H_DIFF:
-                        print(f"[PICK] Reject base candidate high tilt: "
-                              f"({cand[0]:.2f},{cand[1]:.2f}) "
-                              f"h2-h1={h_diff:.3f}m > {PICK_MAX_H_DIFF:.2f}m")
-                        continue
-                    if float(q_pre[2]) < PICK_MIN_A1:
-                        print(f"[PICK] Reject base candidate arm too retracted: "
-                              f"({cand[0]:.2f},{cand[1]:.2f}) "
-                              f"a1={float(q_pre[2]):.3f}m < {PICK_MIN_A1:.2f}m")
-                        continue
-                    path = arm_bridge.plan(HOME_Q, q_pre, timeout=PICK_VIRTUAL_PLAN_TIMEOUT)
-                    if path is None:
-                        print(f"[PICK] Reject base candidate no arm path: ({cand[0]:.2f},{cand[1]:.2f})")
-                        continue
-                    a1 = float(q_pre[2])
-                    base_obj_dist = float(np.linalg.norm(
-                        np.array(cand, dtype=float) - obj_world[:2]))
-                    target_reach = max(0.0, base_obj_dist - GRIPPER_STANDOFF_XY)
-                    expected_a1 = float(np.clip(
-                        target_reach - PICK_A1_FIXED_REACH_OFFSET,
-                        PICK_MIN_A1, 0.60))
-                    a1_under = max(0.0, expected_a1 - a1)
-                    a1_over = max(0.0, a1 - expected_a1)
-                    # Palm-orientation tiebreaker: world XY direction
-                    # from palm to thumb (finger A) dotted with the
-                    # approach direction.  Higher align → thumb on the
-                    # object side, fingers on the opposite side (1+2
-                    # gripper grips cleanly this way).
-                    palm_align = 0.0
-                    try:
-                        palm_bid = mujoco.mj_name2id(
-                            arm_bridge.model, mujoco.mjtObj.mjOBJ_BODY,
-                            "Gripper_Link3_1")
-                        thumb_bid = mujoco.mj_name2id(
-                            arm_bridge.model, mujoco.mjtObj.mjOBJ_BODY,
-                            "finger_a_link_1_1")
-                        if palm_bid >= 0 and thumb_bid >= 0:
-                            mujoco.mj_forward(
-                                arm_bridge.model, arm_bridge.planning_data)
-                            palm_xy = arm_bridge.planning_data.xpos[palm_bid][:2]
-                            thumb_xy = arm_bridge.planning_data.xpos[thumb_bid][:2]
-                            tx = float(thumb_xy[0] - palm_xy[0])
-                            ty = float(thumb_xy[1] - palm_xy[1])
-                            tn = (tx * tx + ty * ty) ** 0.5
-                            if tn > 1e-6:
-                                ax = obj_world[0] - cand[0]
-                                ay = obj_world[1] - cand[1]
-                                an = (ax * ax + ay * ay) ** 0.5
-                                if an > 1e-6:
-                                    palm_align = (
-                                        (tx / tn) * (ax / an)
-                                      + (ty / tn) * (ay / an))
-                    except Exception:
-                        pass
-                    ORIENT_BONUS_K = 0.02  # ≤ 2cm "h_diff equivalent" tiebreaker
-                    quality = (h_diff * 2.0 + a1_under * 4.0 + a1_over * 0.5
-                               - ORIENT_BONUS_K * palm_align)
-                    print(f"[PICK] Candidate OK: ({cand[0]:.2f},{cand[1]:.2f}) "
-                          f"yaw={math.degrees(yaw):.1f}° path_wps={len(path)} "
-                          f"base_obj={base_obj_dist:.3f}m "
-                          f"exp_a1={expected_a1:.3f} "
-                          f"h2-h1={h_diff:.3f} a1={a1:.3f} "
-                          f"align={palm_align:+.2f} "
-                          f"score={quality:.3f}")
-                    valid.append((
-                        quality, cand, h_diff, a1, base_obj_dist, expected_a1,
-                        [float(v) for v in q_pre],
-                        np.array(actual_pre_target, dtype=float),
-                    ))
-                    if len(valid) >= MAX_VIRTUAL_SCREEN_SUCCESSES:
-                        print(f"[PICK] {len(valid)} feasible candidates found — stopping scan")
-                        break
-                except Exception as e:
-                    print(f"[PICK] Reject base candidate no virtual reach: "
-                          f"({cand[0]:.2f},{cand[1]:.2f}) reason={e}")
-            else:
-                print(f"[PICK] Reject base candidate in collision: ({cand[0]:.2f},{cand[1]:.2f})")
         if not valid:
-            print("[PICK] No virtually feasible base candidates; not moving robot")
+            print("[PICK] No virtually feasible base candidates "
+                  "(both strict and relaxed clearance exhausted); "
+                  f"not moving robot  scan={time.time() - scan_t0:.2f}s")
             return []
         valid.sort(key=lambda item: item[0])
         ordered = [
@@ -956,7 +1434,8 @@ def main():
               " → ".join(f"({cand[0]:.2f},{cand[1]:.2f}) "
                          f"d={base_obj_dist:.2f} "
                          f"hΔ={h_diff:.3f} a1={a1:.3f}/{expected_a1:.3f}"
-                         for _, cand, h_diff, a1, base_obj_dist, expected_a1, _, _ in valid))
+                         for _, cand, h_diff, a1, base_obj_dist, expected_a1, _, _ in valid)
+              + f"  scan={time.time() - scan_t0:.2f}s")
         return ordered
 
     def _start_pick_nav(candidate, reason):
@@ -964,6 +1443,10 @@ def main():
         move_in_progress_flag[0] = True
         grasp_in_progress_flag[0] = False
         _pick_local_retry_used[0] = 0
+        # Reset the per-candidate early-bail trackers so they compare
+        # only within this candidate's attempts.
+        _pick_prev_max_far[0] = None
+        _pick_prev_failure_sig[0] = None
         # Only park the arm before base motion after an actual grasp/arm
         # attempt.  A pure "navigation failed" retry has not moved the arm yet;
         # parking there looked like the arm was moving while the base was stuck.
@@ -977,7 +1460,9 @@ def main():
                 theta = float(sim.direct_arm_commands[3])
                 sim.direct_arm_commands[0:4] = [CARRY_H1, CARRY_H2,
                                                 CARRY_A1, theta]
-            time.sleep(0.8)
+            # Brief idle so the carry-pose command is committed before
+            # base motion resumes.
+            time.sleep(0.2)
         print(f"[PICK] Navigate candidate {_pick_candidate_idx[0]+1}/"
               f"{len(_pick_candidates[0])}: ({goal_xy[0]:.2f},{goal_xy[1]:.2f})  "
               f"reason={reason}")
@@ -1012,6 +1497,45 @@ def main():
         obj_idx = _current_obj_idx[0]
         obj_world = get_object_world_pos(sim.model, sim.data, obj_idx)
         current_xy = np.array(sim.localization()[:2], dtype=float)
+
+        # SAFETY: side-grip leaves the chassis ~0.52 m from obj.  Any
+        # rotation / nav from this close pose risks the chassis clipping
+        # the obj.  Back the chassis straight away from obj to the safe
+        # radius before continuing.  Uses sim.target_base (the chassis
+        # PID controller's input) — same mechanism as fine-align and
+        # the side-grip forward push.
+        cur_dist_to_obj = float(np.linalg.norm(
+            current_xy - np.asarray(obj_world[:2])))
+        if cur_dist_to_obj < MIN_PICK_BASE_OBJ_DIST - 0.02:
+            obj_xy_2d = np.asarray(obj_world[:2], dtype=float)
+            if cur_dist_to_obj > 1e-6:
+                away_unit = (current_xy - obj_xy_2d) / cur_dist_to_obj
+            else:
+                away_unit = np.array([1.0, 0.0])
+            # Target: chassis at MIN_PICK_BASE_OBJ_DIST from obj, on the
+            # same approach line.
+            safe_xy = obj_xy_2d + away_unit * MIN_PICK_BASE_OBJ_DIST
+            safe_yaw = math.atan2(obj_xy_2d[1] - safe_xy[1],
+                                  obj_xy_2d[0] - safe_xy[0])
+            print(f"[PICK] Safe retract before retry: chassis at "
+                  f"{cur_dist_to_obj:.2f}m → {MIN_PICK_BASE_OBJ_DIST:.2f}m "
+                  f"(avoid obj-vs-chassis clip during nav rotation)")
+            with sim._target_lock:
+                sim.target_base = np.array([float(safe_xy[0]),
+                                            float(safe_xy[1]),
+                                            float(safe_yaw)])
+            t0 = time.time()
+            while time.time() - t0 < PICK_FINE_ALIGN_TIMEOUT:
+                cx, cy, _ = sim.localization()
+                if math.hypot(cx - safe_xy[0],
+                              cy - safe_xy[1]) <= PICK_FINE_ALIGN_DIST_TOL:
+                    break
+                time.sleep(0.05)
+            fx, fy, _ = sim.localization()
+            current_xy = np.array([fx, fy], dtype=float)
+            actual_dist = float(np.linalg.norm(current_xy - obj_xy_2d))
+            print(f"[PICK] Safe retract done: base-obj dist={actual_dist:.3f}m")
+
         while next_idx < len(_pick_candidates[0]):
             cand = _pick_candidates[0][next_idx]
             cand_xy = _candidate_xy(cand)
@@ -1132,6 +1656,71 @@ def main():
         print(f"[PICK] Fine-align done: base-object dist={final_dist:.3f}m")
         return True
 
+    def _side_grip_approach_push(obj_world):
+        """Drive the chassis straight forward (toward obj) to
+        `SIDE_FORWARD_PUSH_TARGET` for side-grip mode.  The nav planner
+        keeps its full chassis-safety margins (stops at ~0.78 m, fine-
+        align trims to ~0.70 m); this step closes the remaining gap so
+        the arm's horizontal reach lands on the obj.
+
+        No OMPL needed — the obj is directly in front of the chassis
+        at this stage and the corridor was already validated clean by
+        nav + fine-align.  Uses the same nav-validator approach as
+        fine-align: pose-driven setpoint + timed wait for the chassis
+        to converge.
+        """
+        obj_xy = np.array(obj_world[:2], dtype=float)
+        loc = sim.localization()
+        base_xy = np.array(loc[:2], dtype=float)
+        cur_dist = float(np.linalg.norm(base_xy - obj_xy))
+        if cur_dist < 1e-6:
+            return False
+        if cur_dist <= SIDE_FORWARD_PUSH_TARGET + PICK_FINE_ALIGN_DIST_TOL:
+            print(f"[PICK] Side-grip push skipped: already at "
+                  f"{cur_dist:.3f}m ≤ target {SIDE_FORWARD_PUSH_TARGET:.2f}m")
+            return False
+        direction = (base_xy - obj_xy) / cur_dist  # unit vector AWAY from obj
+        target_xy = obj_xy + direction * SIDE_FORWARD_PUSH_TARGET
+        target_yaw = pick_candidate_yaw(target_xy, obj_xy)
+        nav.validator.sync(sim.data)
+        if not nav.validator.is_valid(float(target_xy[0]), float(target_xy[1]),
+                                      yaw=float(target_yaw)):
+            print(f"[PICK] Side-grip push aborted: target "
+                  f"({target_xy[0]:.2f},{target_xy[1]:.2f}) fails validator")
+            return False
+        print(f"[PICK] Side-grip approach push: "
+              f"{cur_dist:.3f}m → {SIDE_FORWARD_PUSH_TARGET:.2f}m "
+              f"(chassis forward toward obj)")
+        # Use sim.target_base — the attribute the chassis PID controller
+        # actually reads.  (sim.target_pos is a vestigial attribute the
+        # sim does NOT consume.)  Matches the fine-align convention.
+        with sim._target_lock:
+            sim.target_base = np.array([float(target_xy[0]),
+                                        float(target_xy[1]),
+                                        float(target_yaw)])
+        t0 = time.time()
+        last_diag = t0
+        while time.time() - t0 < PICK_FINE_ALIGN_TIMEOUT:
+            cx, cy, _ = sim.localization()
+            if math.hypot(cx - target_xy[0],
+                          cy - target_xy[1]) <= PICK_FINE_ALIGN_DIST_TOL:
+                break
+            # Diag every 0.3s so we can see whether the chassis is
+            # making progress or stuck against something.
+            now = time.time()
+            if now - last_diag >= 0.3:
+                last_diag = now
+                cur_d = float(np.linalg.norm(np.array([cx, cy]) - obj_xy))
+                print(f"[PICK]   push progress: t={now-t0:.1f}s "
+                      f"base=({cx:.3f},{cy:.3f}) dist_to_obj={cur_d:.3f}m")
+            time.sleep(0.05)
+        fx, fy, _ = sim.localization()
+        final_dist = float(np.linalg.norm(np.array([fx, fy]) - obj_xy))
+        moved = math.hypot(fx - base_xy[0], fy - base_xy[1])
+        print(f"[PICK] Side-grip push done: base-object dist={final_dist:.3f}m "
+              f"(moved {moved*100:.1f}cm in {time.time()-t0:.1f}s)")
+        return True
+
     def _local_radial_retry_after_grasp_fail(obj_world):
         """Closed-loop base correction after a pre-close gate rejection.
 
@@ -1150,6 +1739,48 @@ def main():
                   "(failure was not from pre-close gate)")
             return False
 
+        # Early-bail when a local retry makes reach worse than the
+        # previous attempt — same-yaw retries can flip the asymmetry
+        # rather than fix it.  Tolerate a +1 cm noise margin; bail only
+        # when max_far definitely worsened.  Falls through to the next
+        # nav candidate (different approach yaw, different wrist result).
+        cur_max_far = info.get('max_far', None)
+        prev_max_far = _pick_prev_max_far[0]
+        if (cur_max_far is not None and prev_max_far is not None
+                and cur_max_far > prev_max_far + 0.01):
+            print(f"[PICK] Local retry EARLY-BAIL: max_far worsened "
+                  f"{prev_max_far*100:.1f}cm → {cur_max_far*100:.1f}cm "
+                  f"(>1cm regress) — same-yaw retries won't escape "
+                  f"this asymmetry pattern; jumping to next nav "
+                  f"candidate for a different approach yaw")
+            _pick_prev_max_far[0] = None
+            _pick_prev_failure_sig[0] = None
+            return False
+        _pick_prev_max_far[0] = cur_max_far
+
+        # Same-pattern early-bail: when two consecutive retries fail
+        # with effectively identical geometry (same arm-clip state and
+        # both finger distances within 2 cm of the prior attempt), the
+        # local retry is not making progress — declare the candidate
+        # dead and jump to the next.
+        cur_sig = (
+            int(info.get('arm_obj_ncon', 0) > 0),
+            round(info.get('d_thumb', 0.0) * 50.0),   # 2 cm buckets
+            round(info.get('d_bc',    0.0) * 50.0),
+        )
+        prev_sig = _pick_prev_failure_sig[0]
+        if prev_sig is not None and cur_sig == prev_sig:
+            print(f"[PICK] Local retry EARLY-BAIL: same failure pattern "
+                  f"repeats (arm_clip={cur_sig[0]} d_thumb≈"
+                  f"{info.get('d_thumb', 0.0)*100:.1f}cm d_bc≈"
+                  f"{info.get('d_bc', 0.0)*100:.1f}cm) — local nudges "
+                  f"cannot break this geometry; jumping to next nav "
+                  f"candidate")
+            _pick_prev_max_far[0] = None
+            _pick_prev_failure_sig[0] = None
+            return False
+        _pick_prev_failure_sig[0] = cur_sig
+
         loc = sim.localization()
         base_xy = np.array(loc[:2], dtype=float)
         cur_yaw = float(loc[2])
@@ -1157,15 +1788,24 @@ def main():
         gripper_actual_xy = np.array(info['gripper_xy'], dtype=float)
         ik_target_xy      = np.array(info['ik_target_xy'], dtype=float)
 
-        # Residual: how much the gripper undershot/overshot the IK
-        # target.  Translating the base by +err moves the gripper to
-        # the IK target (which sits GRIPPER_STANDOFF_XY behind the
-        # object — exactly where it should be for grasp closure).
-        err_vec = ik_target_xy - gripper_actual_xy
+        # Residual = obj_xy - carry_anchor_xy (fingertip centroid).
+        # Translating the base by this delta moves the carry_anchor
+        # onto the cylinder because base→arm→carry_anchor is rigid in
+        # the base frame when yaw is held fixed.
+        carry_xy = info.get('carry_xy')
+        if carry_xy is not None:
+            carry_xy = np.array(carry_xy, dtype=float)
+            err_vec = obj_xy - carry_xy
+            err_source = "carry_anchor→obj"
+        else:
+            # Fallback for failure modes that didn't capture carry_xy.
+            err_vec = ik_target_xy - gripper_actual_xy
+            err_source = "ik_target→Link1"
         err_mag = float(np.linalg.norm(err_vec))
         if err_mag < PICK_LOCAL_RETRY_MIN_ERR:
             print(f"[PICK] Local retry skipped: residual {err_mag*100:.1f}cm "
-                  f"below {PICK_LOCAL_RETRY_MIN_ERR*100:.1f}cm threshold")
+                  f"below {PICK_LOCAL_RETRY_MIN_ERR*100:.1f}cm threshold "
+                  f"(metric: {err_source})")
             return False
         if err_mag > PICK_LOCAL_RETRY_MAX_ERR:
             err_vec = err_vec * (PICK_LOCAL_RETRY_MAX_ERR / err_mag)
@@ -1174,16 +1814,32 @@ def main():
                   f"{PICK_LOCAL_RETRY_MAX_ERR*100:.1f}cm")
 
         nav.validator.sync(sim.data)
+        # During a pick the target obj is intentionally close to the
+        # chassis — exempt it from the validator's floor-object
+        # clearance check so candidate poses inside the nav-clearance
+        # band (but on the way TO obj) aren't rejected.  Restore after.
+        obj_idx_for_exempt = _current_obj_idx[0]
+        obj_bid_for_exempt = mujoco.mj_name2id(
+            sim.model, mujoco.mjtObj.mjOBJ_BODY,
+            f"pickup_obj_{obj_idx_for_exempt}")
+        prev_exempt = set(nav.validator.exempt_obj_ids)
+        if obj_bid_for_exempt >= 0:
+            new_exempt = prev_exempt | {int(obj_bid_for_exempt)}
+            nav.validator.set_exempt_objects(new_exempt)
+
         target_xy = None
         target_yaw = cur_yaw   # KEEP CURRENT YAW — rigid arm in base frame
         chosen_scale = None
         for scale in PICK_LOCAL_RETRY_SCALES:
             cand_xy = base_xy + err_vec * scale
-            # Keep the chassis a safe distance from the object so the
-            # arm has room to descend without the base bumping the
-            # cylinder.
+            # Use the during-pick min-dist (PICK_LOCAL_RETRY_MIN_DIST_PICK
+            # = 0.40 m), not the nav-distance min (0.70 m) which would
+            # reject every local-retry candidate that moves toward obj
+            # (chassis is at 0.64m post-push, already inside the 0.70m
+            # nav clearance).  The during-pick min is calibrated to
+            # the side-grip push target minus a small reach buffer.
             cand_dist = float(np.linalg.norm(cand_xy - obj_xy))
-            if cand_dist < PICK_LOCAL_RETRY_MIN_DIST:
+            if cand_dist < PICK_LOCAL_RETRY_MIN_DIST_PICK:
                 continue
             if nav.validator.is_valid(float(cand_xy[0]), float(cand_xy[1]),
                                       yaw=cur_yaw):
@@ -1191,16 +1847,24 @@ def main():
                 chosen_scale = scale
                 break
 
+        # Restore the validator's exempt set so subsequent nav planning
+        # (after a successful retry or after this retry's eventual
+        # failure) treats obstacles correctly.
+        nav.validator.set_exempt_objects(prev_exempt)
+
         if target_xy is None:
             print(f"[PICK] Local retry skipped: no valid pose at any scale "
                   f"of err={err_mag*100:.1f}cm "
-                  f"(dir=({err_vec[0]:+.3f},{err_vec[1]:+.3f}))")
+                  f"(dir=({err_vec[0]:+.3f},{err_vec[1]:+.3f}))  "
+                  f"[min_dist={PICK_LOCAL_RETRY_MIN_DIST_PICK}m, "
+                  f"target exempt={obj_bid_for_exempt>=0}]")
             return False
 
         applied = err_mag * chosen_scale
         print(f"[PICK] Local retry #{attempts + 1}/"
-              f"{PICK_LOCAL_RETRY_MAX_ATTEMPTS}: gripper-target residual "
-              f"{err_mag*100:.1f}cm  applied {applied*100:.1f}cm "
+              f"{PICK_LOCAL_RETRY_MAX_ATTEMPTS}: residual "
+              f"{err_mag*100:.1f}cm ({err_source})  "
+              f"applied {applied*100:.1f}cm "
               f"({chosen_scale*100:.0f}%)  "
               f"base ({base_xy[0]:.2f},{base_xy[1]:.2f}) → "
               f"({target_xy[0]:.2f},{target_xy[1]:.2f})  yaw fixed")
@@ -1217,8 +1881,13 @@ def main():
         move_in_progress_flag[0] = False
         grasp_in_progress_flag[0] = True
         _any_grasp_attempted[0] = True
+        # Local-retry path: the executor skips the arm motion phases
+        # and performs a chassis back-then-forward maneuver to realign.
+        # Saves arm motion time and avoids re-descent collisions.
         grasp_exec.pick(
-            _current_obj_idx[0], obj_world, on_complete=_on_grasp_complete)
+            _current_obj_idx[0], obj_world,
+            on_complete=_on_grasp_complete,
+            is_local_retry=True)
         return True
 
     def _choose_approx_drop_standoff(shelf_pos):
@@ -1258,13 +1927,37 @@ def main():
         obj_world = get_object_world_pos(sim.model, sim.data, obj_idx)
         candidate = _pick_candidates[0][_pick_candidate_idx[0]]
         fine_aligned = _fine_align_base_for_pick(candidate, obj_world)
+
+        # Side-grip mode: compute the "virtual base position" the IK
+        # should plan for.  The chassis stays at the safe nav distance
+        # for now (~0.70 m).  AFTER the arm descent completes, a
+        # forward chassis push (run by GraspExecutor between [5] descent
+        # and [6] close) translates the arm into final position.
+        # Planning the IK from this future-chassis position lets the arm
+        # pick a comfortable low-tilt pose now (instead of reaching
+        # across 22 cm with h2-h1≈0.36 and clipping the chassis).
+        sel_bid_pickup = -1
+        try:
+            sel_bid_pickup = mujoco.mj_name2id(
+                sim.model, mujoco.mjtObj.mjOBJ_BODY,
+                f"pickup_obj_{obj_idx}")
+        except Exception:
+            pass
+        wrist_goal_pickup = (compute_wrist_goal_for_obj(sim.model, sel_bid_pickup)
+                             if sel_bid_pickup >= 0 else None)
+        side_grip_pickup = (abs(float(wrist_goal_pickup[0])) < 0.20
+                            if wrist_goal_pickup is not None else False)
+
         move_in_progress_flag[0] = False
+        # Chassis-safety floor: only enforced for top-down/diagonal —
+        # side-grip is at the safe nav distance now; the close-approach
+        # push happens AFTER arm descent.
         base_xy = np.array(sim.localization()[:2], dtype=float)
         base_obj_dist = float(np.linalg.norm(base_xy - obj_world[:2]))
-        if base_obj_dist < MIN_PICK_BASE_OBJ_DIST:
+        if not side_grip_pickup and base_obj_dist < MIN_PICK_BASE_OBJ_DIST:
             print(f"[PICK] Reject reached pose: base-object dist={base_obj_dist:.2f}m "
-                  f"< {MIN_PICK_BASE_OBJ_DIST:.2f}m; object is inside/too near "
-                  f"chassis. Retrying next candidate.")
+                  f"< {MIN_PICK_BASE_OBJ_DIST:.2f}m (chassis-safety floor); "
+                  f"Retrying next candidate.")
             if _try_next_pick_candidate("base too close to object"):
                 return
             print("[GUI] No safe pick candidate left after base-object distance check")
@@ -1272,8 +1965,11 @@ def main():
         grasp_in_progress_flag[0] = True
         _any_grasp_attempted[0] = True
 
-        # Hand off to GraspExecutor (open -> approach -> descent -> close ->
-        # pin-to-gripper). _on_grasp_complete starts base->shelf navigation.
+        # Hand off to GraspExecutor (open -> approach -> descent ->
+        # OPTIONAL chassis push -> close -> pin-to-gripper).
+        # side_grip flag tells the executor to plan IK from the
+        # post-push virtual base AND to run the chassis push after
+        # descent.
         if fine_aligned:
             print("[PICK] Fine-align changed base pose; recomputing IK "
                   "from actual pose")
@@ -1281,7 +1977,9 @@ def main():
             obj_idx, obj_world, on_complete=_on_grasp_complete,
             pre_grasp_q=None if fine_aligned else _candidate_pre_q(candidate),
             pre_grasp_actual_target=None if fine_aligned
-            else _candidate_actual_pre_target(candidate))
+            else _candidate_actual_pre_target(candidate),
+            side_grip_push_target=(
+                SIDE_FORWARD_PUSH_TARGET if side_grip_pickup else None))
 
     def _on_grasp_complete(success):
         print(f"[GUI] Grasp complete — success={success}")
@@ -1451,7 +2149,11 @@ def main():
             collision_debug = not collision_debug
             counts = set_collision_debug_overlay(sim.model, collision_rgba_orig, collision_debug)
             sim.opt.geomgroup[3] = 1 if collision_debug else 0
-            sim.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT] = 1 if collision_debug else 0
+            # NOTE: do NOT touch mjVIS_CONTACTPOINT here.  The yellow
+            # contact-point markers are useful regardless of whether
+            # the collision-overlay is on, and they're enabled at
+            # startup (morph_i_free_move.py).  Use the `C` key (in
+            # the free-move sim's handler) to toggle them independently.
             sim.opt.flags[mujoco.mjtVisFlag.mjVIS_TRANSPARENT] = 1 if collision_debug else 0
             print(f"[VIS] Collision debug {'ON' if collision_debug else 'OFF'} "
                   f"(geomgroup[3]={sim.opt.geomgroup[3]}) "
@@ -1663,14 +2365,21 @@ def main():
         imgui.separator(); imgui.text("Grippers")
         imgui.text_disabled("(0% = Safe Open, 100% = Closed)")
         OPEN, CLOSED = -0.35, 0.8
-        # Curl profile mirrors grasp_executor._curl_targets so manual slider
-        # control matches autonomous grasp visuals. j3 (distal) ctrl range is
-        # [-1.22, -0.052], so it curls inward by becoming more negative.
-        CURL_J1_F, CURL_J2_F, CURL_J3_F = 0.70, 0.90, 1.00
+        # Curl profile mirrors grasp_executor._curl_targets so the manual
+        # slider matches autonomous-grasp visuals.  j3 (distal) curls
+        # inward (more negative).  j1 (proximal) is decoupled per finger:
+        # the thumb uses a shallower factor to avoid curling into the
+        # wrist; the side fingers use a deeper factor to wrap the object.
+        CURL_J1_F_THUMB = 0.70   # finger_a (thumb)
+        CURL_J1_F_SIDE  = 0.85   # finger_b, finger_c
+        CURL_J2_F, CURL_J3_F = 0.90, 1.00
         J1_EXTENT, J2_EXTENT, J3_EXTENT = 0.85, 0.95, 1.10
         J3_REST = -0.052
         # Palm spread joints (indices 9, 10 of gripper_ids_left).
+        # See grasp_executor.PALM_*_SIGN comment — both palms driven
+        # with the same sign by default (legacy convention).
         PALM_OPEN, PALM_CLOSE = 0.18, 0.0
+        PALM_C_SIGN_MAN, PALM_B_SIGN_MAN = +1.0, +1.0
 
         def _apply_curl(gids, v):
             if len(gids) < 9:
@@ -1679,31 +2388,40 @@ def main():
                     if idx < len(gids):
                         sim.data.ctrl[gids[idx]] = v
                 return
+            # CLOSE symmetric (thumb closes with sides).  OPEN asymmetric
+            # — thumb j1 goes deeper than sides for descent clearance.
+            THUMB_OPEN_MAN = -1.87   # matches grasp_executor.THUMB_OPEN_POS
             if v >= 0.0:
                 intensity = min(1.0, max(0.0, v / 0.20))
-                j1 = intensity * CURL_J1_F * J1_EXTENT
-                j2 = intensity * CURL_J2_F * J2_EXTENT
+                j1 = intensity * CURL_J1_F_SIDE * J1_EXTENT
+                j2 = intensity * CURL_J2_F      * J2_EXTENT
                 j3 = J3_REST - intensity * CURL_J3_F * J3_EXTENT
-                palm = PALM_CLOSE
+                palm_mag = PALM_CLOSE
+                j1_side, j1_thumb = j1, j1
             else:
-                j1 = v
+                j1 = v               # = OPEN slider value = -0.55
                 j2 = 0.0
-                j3 = J3_REST
-                palm = PALM_OPEN
-            # Drive all 9 finger joints (3 fingers x {proximal, middle, distal}).
-            for base in (0, 3, 6):
-                sim.data.ctrl[gids[base + 0]] = j1
+                j3 = -0.0523
+                palm_mag = PALM_OPEN
+                j1_side, j1_thumb = v, THUMB_OPEN_MAN
+            # gids order: indices 0..2 = finger_c, 3..5 = finger_b,
+            # 6..8 = finger_a.  finger_a's j1 uses j1_thumb (deeper on
+            # OPEN); j2/j3 same across all three.
+            for base, j1_use in ((0, j1_side), (3, j1_side), (6, j1_thumb)):
+                sim.data.ctrl[gids[base + 0]] = j1_use
                 sim.data.ctrl[gids[base + 1]] = j2
                 sim.data.ctrl[gids[base + 2]] = j3
-            # Palm spread (palm_finger_c, palm_finger_b).
+            # Palm spread (palm_finger_c, palm_finger_b) — mirrored signs.
             if len(gids) >= 11:
-                sim.data.ctrl[gids[9]]  = palm
-                sim.data.ctrl[gids[10]] = palm
+                sim.data.ctrl[gids[9]]  = PALM_C_SIGN_MAN * palm_mag
+                sim.data.ctrl[gids[10]] = PALM_B_SIGN_MAN * palm_mag
 
         imgui.push_item_width(180)
         # Slider display maps the proximal-joint (j1) ctrl back to an
-        # equivalent slider percentage.
-        J1_MAX_CLOSE = CURL_J1_F * J1_EXTENT     # j1 ctrl when intensity=1
+        # equivalent slider percentage.  Use the side-finger j1 since
+        # that's what's visible on gids[0] (finger_c) — gives a more
+        # useful read-out than the shallow thumb factor.
+        J1_MAX_CLOSE = CURL_J1_F_SIDE * J1_EXTENT     # j1 ctrl when intensity=1
         if len(sim.gripper_ids_left) >= 9:
             cur_prox = float(sim.data.ctrl[sim.gripper_ids_left[0]])
             if cur_prox >= 0.0 and J1_MAX_CLOSE > 1e-6:
@@ -1825,6 +2543,16 @@ def main():
                 _relaxed_clearance[0] = False  # start each cycle in strict mode
                 _any_grasp_attempted[0] = False
                 nav.validator.skip_segment_validation = False
+                # Path B Step 2: reset the 3-finger strict-attempts
+                # counter at the start of each MOVE cycle.  The counter
+                # persists across the base-XY retries that happen inside
+                # the cycle, so the strict→relaxed transition fires after
+                # MAX_STRICT_3FINGER_ATTEMPTS total attempts in the
+                # cycle (not per retry).
+                try:
+                    grasp_exec.reset_finger_attempt_counter()
+                except AttributeError:
+                    pass
                 _pick_candidates[0] = _filtered_pick_candidates(obj_world)
                 _cycle_start_time[0] = time.time()
                 if not _pick_candidates[0]:

@@ -26,24 +26,102 @@ from ompl import geometric as og
 
 # Physical constants
 D2            = 0.1     # column lateral separation (m)
-ALPHA_MIN_DEG = 10.0    # minimum arm tilt from horizontal (degrees)
+# Minimum arm tilt from horizontal — the validity check rejects poses
+# where the parallel manipulator approaches singular (boom exactly
+# horizontal at h1 == h2).  Lowered through 10° → 3° → 1.5° as the
+# side-grip mode emerged: the free-move screenshot showed a stable
+# pose at 1.15° tilt (h2-h1 = -0.002 m), proving the parallel chain
+# holds firmly with the column springs (stiffness=58000, damping=2000)
+# even very close to singular.  1.5° corresponds to a 0.0026 m h2-h1
+# differential — still away from the true singularity at 0° but
+# letting the validity check accept the near-level poses side-grip
+# needs.  Top-down poses naturally return |h2-h1| ≥ 0.03 m (alpha ≈
+# 17°), so they remain comfortably above this floor.
+ALPHA_MIN_DEG = 1.5
 INTERP_RES    = 0.02    # one waypoint per 2 cm of state-space path length
+
+# IK debug printing toggle.  When False the per-z-step / per-seed
+# dumps and the "won by seed#X" lines are suppressed.  Failure dumps
+# (no valid solution found) still print regardless.  Reduces log
+# noise + I/O blocking on the main thread during heavy IK loops.
+IK_DEBUG_VERBOSE = False
+
+# Planning-only safety clearance between the arm/gripper and the
+# robot chassis.  The runtime sim model is unchanged.
+#
+# Mechanism: inflate `geom_margin` on chassis geoms in the planning
+# model.  MuJoCo then reports any geom-pair within margin in the
+# contact list with a signed `dist` field.  isValid() checks `dist`
+# instead of just contact presence — for non-rest geom pairs we
+# require `dist >= MIN_NONREST_CLEARANCE`.  Rest-pair whitelist still
+# applies (wheels-floor, intra-chassis, intra-arm contacts stay
+# allowed).
+#
+# Why this matters:
+#   - Strict-binary validity (no margin) accepts a path that grazes
+#     the chassis at 0.1 mm clearance.  Runtime physics + chassis
+#     yaw/translation during the pick then push the arm into actual
+#     contact, and the arm fights the chassis instead of reaching obj.
+#   - With a 1.2 cm enforced gap, the planner naturally routes around
+#     the chassis envelope, leaving room for runtime perturbations.
+CHASSIS_PLAN_MARGIN     = 0.025  # margin (m) added to chassis geoms so
+                                 # near-contacts within this band show
+                                 # up in ncon (only enables visibility)
+MIN_NONREST_CLEARANCE   = 0.003  # required signed distance for non-rest
+                                 # pairs.  c.dist >= this → valid;
+                                 # below → reject (path too close).
+                                 # Tried 1 mm — arm physically clipped
+                                 # the LifePo4 battery body.  3 mm
+                                 # keeps a real safety buffer while
+                                 # still letting the IK fold reasonably
+                                 # low.
 
 # OMPL state space bounds (SI units). a1 upper limit is set by the
 # ArmLeftJoint actuator ctrlrange (executable, not commanded, range).
+#
+# 8-DOF state: 4 arm slides + 4 wrist orientation joints.  The wrist
+# joints (HandBearingJoint, gripper_z/x/y_rotation) were always actuated
+# in the model but ignored by the original 4-DOF planner; integrating
+# them lets OMPL plan the full arm+wrist trajectory and lets the wrist
+# tilt to a real top-down pose for proper 3-finger pickup.
 JOINT_RANGES_ARM = [
-    (0.05,  1.35),    # h1: ColumnLeftBearingJoint
-    (0.05,  1.35),    # h2: ColumnRightBearingJoint
-    (0.0,   0.60),    # a1: ArmLeftJoint
-    (-3.14, 3.14),    # theta: BaseJoint
+    (0.05,  1.35),    # 0: h1   ColumnLeftBearingJoint
+    (0.05,  1.35),    # 1: h2   ColumnRightBearingJoint
+    (0.0,   0.60),    # 2: a1   ArmLeftJoint
+    (-3.14, 3.14),    # 3: th   BaseJoint
+    (-1.57, 1.57),    # 4: hb   HandBearingJoint (wrist pitch; XML ±1.5708)
+    (-3.14, 3.14),    # 5: wz   gripper_z_rotation (palm roll; full rev required
+                      #         for side-grip orientations)
+    (-0.80, 0.80),    # 6: wx   gripper_x_rotation (actuator ctrlrange ±0.8)
+    (-0.80, 0.80),    # 7: wy   gripper_y_rotation (actuator ctrlrange ±0.8)
 ]
+ARM_DOF = len(JOINT_RANGES_ARM)
+WRIST_NEUTRAL = (0.0, 0.0, 0.0, 0.0)   # hb, wz, wx, wy at neutral pose
 
-# Reference arm configurations (SI units: m, rad)
-HOME_Q = [0.5, 0.9, 0.1, 0.0]    # canonical home/rest pose for ARM1 OMPL
+# Reference arm configurations (SI units: m, rad).  Extended to 8-DOF;
+# wrist defaults to neutral so 4-vector legacy callers behave identically.
+HOME_Q = [0.5, 0.9, 0.1, 0.0,  0.0, 0.0, 0.0, 0.0]
 # Static pose for the inactive ARM2 (acts as an obstacle while ARM1 plans).
 # Intentionally singular for ARM1 OMPL (h1==h2 → alpha=0°); never used as an
 # ARM1 planning state.
-PARK_Q = [1.2, 1.2, 0.1, 0.0]
+PARK_Q = [1.2, 1.2, 0.1, 0.0,  0.0, 0.0, 0.0, 0.0]
+
+
+def _pad_q(q):
+    """
+    Accept a 4-vector (arm-only) or 8-vector (arm + wrist) and return an
+    8-vector with wrist defaulting to WRIST_NEUTRAL.  Lets legacy callers
+    continue passing 4-vectors during the 4→8-DOF transition.
+    """
+    if q is None:
+        return None
+    q = list(q)
+    if len(q) == ARM_DOF:
+        return [float(v) for v in q]
+    if len(q) == 4:
+        return [float(v) for v in q] + list(WRIST_NEUTRAL)
+    raise ValueError(
+        f"Arm q must have length 4 or {ARM_DOF}, got {len(q)}")
 
 # Scale applied to the optional kinematic-calibration LUT correction.
 # Measured deflection (free pendulum) is much larger than runtime
@@ -53,17 +131,29 @@ CALIB_SCALE = 0.20
 
 class MORPHValidityChecker(ob.StateValidityChecker):
     """
-    Two-layer validity checker for MORPH-I single arm (4-DOF).
+    Two-layer validity checker for MORPH-I single arm (8-DOF: 4 arm
+    slides + 4 wrist orientation joints).
 
     Layer 1 — geometry (fast, no MuJoCo):
         |arctan2(h2-h1, d2)| >= alpha_min_deg
+        (depends only on h1, h2; wrist joints don't change arm tilt.)
 
     Layer 2 — MuJoCo collision (~0.25 ms):
-        Set qpos → mj_forward → inspect contacts vs allowed set.
+        Set all 8 qpos entries → mj_forward → inspect contacts vs
+        allowed set.  The wrist qpos writes let the collision check
+        see the actual gripper orientation, so OMPL never plans a
+        wrist tilt that drives the palm into nearby geometry.
+
+        Clearance-aware: rest pairs (whitelisted at HOME) pass
+        unconditionally; non-rest pairs require c.dist >=
+        MIN_NONREST_CLEARANCE.  Combined with chassis-margin
+        inflation, this gives the planner a real safety buffer
+        instead of the previous binary contact check.
     """
 
     def __init__(self, si, model, planning_data, qpos_map,
-                 d2=D2, alpha_min_deg=ALPHA_MIN_DEG, allowed_pairs=None):
+                 d2=D2, alpha_min_deg=ALPHA_MIN_DEG, allowed_pairs=None,
+                 min_nonrest_clearance=MIN_NONREST_CLEARANCE):
         super().__init__(si)
         self._model    = model
         self._data     = planning_data
@@ -71,9 +161,11 @@ class MORPHValidityChecker(ob.StateValidityChecker):
         self._d2       = d2
         self._alpha_sq = alpha_min_deg * alpha_min_deg
         self._allowed  = allowed_pairs if allowed_pairs is not None else set()
+        self._min_clearance = float(min_nonrest_clearance)
 
     def isValid(self, state):
         h1, h2, a1, theta = state[0], state[1], state[2], state[3]
+        hb, wz, wx, wy    = state[4], state[5], state[6], state[7]
 
         # Layer 1: geometry. Cast to Python bool — nanobind rejects numpy.bool_.
         alpha_deg = np.degrees(np.arctan2(h2 - h1, self._d2))
@@ -85,12 +177,23 @@ class MORPHValidityChecker(ob.StateValidityChecker):
         self._data.qpos[self._qpos["ColumnRight"]] = h2
         self._data.qpos[self._qpos["ArmLeft"]]     = a1
         self._data.qpos[self._qpos["Base"]]        = theta
+        self._data.qpos[self._qpos["HandBearing"]] = hb
+        self._data.qpos[self._qpos["WristZ"]]      = wz
+        self._data.qpos[self._qpos["WristX"]]      = wx
+        self._data.qpos[self._qpos["WristY"]]      = wy
         mujoco.mj_forward(self._model, self._data)
 
         for i in range(self._data.ncon):
             c = self._data.contact[i]
             g1, g2 = int(c.geom1), int(c.geom2)
-            if (g1, g2) not in self._allowed and (g2, g1) not in self._allowed:
+            if (g1, g2) in self._allowed or (g2, g1) in self._allowed:
+                # Whitelisted rest pair — always accepted regardless of dist
+                continue
+            # Non-rest pair: enforce signed-distance clearance.  c.dist
+            # is negative for penetration, 0 for touching, positive
+            # within margin.  Anything closer than min_clearance
+            # (typ. 1.2 cm) is treated as too close → reject path.
+            if c.dist < self._min_clearance:
                 return False
 
         return True
@@ -119,6 +222,20 @@ class MORPHBridge:
         # Runtime maps — safe against XML topology changes
         self._qpos_map = self._build_qpos_map(arm)
         self._ctrl_map = self._build_ctrl_map(arm)
+
+        # Planning-only clearance: inflate chassis geom_margin in the
+        # planning model so the validity checker sees arm-vs-chassis
+        # near-contacts (up to CHASSIS_PLAN_MARGIN) in ncon.  isValid()
+        # then enforces MIN_NONREST_CLEARANCE for any non-rest pair.
+        # Runtime sim model is untouched — this is a SEPARATE MjModel.
+        self._chassis_geom_ids = self._collect_chassis_geom_ids()
+        for gid in self._chassis_geom_ids:
+            self._model.geom_margin[gid] = CHASSIS_PLAN_MARGIN
+        print(f"[ArmPlanner] planning-only chassis clearance: "
+              f"margin={CHASSIS_PLAN_MARGIN*100:.1f}cm on "
+              f"{len(self._chassis_geom_ids)} chassis geoms; "
+              f"min non-rest clearance="
+              f"{MIN_NONREST_CLEARANCE*100:.1f}cm")
 
         self._rest_pairs = self._build_rest_pairs()
         allowed          = set(self._rest_pairs)
@@ -246,6 +363,38 @@ class MORPHBridge:
 
     # ── Map builders ─────────────────────────────────────────────────────────
 
+    def _collect_chassis_geom_ids(self):
+        """Return geom ids belonging to the chassis/base subtree
+        (descendants of the 'robot' or 'base' body), EXCLUDING any
+        geoms in the arm subtrees ('Arm_1', 'Arm_2').
+
+        These are the geoms whose `geom_margin` we inflate in the
+        planning model so the validity checker can see arm-vs-chassis
+        near-contacts.  Walks each geom's body up the parent chain;
+        if an arm ancestor is found first it's an arm geom, if a
+        chassis ancestor is found first it's a chassis geom.
+        """
+        m = self._model
+        ids = []
+        for gid in range(m.ngeom):
+            cur = int(m.geom_bodyid[gid])
+            is_chassis = False
+            for _ in range(30):
+                name = mujoco.mj_id2name(
+                    m, mujoco.mjtObj.mjOBJ_BODY, cur) or ""
+                if name in ("Arm_1", "Arm_2"):
+                    is_chassis = False
+                    break
+                if name in ("robot", "base"):
+                    is_chassis = True
+                    break
+                if cur == 0:
+                    break
+                cur = int(m.body_parentid[cur])
+            if is_chassis:
+                ids.append(gid)
+        return ids
+
     def _build_qpos_map(self, arm):
         m = self._model
 
@@ -260,6 +409,10 @@ class MORPHBridge:
             "ColumnRight": qi(f"ColumnRightBearingJoint_{arm}"),
             "ArmLeft":     qi(f"ArmLeftJoint_{arm}"),
             "Base":        qi(f"BaseJoint_{arm}"),
+            "HandBearing": qi(f"HandBearingJoint_{arm}"),
+            "WristZ":      qi(f"gripper_z_rotation_{arm}"),
+            "WristX":      qi(f"gripper_x_rotation_{arm}"),
+            "WristY":      qi(f"gripper_y_rotation_{arm}"),
         }
 
     def _build_ctrl_map(self, arm):
@@ -291,8 +444,8 @@ class MORPHBridge:
         arm2_map = self._build_qpos_map(2)
 
         ref_states = [
-            HOME_Q,
-            [0.05, 0.5, 0.1, 0.0],   # low reference
+            _pad_q(HOME_Q),
+            _pad_q([0.05, 0.5, 0.1, 0.0]),   # low reference
         ]
 
         def body_group(body_id):
@@ -316,11 +469,20 @@ class MORPHBridge:
             rd.qpos[arm1_map["ColumnRight"]] = ref_q[1]
             rd.qpos[arm1_map["ArmLeft"]]     = ref_q[2]
             rd.qpos[arm1_map["Base"]]        = ref_q[3]
+            rd.qpos[arm1_map["HandBearing"]] = ref_q[4]
+            rd.qpos[arm1_map["WristZ"]]      = ref_q[5]
+            rd.qpos[arm1_map["WristX"]]      = ref_q[6]
+            rd.qpos[arm1_map["WristY"]]      = ref_q[7]
 
-            rd.qpos[arm2_map["ColumnLeft"]]  = PARK_Q[0]
-            rd.qpos[arm2_map["ColumnRight"]] = PARK_Q[1]
-            rd.qpos[arm2_map["ArmLeft"]]     = PARK_Q[2]
-            rd.qpos[arm2_map["Base"]]        = PARK_Q[3]
+            park_q = _pad_q(PARK_Q)
+            rd.qpos[arm2_map["ColumnLeft"]]  = park_q[0]
+            rd.qpos[arm2_map["ColumnRight"]] = park_q[1]
+            rd.qpos[arm2_map["ArmLeft"]]     = park_q[2]
+            rd.qpos[arm2_map["Base"]]        = park_q[3]
+            rd.qpos[arm2_map["HandBearing"]] = park_q[4]
+            rd.qpos[arm2_map["WristZ"]]      = park_q[5]
+            rd.qpos[arm2_map["WristX"]]      = park_q[6]
+            rd.qpos[arm2_map["WristY"]]      = park_q[7]
 
             mujoco.mj_forward(self._model, rd)
 
@@ -344,8 +506,8 @@ class MORPHBridge:
     # ── OMPL state space ──────────────────────────────────────────────────────
 
     def _build_space(self):
-        space  = ob.RealVectorStateSpace(4)
-        bounds = ob.RealVectorBounds(4)
+        space  = ob.RealVectorStateSpace(ARM_DOF)
+        bounds = ob.RealVectorBounds(ARM_DOF)
         for i, (lo, hi) in enumerate(JOINT_RANGES_ARM):
             bounds.setLow(i, lo)
             bounds.setHigh(i, hi)
@@ -356,25 +518,31 @@ class MORPHBridge:
 
     def plan(self, start_q, goal_q, timeout=None):
         """
-        Plan a collision-free path from start_q to goal_q (4D).
+        Plan a collision-free path from start_q to goal_q (8-DOF: 4 arm
+        slides + 4 wrist orientation joints).
+
+        Accepts 4-vectors (legacy callers) and pads to 8 with neutral
+        wrist for the transition period.
 
         Args:
-            start_q: [h1, h2, a1, theta]
-            goal_q:  [h1, h2, a1, theta]
+            start_q: [h1, h2, a1, th, hb, wz, wx, wy]  (or 4-vec)
+            goal_q:  [h1, h2, a1, th, hb, wz, wx, wy]  (or 4-vec)
             timeout: seconds (instance default if None)
 
         Returns:
-            List of [h1, h2, a1, theta] waypoints, or None if planning failed.
+            List of 8-element waypoints, or None if planning failed.
             Waypoint count ≈ path_length / INTERP_RES (min 10).
         """
         t = timeout if timeout is not None else self._timeout
+        sq = _pad_q(start_q)
+        gq = _pad_q(goal_q)
 
         pdef  = ob.ProblemDefinition(self._si)
         start = self._si.allocState()
         goal  = self._si.allocState()
-        for i in range(4):
-            start[i] = float(start_q[i])
-            goal[i]  = float(goal_q[i])
+        for i in range(ARM_DOF):
+            start[i] = float(sq[i])
+            goal[i]  = float(gq[i])
         pdef.setStartAndGoalStates(start, goal)
 
         planner = og.RRTConnect(self._si)
@@ -390,55 +558,121 @@ class MORPHBridge:
         n_wps = max(10, int(path.length() / INTERP_RES))
         path.interpolate(n_wps)
 
-        return [[path.getState(i)[j] for j in range(4)]
+        return [[path.getState(i)[j] for j in range(ARM_DOF)]
                 for i in range(path.getStateCount())]
 
     # ── IK ────────────────────────────────────────────────────────────────────
 
-    def solve_ik(self, target_pos, n_seeds=8, threshold=0.02):
+    def solve_ik(self, target_pos, n_seeds=8, threshold=0.02,
+                 wrist_goal=None, wrist_weight=5.0,
+                 target_body="Gripper_Link1_1",
+                 seed_q=None):
         """
-        Solve IK for Gripper_Link1_1 to reach target_pos (WORLD frame).
+        Solve 8-DOF IK to reach target_pos (WORLD frame) with `target_body`.
 
-        Cost combines reach error with an asymmetric tilt penalty that prefers
-        a level pose for mid-height targets and tilts up/down for high/low
-        targets. Seeds mix a biased "low + extended" pattern with HOME_Q and
-        random seeds for robustness across shelf and floor targets.
+        Cost combines reach error, tilt penalty, and a wrist preference
+        term.  When `target_body` is `Gripper_Link3_1` (the palm) and
+        `wrist_weight` is low on HandBearing, SLSQP uses HandBearing
+        as a 5th positional DOF: rotating it swings the palm by 15-20
+        cm around the Hand_Bearing pivot.  The other wrist DOFs
+        (gripper_z/x/y_rotation) are typically held tight at the goal
+        because they set the gripper-frame ORIENTATION (palm leveling,
+        thumb-vs-fingers spin) and shouldn't drift.
+
+        Args:
+            target_pos:    (x, y, z) world target for `target_body`.
+            n_seeds:       SLSQP seed count.
+            threshold:     accept solutions with reach error <= threshold.
+            wrist_goal:    (hb, wz, wx, wy) desired wrist pose; None → neutral.
+            wrist_weight:  λ on the wrist preference term.  Accepts either
+                           a scalar (applies to all 4 wrist dims) or a
+                           4-tuple (hb_w, wz_w, wx_w, wy_w) for per-DOF
+                           weights.  Use per-DOF for side-grip: low HB
+                           weight (0.1) lets HandBearing be a reach DOF,
+                           high wz/wx/wy weights (3.0) lock the gripper
+                           orientation in place.
+            target_body:   "Gripper_Link1_1" (wrist) for legacy/top-down,
+                           "Gripper_Link3_1" (palm) for grasp targeting.
+
+        Returns 8-element list [h1, h2, a1, th, hb, wz, wx, wy].
         """
         from scipy.optimize import minimize
         import math as _math
 
         gripper_bid = mujoco.mj_name2id(
-            self._model, mujoco.mjtObj.mjOBJ_BODY, "Gripper_Link1_1")
+            self._model, mujoco.mjtObj.mjOBJ_BODY, target_body)
         if gripper_bid < 0:
-            raise RuntimeError("Body 'Gripper_Link1_1' not found in model")
+            raise RuntimeError(f"Body '{target_body}' not found in model")
+
+        # Normalise wrist_weight to a 4-tuple.
+        if np.isscalar(wrist_weight):
+            ww = np.array([wrist_weight] * 4, dtype=float)
+        else:
+            ww = np.asarray(wrist_weight, dtype=float)
+            if ww.shape != (4,):
+                raise ValueError(
+                    "wrist_weight must be a scalar or 4-tuple, got "
+                    f"shape {ww.shape}")
 
         target_pos = np.asarray(target_pos, dtype=float)
+        wg = (np.asarray(wrist_goal, dtype=float)
+              if wrist_goal is not None
+              else np.asarray(WRIST_NEUTRAL, dtype=float))
 
-        # Choose preferred tilt direction based on target z. Note that h2 only
-        # affects body positions during mj_step (passive RotationLeftJoint), so
-        # encoding tilt direction via this preference produces the right
-        # physical tilt at runtime even though plan_data uses mj_forward only.
+        # Side-grip detection: when HandBearing goal is near 0, the
+        # gripper is held palm-horizontal and the right arm pose is a
+        # LEVEL one (h1 ≈ h2) at mid-column height so the wrist hangs
+        # below the trolley to obj-level.  When hb is significantly
+        # negative the gripper tilts down — the arm wants a
+        # DOWNWARD-TILTED pose (h2 > h1) and lower columns so the
+        # wrist sits above the obj for the descent.
+        side_grip_mode = bool(abs(float(wg[0])) < 0.20)
+
+        # Tilt-preference direction.  For diagonal/top-down (legacy
+        # behaviour) we keep the "low target → tilt down" heuristic.
+        # For side grip we want LEVEL (no h2-h1 deviation), so the
+        # tilt cost punishes any deviation equally.
         WRIST_Z_MID = 1.0
         prefer_downward = bool(target_pos[2] < WRIST_Z_MID)
 
-        def cost_fn(x):
+        def _write_qpos(x):
             self._plan_data.qpos[self._qpos_map["ColumnLeft"]]  = x[0]
             self._plan_data.qpos[self._qpos_map["ColumnRight"]] = x[1]
             self._plan_data.qpos[self._qpos_map["ArmLeft"]]     = x[2]
             self._plan_data.qpos[self._qpos_map["Base"]]        = x[3]
+            self._plan_data.qpos[self._qpos_map["HandBearing"]] = x[4]
+            self._plan_data.qpos[self._qpos_map["WristZ"]]      = x[5]
+            self._plan_data.qpos[self._qpos_map["WristX"]]      = x[6]
+            self._plan_data.qpos[self._qpos_map["WristY"]]      = x[7]
+
+        def cost_fn(x):
+            _write_qpos(x)
             mujoco.mj_forward(self._model, self._plan_data)
             reach_err = float(np.linalg.norm(
                 self._plan_data.xpos[gripper_bid] - target_pos))
-            # Piecewise tilt penalty: linear-cheap for mild tilt so reach can
-            # dominate, quadratic-expensive past TILT_KNEE so the optimizer
-            # cannot pick extreme spreads the runtime arm would not track.
-            # Wrong-direction tilt stays linearly heavy at all magnitudes.
             diff = float(x[1]) - float(x[0])    # h2 - h1, positive = downward tilt
             TILT_KNEE = 0.30
             TILT_QUAD_K = 1.0
-            if prefer_downward:
-                preferred = max(0.0, diff)        # downward
-                opposed   = max(0.0, -diff)       # upward
+            if side_grip_mode:
+                # Side-grip cost: target h-diff = SIDE_TILT_TARGET with a
+                # quadratic penalty outside SIDE_TILT_WINDOW.  Extra
+                # quadratic pulls toward known-good (h1, a1) keep SLSQP in
+                # the reachable basin instead of collapsing to a small-tilt
+                # local minimum that leaves the fingers short of the object.
+                SIDE_TILT_TARGET = 0.20
+                SIDE_TILT_WINDOW = 0.05
+                SIDE_H1_TARGET   = 0.21
+                SIDE_A1_TARGET   = 0.55
+                tilt_dev = abs(diff - SIDE_TILT_TARGET)
+                preferred = 0.0
+                opposed = max(0.0, tilt_dev - SIDE_TILT_WINDOW)
+                h1_pull = 0.5 * (float(x[0]) - SIDE_H1_TARGET) ** 2
+                a1_pull = 2.0 * (float(x[2]) - SIDE_A1_TARGET) ** 2
+            elif prefer_downward:
+                # Diagonal / top-down with low target Z — slight downward
+                # tilt is preferred (the original 4-DOF heuristic).
+                preferred = max(0.0, diff)
+                opposed   = max(0.0, -diff)
             else:
                 preferred = max(0.0, -diff)
                 opposed   = max(0.0, diff)
@@ -447,7 +681,19 @@ class MORPHBridge:
                 + TILT_QUAD_K * max(0.0, preferred - TILT_KNEE) ** 2
             )
             opposed_penalty = 0.10 * opposed
-            return reach_err + preferred_penalty + opposed_penalty
+            # Wrist preference: per-DOF quadratic pull toward wrist_goal.
+            # Side-grip callers pass per-DOF ww = (low, high, high, high)
+            # so HB is free as a reach DOF while wx/wz/wy stay locked at
+            # the orientation goal.
+            wrist_dev = (np.asarray(x[4:8]) - wg) ** 2
+            wrist_penalty = float(np.sum(ww * wrist_dev))
+            # Side-grip-specific manual-pose pulls (h1, a1 toward the
+            # known-working floor pickup values).  Zero in other modes.
+            manual_pull = 0.0
+            if side_grip_mode:
+                manual_pull = h1_pull + a1_pull
+            return (reach_err + preferred_penalty + opposed_penalty
+                    + wrist_penalty + manual_pull)
 
         # Theta guess: rotate arm toward target XY from the robot base in world.
         robot_bid = mujoco.mj_name2id(
@@ -461,47 +707,148 @@ class MORPHBridge:
         # Clamp into joint range
         theta_guess = max(-3.14, min(3.14, theta_guess))
 
-        # Biased seeds: a "low + extended" pattern that works well for floor
-        # objects, with several h1 values for higher-shelf targets.
-        biased_seeds = [
-            np.array([0.05, 0.10, 0.60, theta_guess]),
-            np.array([0.10, 0.15, 0.60, theta_guess]),
-            np.array([0.15, 0.20, 0.55, theta_guess]),
-            np.array([0.20, 0.25, 0.55, theta_guess]),
-        ]
-        seeds = biased_seeds + [np.array(HOME_Q, dtype=float)]
+        # Seeds: choose the family based on the wrist orientation.
+        #
+        # Side-grip mode (palm horizontal, hb ≈ 0): the wrist must reach
+        # the obj's mid-height with the arm LEVEL (h1 ≈ h2).  The hand
+        # hangs from a mid-column trolley by the static chain offset
+        # (~0.5 m), so to reach floor obj at z ≈ 0.1 m we need columns
+        # at h ≈ 0.55–0.65 m.  Seeds span that band.
+        #
+        # Diagonal / top-down mode (hb < -0.2): the wrist sits ABOVE the
+        # obj with the arm tilted down (h2 > h1).  Use the original
+        # "low + extended" seed family that worked for the 4-DOF planner.
+        wg_list = wg.tolist()
+        if side_grip_mode:
+            # Side seeds — focus on the NEAR-LEVEL mid-column family.
+            # The new architecture (IK plans from virtual chassis at
+            # 0.52 m, chassis pushes forward after descent) means the
+            # arm only needs the natural small tilt that the parallel
+            # chain produces.  The previous "tilted-arm + level-palm"
+            # family (h1=0.05, h2=0.50) is no longer needed and was
+            # the source of the chassis-clipping h2-h1=0.36 solutions.
+            #
+            # Seeds vary h1/h2 around mid-column with a small valid
+            # tilt (h2-h1=0.03 → alpha ≈ 17°, comfortably above
+            # ALPHA_MIN_DEG=1.5°), and a few HB pre-tilts so SLSQP
+            # can use HB as a fine reach adjustment if needed.
+            def _ws(hb_seed):
+                ws = list(wg)
+                ws[0] = float(hb_seed)
+                return ws
+            biased_seeds = [
+                # High-tilt seed near the known-good floor side-grip pose
+                # (h1≈0.21, h2≈0.50, a1≈0.44).  Tried first so SLSQP
+                # starts in the reachable basin; if validity rejects, the
+                # forward-tilt seeds below act as fallbacks.
+                np.array([0.21, 0.50, 0.44, theta_guess] + _ws(wg[0])),
+                # Forward-tilt seeds (h2 > h1).  Side-grip on a floor obj
+                # requires forward tilt; reverse tilt is invalid here.
+                np.array([0.55, 0.58, 0.30, theta_guess] + _ws(wg[0])),
+                np.array([0.60, 0.63, 0.30, theta_guess] + _ws(wg[0])),
+                np.array([0.50, 0.53, 0.40, theta_guess] + _ws(wg[0])),
+                np.array([0.55, 0.58, 0.40, theta_guess] + _ws(wg[0])),
+                np.array([0.60, 0.63, 0.40, theta_guess] + _ws(wg[0])),
+                # Near-level with slight HB adjustment for reach
+                np.array([0.55, 0.58, 0.35, theta_guess] + _ws(-0.30)),
+                np.array([0.60, 0.63, 0.35, theta_guess] + _ws(-0.30)),
+            ]
+        else:
+            biased_seeds = [
+                np.array([0.05, 0.10, 0.60, theta_guess] + wg_list),
+                np.array([0.10, 0.15, 0.60, theta_guess] + wg_list),
+                np.array([0.15, 0.20, 0.55, theta_guess] + wg_list),
+                np.array([0.20, 0.25, 0.55, theta_guess] + wg_list),
+            ]
+        home_seed = np.array(_pad_q(HOME_Q), dtype=float)
+        home_seed[4:8] = wg
+        seeds = biased_seeds + [home_seed]
+        # Warm-start: when the caller passes a prior valid solution as
+        # `seed_q`, prepend it so SLSQP starts in a known-feasible basin.
+        if seed_q is not None:
+            try:
+                sq = _pad_q(seed_q)
+                warm = np.array(sq, dtype=float)
+                # Overwrite the wrist block with the caller's wrist goal
+                # so the seed matches the IK's wz/wx/wy bias.
+                warm[4:8] = wg
+                seeds = [warm] + seeds
+            except Exception:
+                pass
         rng = np.random.default_rng()
         for _ in range(max(0, n_seeds - len(seeds))):
-            seeds.append(np.array([rng.uniform(lo, hi) for lo, hi in JOINT_RANGES_ARM]))
+            arm_rand = [rng.uniform(lo, hi)
+                        for lo, hi in JOINT_RANGES_ARM[:4]]
+            seeds.append(np.array(arm_rand + wg_list))
 
         best_q, best_err = None, float('inf')
-        for seed in seeds:
+        best_seed_idx = -1
+        seed_diags = []   # (seed_idx, reach_err, valid, cost_fn) per seed
+        for si, seed in enumerate(seeds):
+            # SLSQP normally converges in <20 iterations; cap at 40 to
+            # bound worst-case time on hard cost landscapes.  Suboptimal
+            # early stops are acceptable since we rank multiple seeds.
             res = minimize(cost_fn, seed, method='SLSQP',
-                           bounds=JOINT_RANGES_ARM, tol=1e-4)
+                           bounds=JOINT_RANGES_ARM, tol=1e-4,
+                           options={'maxiter': 40})
             # Threshold on pure reach error (cost_fn also includes tilt penalty).
-            self._plan_data.qpos[self._qpos_map["ColumnLeft"]]  = res.x[0]
-            self._plan_data.qpos[self._qpos_map["ColumnRight"]] = res.x[1]
-            self._plan_data.qpos[self._qpos_map["ArmLeft"]]     = res.x[2]
-            self._plan_data.qpos[self._qpos_map["Base"]]        = res.x[3]
+            _write_qpos(res.x)
             mujoco.mj_forward(self._model, self._plan_data)
             reach_err = float(np.linalg.norm(
                 self._plan_data.xpos[gripper_bid] - target_pos))
+            valid = self.is_valid(res.x)
+            seed_diags.append((si, reach_err, valid, float(res.fun),
+                               float(res.x[0]), float(res.x[1])))
             # Rank by cost_fn (includes tilt penalty) for tie-breaking.
-            if res.fun < best_err and self.is_valid(res.x) and reach_err <= threshold + 1e-6:
+            if res.fun < best_err and valid and reach_err <= threshold + 1e-6:
                 best_err = res.fun
                 best_q   = res.x.tolist()
+                best_seed_idx = si
             if best_err < 0.005:
                 break
 
         if best_q is None:
+            # Per-seed failure dump is high-volume — `solve_ik_with_z_lift`
+            # invokes solve_ik() repeatedly while sweeping z, and most
+            # raises are expected intermediate failures.  Gate the dump
+            # behind IK_DEBUG_VERBOSE.
+            if IK_DEBUG_VERBOSE:
+                print(f"[IK-DBG] IK failed.  Seed results:")
+                for (si, re, va, cf, h1, h2) in seed_diags:
+                    print(f"   seed#{si}: reach_err={re:.3f}m  valid={va}  "
+                          f"cost={cf:.4f}  h1={h1:.3f} h2={h2:.3f}")
             raise RuntimeError(
                 f"IK failed: target={target_pos}, best_err=infm "
                 f"(threshold={threshold}m). Consider increasing n_seeds or threshold.")
 
+        # Phase 2 diagnostic: which seed won?  Helps diagnose whether
+        # the manual high-tilt seed (#0) was actually picked or whether
+        # SLSQP converged to a different basin from a small-tilt seed.
+        # Only print for side-grip mode (where the manual seed is in
+        # play) to keep diagonal/top-down logs clean.
+        # Gated by IK_DEBUG_VERBOSE; flip True to re-enable for tuning.
+        if (IK_DEBUG_VERBOSE
+                and side_grip_mode and len(seed_diags) > 0):
+            win = seed_diags[best_seed_idx]
+            print(f"[IK-DBG] side-grip IK won by seed#{win[0]}: "
+                  f"h1={win[4]:.3f} h2={win[5]:.3f} h-diff={win[5]-win[4]:+.3f}  "
+                  f"reach_err={win[1]:.3f}m  cost={win[3]:.4f}")
+            # If seed#0 (the manual high-tilt seed) was tried, also
+            # report its result so we can see WHY it lost.
+            if len(seed_diags) > 0:
+                s0 = seed_diags[0]
+                print(f"[IK-DBG]   seed#0 (manual high-tilt seed): "
+                      f"h1={s0[4]:.3f} h2={s0[5]:.3f} h-diff={s0[5]-s0[4]:+.3f}  "
+                      f"reach_err={s0[1]:.3f}m  valid={s0[2]}  cost={s0[3]:.4f}"
+                      + ("  ← WINNING" if best_seed_idx == 0 else ""))
+
         return best_q
 
     def solve_ik_with_z_lift(self, target_pos, n_seeds=12,
-                             max_lift=0.40, step=0.05, threshold=0.04):
+                             max_lift=0.40, step=0.02, threshold=0.04,
+                             wrist_goal=None, wrist_weight=5.0,
+                             target_body="Gripper_Link1_1",
+                             seed_q=None):
         """
         Strict-IK variant for grasp/pick targets: never returns a solution
         for a target below the requested z. If the requested target_z is
@@ -509,6 +856,19 @@ class MORPHBridge:
 
         Returns (q, actual_target) so the caller knows where the wrist will
         actually be. Unlike solve_ik_robust, never silently downgrades z.
+
+        Pass-through args (see solve_ik):
+            wrist_goal, wrist_weight, target_body — used unchanged inside
+            the lift-and-retry loop.  For side-grip, the typical call is
+            `target_body="Gripper_Link3_1"` and `wrist_weight=0.5` so
+            SLSQP can use HandBearing as a 5th reach DOF and put the palm
+            (not the wrist) on the obj.
+
+        Note on step size: lowered 0.05 → 0.02 (2 cm) so the IK lands on
+        the lowest valid z instead of jumping past it in 5 cm chunks.
+        At 5 cm step, asking for z=0.13 m on a floor obj would jump to
+        0.18, 0.23, ... 0.48 — landing way above the user-desired mid-
+        height.  At 2 cm step the same search lands at z=0.15-0.17 m.
         """
         target_pos = np.asarray(target_pos, dtype=float)
         last_err = None
@@ -518,7 +878,12 @@ class MORPHBridge:
             probe = target_pos.copy()
             probe[2] += lift
             try:
-                q = self.solve_ik(probe, n_seeds=n_seeds, threshold=threshold)
+                q = self.solve_ik(probe, n_seeds=n_seeds,
+                                  threshold=threshold,
+                                  wrist_goal=wrist_goal,
+                                  wrist_weight=wrist_weight,
+                                  target_body=target_body,
+                                  seed_q=seed_q)
                 return q, probe
             except RuntimeError as e:
                 last_err = e
@@ -527,7 +892,8 @@ class MORPHBridge:
             f"+{max_lift:.2f}m of z. Last: {last_err}")
 
     def solve_ik_with_z_lift_link3(self, target_pos, n_seeds=12,
-                                   max_iters=3, tol=0.005):
+                                   max_iters=3, tol=0.005,
+                                   wrist_goal=None):
         """Z-lift IK aimed at Gripper_Link3_1 (palm) instead of Link1.
 
         The base solve_ik aims Link1 at the target.  The palm (Link3),
@@ -555,7 +921,8 @@ class MORPHBridge:
             # Fall back to the regular Link1-aimed IK if either body is
             # missing from the model (defensive — both are required by
             # the rest of the pipeline).
-            return self.solve_ik_with_z_lift(target_pos, n_seeds=n_seeds)
+            return self.solve_ik_with_z_lift(target_pos, n_seeds=n_seeds,
+                                             wrist_goal=wrist_goal)
 
         # GRIPPER_STANDOFF_XY already accounts for the rigid Link1→Link3
         # offset, so we only subtract `calib_corr` (passive-deflection
@@ -568,11 +935,15 @@ class MORPHBridge:
 
         for it in range(max_iters):
             q, link1_actual = self.solve_ik_with_z_lift(
-                adjusted_target, n_seeds=n_seeds)
+                adjusted_target, n_seeds=n_seeds, wrist_goal=wrist_goal)
             self._plan_data.qpos[self._qpos_map["ColumnLeft"]]  = q[0]
             self._plan_data.qpos[self._qpos_map["ColumnRight"]] = q[1]
             self._plan_data.qpos[self._qpos_map["ArmLeft"]]     = q[2]
             self._plan_data.qpos[self._qpos_map["Base"]]        = q[3]
+            self._plan_data.qpos[self._qpos_map["HandBearing"]] = q[4]
+            self._plan_data.qpos[self._qpos_map["WristZ"]]      = q[5]
+            self._plan_data.qpos[self._qpos_map["WristX"]]      = q[6]
+            self._plan_data.qpos[self._qpos_map["WristY"]]      = q[7]
             mujoco.mj_forward(self._model, self._plan_data)
             calib_corr = self._calib_error(q[0], q[1], q[2], q[3])
             new_adjusted = original_target - calib_corr
@@ -593,7 +964,8 @@ class MORPHBridge:
                                + last_calib_corr)
         return last_q, link3_actual_target
 
-    def solve_ik_robust(self, target_pos, n_seeds=12, z_perturbs=None):
+    def solve_ik_robust(self, target_pos, n_seeds=12, z_perturbs=None,
+                        wrist_goal=None):
         """
         Retry IK with z-offset perturbations when the exact target is unreachable.
 
@@ -608,7 +980,8 @@ class MORPHBridge:
             try:
                 probe = target_pos.copy()
                 probe[2] += dz
-                return self.solve_ik(probe, n_seeds=n_seeds, threshold=0.04)
+                return self.solve_ik(probe, n_seeds=n_seeds, threshold=0.04,
+                                     wrist_goal=wrist_goal)
             except RuntimeError as e:
                 last_err = e
         raise RuntimeError(
@@ -617,10 +990,15 @@ class MORPHBridge:
     # ── Validity helpers ──────────────────────────────────────────────────────
 
     def is_valid(self, q):
-        """Check if a single 4D config is collision-free."""
+        """Check if an arm config is collision-free.
+
+        Accepts a 4-vector (legacy callers — wrist defaulted to neutral)
+        or an 8-vector (4 arm + 4 wrist DOFs).
+        """
+        qp = _pad_q(q)
         s = self._si.allocState()
-        for i in range(4):
-            s[i] = float(q[i])
+        for i in range(ARM_DOF):
+            s[i] = float(qp[i])
         return self._si.isValid(s)
 
     def update_allowed_pairs(self, extra_pairs):
@@ -738,7 +1116,7 @@ if __name__ == "__main__":
     import time
 
     print("\n" + "=" * 65)
-    print("arm_planner.py self-test  —  MORPHBridge dof=4")
+    print(f"arm_planner.py self-test  —  MORPHBridge dof={ARM_DOF}")
     print("=" * 65)
 
     candidates = [
@@ -767,13 +1145,15 @@ if __name__ == "__main__":
     print("  [scene] All pickup objects parked in plan_data")
 
     # ── Validity checks ───────────────────────────────────────────────────────
+    # 4-vec entries exercise the legacy code path via _pad_q; 8-vec entries
+    # confirm wrist DOFs are accepted directly.
     print("\n--- Validity checks ---")
     checks = [
-        ("HOME_Q (expect valid)",              HOME_Q,               True),
-        ("Singular h1==h2 (expect invalid)",   [0.5, 0.5, 0.2, 0.0], False),
-        ("Low arm, valid height diff",          [0.3, 0.8, 0.1, 0.0], True),
+        ("HOME_Q (8-vec, expect valid)",        HOME_Q,                True),
+        ("Singular h1==h2 (4-vec, invalid)",    [0.5, 0.5, 0.2, 0.0], False),
+        ("Low arm, valid height diff (4-vec)",  [0.3, 0.8, 0.1, 0.0], True),
         # PARK_Q is the ARM2 static pose; ARM1-singular by design.
-        ("PARK_Q (expect ARM1-invalid; ARM2 static only)", PARK_Q, False),
+        ("PARK_Q (expect ARM1-invalid)",        PARK_Q,               False),
     ]
     all_ok = True
     for desc, q, expect in checks:
@@ -802,12 +1182,18 @@ if __name__ == "__main__":
             print(f"  ✓  {desc}  →  {len(path)} waypoints in {dt:.3f}s")
 
     # ── Performance ───────────────────────────────────────────────────────────
+    # 8-DOF samples: random arm + neutral wrist (zeros) so the perf number is
+    # comparable to the pre-extension 4-DOF baseline.
     print("\n--- Performance: isValid() ---")
     N  = 200
     qs = np.column_stack([
         np.random.uniform(0.1, 1.3, N),
         np.random.uniform(0.1, 1.3, N),
         np.random.uniform(0.0, 0.6, N),
+        np.zeros(N),
+        np.zeros(N),
+        np.zeros(N),
+        np.zeros(N),
         np.zeros(N),
     ])
     t0 = time.time()
