@@ -28,58 +28,55 @@ from ompl import geometric as og
 D2            = 0.1     # column lateral separation (m)
 # Minimum arm tilt from horizontal — the validity check rejects poses
 # where the parallel manipulator approaches singular (boom exactly
-# horizontal at h1 == h2).  Lowered through 10° → 3° → 1.5° as the
+# horizontal at h1 == h2). Lowered through 10° → 3° → 1.5° as the
 # side-grip mode emerged: the free-move screenshot showed a stable
 # pose at 1.15° tilt (h2-h1 = -0.002 m), proving the parallel chain
 # holds firmly with the column springs (stiffness=58000, damping=2000)
-# even very close to singular.  1.5° corresponds to a 0.0026 m h2-h1
+# even very close to singular. 1.5° corresponds to a 0.0026 m h2-h1
 # differential — still away from the true singularity at 0° but
 # letting the validity check accept the near-level poses side-grip
-# needs.  Top-down poses naturally return |h2-h1| ≥ 0.03 m (alpha ≈
+# needs. Top-down poses naturally return |h2-h1| ≥ 0.03 m (alpha ≈
 # 17°), so they remain comfortably above this floor.
 ALPHA_MIN_DEG = 1.5
 INTERP_RES    = 0.02    # one waypoint per 2 cm of state-space path length
 
-# IK debug printing toggle.  When False the per-z-step / per-seed
-# dumps and the "won by seed#X" lines are suppressed.  Failure dumps
-# (no valid solution found) still print regardless.  Reduces log
+# IK debug printing toggle. When False the per-z-step / per-seed
+# dumps and the "won by seed#X" lines are suppressed. Failure dumps
+# (no valid solution found) still print regardless. Reduces log
 # noise + I/O blocking on the main thread during heavy IK loops.
 IK_DEBUG_VERBOSE = False
 
 # Planning-only safety clearance between the arm/gripper and the
-# robot chassis.  The runtime sim model is unchanged.
-#
+# robot chassis. The runtime sim model is unchanged.
 # Mechanism: inflate `geom_margin` on chassis geoms in the planning
-# model.  MuJoCo then reports any geom-pair within margin in the
-# contact list with a signed `dist` field.  isValid() checks `dist`
+# model. MuJoCo then reports any geom-pair within margin in the
+# contact list with a signed `dist` field. isValid() checks `dist`
 # instead of just contact presence — for non-rest geom pairs we
-# require `dist >= MIN_NONREST_CLEARANCE`.  Rest-pair whitelist still
+# require `dist >= MIN_NONREST_CLEARANCE`. Rest-pair whitelist still
 # applies (wheels-floor, intra-chassis, intra-arm contacts stay
 # allowed).
-#
 # Why this matters:
-#   - Strict-binary validity (no margin) accepts a path that grazes
-#     the chassis at 0.1 mm clearance.  Runtime physics + chassis
-#     yaw/translation during the pick then push the arm into actual
-#     contact, and the arm fights the chassis instead of reaching obj.
-#   - With a 1.2 cm enforced gap, the planner naturally routes around
-#     the chassis envelope, leaving room for runtime perturbations.
+# - Strict-binary validity (no margin) accepts a path that grazes
+# the chassis at 0.1 mm clearance. Runtime physics + chassis
+# yaw/translation during the pick then push the arm into actual
+# contact, and the arm fights the chassis instead of reaching obj.
+# - With a 1.2 cm enforced gap, the planner naturally routes around
+# the chassis envelope, leaving room for runtime perturbations.
 CHASSIS_PLAN_MARGIN     = 0.025  # margin (m) added to chassis geoms so
                                  # near-contacts within this band show
                                  # up in ncon (only enables visibility)
 MIN_NONREST_CLEARANCE   = 0.003  # required signed distance for non-rest
-                                 # pairs.  c.dist >= this → valid;
+                                 # pairs. c.dist >= this → valid;
                                  # below → reject (path too close).
                                  # Tried 1 mm — arm physically clipped
-                                 # the LifePo4 battery body.  3 mm
+                                 # the LifePo4 battery body. 3 mm
                                  # keeps a real safety buffer while
                                  # still letting the IK fold reasonably
                                  # low.
 
 # OMPL state space bounds (SI units). a1 upper limit is set by the
 # ArmLeftJoint actuator ctrlrange (executable, not commanded, range).
-#
-# 8-DOF state: 4 arm slides + 4 wrist orientation joints.  The wrist
+# 8-DOF state: 4 arm slides + 4 wrist orientation joints. The wrist
 # joints (HandBearingJoint, gripper_z/x/y_rotation) were always actuated
 # in the model but ignored by the original 4-DOF planner; integrating
 # them lets OMPL plan the full arm+wrist trajectory and lets the wrist
@@ -91,14 +88,14 @@ JOINT_RANGES_ARM = [
     (-3.14, 3.14),    # 3: th   BaseJoint
     (-1.57, 1.57),    # 4: hb   HandBearingJoint (wrist pitch; XML ±1.5708)
     (-3.14, 3.14),    # 5: wz   gripper_z_rotation (palm roll; full rev required
-                      #         for side-grip orientations)
+                      # for side-grip orientations)
     (-0.80, 0.80),    # 6: wx   gripper_x_rotation (actuator ctrlrange ±0.8)
     (-0.80, 0.80),    # 7: wy   gripper_y_rotation (actuator ctrlrange ±0.8)
 ]
 ARM_DOF = len(JOINT_RANGES_ARM)
 WRIST_NEUTRAL = (0.0, 0.0, 0.0, 0.0)   # hb, wz, wx, wy at neutral pose
 
-# Reference arm configurations (SI units: m, rad).  Extended to 8-DOF;
+# Reference arm configurations (SI units: m, rad). Extended to 8-DOF;
 # wrist defaults to neutral so 4-vector legacy callers behave identically.
 HOME_Q = [0.5, 0.9, 0.1, 0.0,  0.0, 0.0, 0.0, 0.0]
 # Static pose for the inactive ARM2 (acts as an obstacle while ARM1 plans).
@@ -124,9 +121,10 @@ def _pad_q(q):
         f"Arm q must have length 4 or {ARM_DOF}, got {len(q)}")
 
 # Scale applied to the optional kinematic-calibration LUT correction.
-# Measured deflection (free pendulum) is much larger than runtime
-# deflection (actuator-resisted), so we apply a fraction.
-CALIB_SCALE = 0.20
+# The LUT is recorded with both passive joints free, zero active-joint
+# stiffness, and actuator ctrl matched to qpos — so it stores
+# actuator-resisted deflection directly and the runtime scale is 1.0.
+CALIB_SCALE = 1.0
 
 
 class MORPHValidityChecker(ob.StateValidityChecker):
@@ -189,9 +187,9 @@ class MORPHValidityChecker(ob.StateValidityChecker):
             if (g1, g2) in self._allowed or (g2, g1) in self._allowed:
                 # Whitelisted rest pair — always accepted regardless of dist
                 continue
-            # Non-rest pair: enforce signed-distance clearance.  c.dist
+            # Non-rest pair: enforce signed-distance clearance. c.dist
             # is negative for penetration, 0 for touching, positive
-            # within margin.  Anything closer than min_clearance
+            # within margin. Anything closer than min_clearance
             # (typ. 1.2 cm) is treated as too close → reject path.
             if c.dist < self._min_clearance:
                 return False
@@ -211,7 +209,8 @@ class MORPHBridge:
     """
 
     def __init__(self, xml_path, arm=1, alpha_min_deg=ALPHA_MIN_DEG,
-                 timeout=5.0, use_calibration=False):
+                 timeout=5.0, use_calibration=False,
+                 calib_wrist_mode="sidegrip"):
         self._timeout = timeout
         self._arm     = arm
 
@@ -225,7 +224,7 @@ class MORPHBridge:
 
         # Planning-only clearance: inflate chassis geom_margin in the
         # planning model so the validity checker sees arm-vs-chassis
-        # near-contacts (up to CHASSIS_PLAN_MARGIN) in ncon.  isValid()
+        # near-contacts (up to CHASSIS_PLAN_MARGIN) in ncon. isValid()
         # then enforces MIN_NONREST_CLEARANCE for any non-rest pair.
         # Runtime sim model is untouched — this is a SEPARATE MjModel.
         self._chassis_geom_ids = self._collect_chassis_geom_ids()
@@ -250,13 +249,17 @@ class MORPHBridge:
         self._si.setStateValidityChecker(self._checker)
         self._si.setup()
 
-        # Calibration LUT for kinematic-vs-physics deflection.  Off by
+        # Calibration LUT for kinematic-vs-physics deflection. Off by
         # default — the planner runs in its original uncorrected mode
         # unless the caller passes use_calibration=True (or play_m1 is
-        # launched with --use-calib).  Generated offline by
+        # launched with --use-calib). Mode-specific LUTs are stored
+        # at data/arm_calibration_<mode>.npz; `calib_wrist_mode`
+        # selects which one to load (defaults to sidegrip — the
+        # current STRICT-mode configuration). Generated offline by
         # tools/calibrate_arm_kinematics.py.
+        self._calib_wrist_mode = calib_wrist_mode
         if use_calibration:
-            self._calib = self._load_calibration()
+            self._calib = self._load_calibration(calib_wrist_mode)
         else:
             self._calib = None
             print("[MORPHBridge] Calibration LUT disabled (default).  Pass "
@@ -265,18 +268,33 @@ class MORPHBridge:
 
     # ── Calibration LUT ──────────────────────────────────────────────────────
 
-    def _load_calibration(self):
-        """Load `data/arm_calibration.npz` if present.  Returns dict of
-        grids + error tensor, or None if file absent / malformed."""
+    def _load_calibration(self, wrist_mode):
+        """Load mode-specific LUT from `data/arm_calibration_<mode>.npz`.
+        Falls back to the legacy `arm_calibration.npz` if the mode-
+        specific file is absent (for backward compatibility with the
+        4-DOF era LUT).  Returns dict of grids + error tensor, or None
+        if no file is loadable."""
         import os
         # Project root is two dirs up from this file (src/navigation/).
         here = os.path.dirname(os.path.abspath(__file__))
         root = os.path.abspath(os.path.join(here, "..", ".."))
-        npz_path = os.path.join(root, "data", "arm_calibration.npz")
-        if not os.path.exists(npz_path):
-            print(f"[MORPHBridge] No calibration LUT at {npz_path} — "
-                  "IK runs uncorrected.  Run tools/calibrate_arm_kinematics.py "
-                  "to generate one for tighter physics-vs-IK agreement.")
+        # Try mode-specific first, then legacy.
+        candidates = [
+            os.path.join(root, "data", f"arm_calibration_{wrist_mode}.npz"),
+            os.path.join(root, "data", "arm_calibration.npz"),
+        ]
+        npz_path = None
+        for path in candidates:
+            if os.path.exists(path):
+                npz_path = path
+                break
+        if npz_path is None:
+            print(f"[MORPHBridge] No calibration LUT found.  Looked for:")
+            for path in candidates:
+                print(f"    {path}")
+            print("    IK runs uncorrected.  Run "
+                  f"tools/calibrate_arm_kinematics.py --wrist-mode {wrist_mode} "
+                  "to generate one.")
             return None
         try:
             d = np.load(npz_path)
@@ -286,10 +304,26 @@ class MORPHBridge:
                 'a1_grid': np.asarray(d['a1_grid'], dtype=float),
                 'error':   np.asarray(d['error'],   dtype=float),
             }
-            print(f"[MORPHBridge] Loaded calibration LUT {npz_path}  "
+            # Optional metadata fields (present in newer LUTs).
+            lut_mode = None
+            try:
+                lut_mode = str(d['wrist_mode']) if 'wrist_mode' in d.files else None
+            except Exception:
+                lut_mode = None
+            mode_str = f" mode={lut_mode}" if lut_mode else ""
+            mismatch = (lut_mode is not None and lut_mode != wrist_mode)
+            mismatch_warn = (" WARNING: LUT was built for "
+                             f"'{lut_mode}' but requested '{wrist_mode}' —"
+                             " calibration may be inaccurate" if mismatch
+                             else "")
+            print(f"[MORPHBridge] Loaded calibration LUT {npz_path}{mode_str}  "
                   f"grid={len(calib['h1_grid'])}×{len(calib['h2_grid'])}×"
                   f"{len(calib['a1_grid'])}  "
-                  f"max_err_xy={np.linalg.norm(calib['error'][..., :2], axis=-1).max()*100:.1f}cm")
+                  f"max_err_xy="
+                  f"{np.linalg.norm(calib['error'][..., :2], axis=-1).max()*100:.1f}cm  "
+                  f"max_err_z="
+                  f"{np.abs(calib['error'][..., 2]).max()*100:.1f}cm"
+                  f"{mismatch_warn}")
             return calib
         except Exception as e:
             print(f"[MORPHBridge] Failed to load LUT {npz_path}: {e}")
@@ -334,7 +368,7 @@ class MORPHBridge:
                 for dk, wk in ((0, 1 - tk), (1, tk)):
                     out += wi * wj * wk * err[i + di, j + dj, k + dk]
 
-        # Apply the runtime scale factor — see CALIB_SCALE comment.  The
+        # Apply the runtime scale factor — see CALIB_SCALE comment. The
         # LUT measures unloaded passive deflection; runtime actuators
         # resist most of it, so a scale of ~0.2 typically matches reality.
         out = out * CALIB_SCALE
@@ -349,7 +383,7 @@ class MORPHBridge:
             out[2],
         ], dtype=float)
 
-        # Rotate by chassis world rotation matrix.  plan_data was set
+        # Rotate by chassis world rotation matrix. plan_data was set
         # up with the runtime chassis pose before IK; xmat reflects it.
         try:
             chassis_bid = mujoco.mj_name2id(
@@ -622,13 +656,13 @@ class MORPHBridge:
         # Side-grip detection: when HandBearing goal is near 0, the
         # gripper is held palm-horizontal and the right arm pose is a
         # LEVEL one (h1 ≈ h2) at mid-column height so the wrist hangs
-        # below the trolley to obj-level.  When hb is significantly
+        # below the trolley to obj-level. When hb is significantly
         # negative the gripper tilts down — the arm wants a
         # DOWNWARD-TILTED pose (h2 > h1) and lower columns so the
         # wrist sits above the obj for the descent.
         side_grip_mode = bool(abs(float(wg[0])) < 0.20)
 
-        # Tilt-preference direction.  For diagonal/top-down (legacy
+        # Tilt-preference direction. For diagonal/top-down (legacy
         # behaviour) we keep the "low target → tilt down" heuristic.
         # For side grip we want LEVEL (no h2-h1 deviation), so the
         # tilt cost punishes any deviation equally.
@@ -655,7 +689,7 @@ class MORPHBridge:
             TILT_QUAD_K = 1.0
             if side_grip_mode:
                 # Side-grip cost: target h-diff = SIDE_TILT_TARGET with a
-                # quadratic penalty outside SIDE_TILT_WINDOW.  Extra
+                # quadratic penalty outside SIDE_TILT_WINDOW. Extra
                 # quadratic pulls toward known-good (h1, a1) keep SLSQP in
                 # the reachable basin instead of collapsing to a small-tilt
                 # local minimum that leaves the fingers short of the object.
@@ -688,7 +722,7 @@ class MORPHBridge:
             wrist_dev = (np.asarray(x[4:8]) - wg) ** 2
             wrist_penalty = float(np.sum(ww * wrist_dev))
             # Side-grip-specific manual-pose pulls (h1, a1 toward the
-            # known-working floor pickup values).  Zero in other modes.
+            # known-working floor pickup values). Zero in other modes.
             manual_pull = 0.0
             if side_grip_mode:
                 manual_pull = h1_pull + a1_pull
@@ -708,15 +742,13 @@ class MORPHBridge:
         theta_guess = max(-3.14, min(3.14, theta_guess))
 
         # Seeds: choose the family based on the wrist orientation.
-        #
         # Side-grip mode (palm horizontal, hb ≈ 0): the wrist must reach
-        # the obj's mid-height with the arm LEVEL (h1 ≈ h2).  The hand
+        # the obj's mid-height with the arm LEVEL (h1 ≈ h2). The hand
         # hangs from a mid-column trolley by the static chain offset
         # (~0.5 m), so to reach floor obj at z ≈ 0.1 m we need columns
-        # at h ≈ 0.55–0.65 m.  Seeds span that band.
-        #
+        # at h ≈ 0.55–0.65 m. Seeds span that band.
         # Diagonal / top-down mode (hb < -0.2): the wrist sits ABOVE the
-        # obj with the arm tilted down (h2 > h1).  Use the original
+        # obj with the arm tilted down (h2 > h1). Use the original
         # "low + extended" seed family that worked for the 4-DOF planner.
         wg_list = wg.tolist()
         if side_grip_mode:
@@ -724,10 +756,9 @@ class MORPHBridge:
             # The new architecture (IK plans from virtual chassis at
             # 0.52 m, chassis pushes forward after descent) means the
             # arm only needs the natural small tilt that the parallel
-            # chain produces.  The previous "tilted-arm + level-palm"
+            # chain produces. The previous "tilted-arm + level-palm"
             # family (h1=0.05, h2=0.50) is no longer needed and was
             # the source of the chassis-clipping h2-h1=0.36 solutions.
-            #
             # Seeds vary h1/h2 around mid-column with a small valid
             # tilt (h2-h1=0.03 → alpha ≈ 17°, comfortably above
             # ALPHA_MIN_DEG=1.5°), and a few HB pre-tilts so SLSQP
@@ -738,11 +769,11 @@ class MORPHBridge:
                 return ws
             biased_seeds = [
                 # High-tilt seed near the known-good floor side-grip pose
-                # (h1≈0.21, h2≈0.50, a1≈0.44).  Tried first so SLSQP
+                # (h1≈0.21, h2≈0.50, a1≈0.44). Tried first so SLSQP
                 # starts in the reachable basin; if validity rejects, the
                 # forward-tilt seeds below act as fallbacks.
                 np.array([0.21, 0.50, 0.44, theta_guess] + _ws(wg[0])),
-                # Forward-tilt seeds (h2 > h1).  Side-grip on a floor obj
+                # Forward-tilt seeds (h2 > h1). Side-grip on a floor obj
                 # requires forward tilt; reverse tilt is invalid here.
                 np.array([0.55, 0.58, 0.30, theta_guess] + _ws(wg[0])),
                 np.array([0.60, 0.63, 0.30, theta_guess] + _ws(wg[0])),
@@ -786,7 +817,7 @@ class MORPHBridge:
         seed_diags = []   # (seed_idx, reach_err, valid, cost_fn) per seed
         for si, seed in enumerate(seeds):
             # SLSQP normally converges in <20 iterations; cap at 40 to
-            # bound worst-case time on hard cost landscapes.  Suboptimal
+            # bound worst-case time on hard cost landscapes. Suboptimal
             # early stops are acceptable since we rank multiple seeds.
             res = minimize(cost_fn, seed, method='SLSQP',
                            bounds=JOINT_RANGES_ARM, tol=1e-4,
@@ -810,7 +841,7 @@ class MORPHBridge:
         if best_q is None:
             # Per-seed failure dump is high-volume — `solve_ik_with_z_lift`
             # invokes solve_ik() repeatedly while sweeping z, and most
-            # raises are expected intermediate failures.  Gate the dump
+            # raises are expected intermediate failures. Gate the dump
             # behind IK_DEBUG_VERBOSE.
             if IK_DEBUG_VERBOSE:
                 print(f"[IK-DBG] IK failed.  Seed results:")
@@ -821,7 +852,7 @@ class MORPHBridge:
                 f"IK failed: target={target_pos}, best_err=infm "
                 f"(threshold={threshold}m). Consider increasing n_seeds or threshold.")
 
-        # Phase 2 diagnostic: which seed won?  Helps diagnose whether
+        # Phase 2 diagnostic: which seed won? Helps diagnose whether
         # the manual high-tilt seed (#0) was actually picked or whether
         # SLSQP converged to a different basin from a small-tilt seed.
         # Only print for side-grip mode (where the manual seed is in
