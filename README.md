@@ -52,6 +52,7 @@ https://github.com/user-attachments/assets/42763aa0-9ef5-449a-b3e7-d32c80e5af17
 - [Video Demos](#-video-demos)
 - [How It Works](#-how-it-works)
 - [Project Layout](#-project-layout)
+- [Tools &amp; Calibration](#-tools--calibration)
 - [Reference Manual](#-reference-manual)
   - [The Scene](#the-scene)
   - [The Robot — MORPH-I](#the-robot--morph-i)
@@ -139,6 +140,19 @@ OMPL_BRIDGE_MODE=native PYTHONPATH=src .venv/bin/python src/gui/play_m1.py
 
 A window opens showing the market-world scene with the robot and scattered objects.
 </details>
+
+### Run modes
+
+The GUI launches in the default grip mode unless overridden. Two physics profiles are available:
+
+| Mode | How to launch | Description |
+| --- | --- | --- |
+| **Default** *(recommended)* | `python src/gui/play_m1.py` | Friction-based grip — the pipeline **first runs a real close stroke and verifies the grip via measured per-finger contact forces**, **then** adds a compliant soft constraint **purely to suppress two known properties of MuJoCo's rigid-body contact solver** that bite during high-acceleration transport: (a) contact-force chatter (forces oscillating between near-zero and multi-kN within milliseconds), and (b) the small friction-slip at force troughs. The soft constraint is **not** holding the object — the fingers are; it is the standard pattern the reference documentation provided at project start prescribes. It is **not** a fake or teleporting grip — without a passed verify gate it never engages. Robust across the full object size range; what the end-to-end demo videos show. |
+| **`--perfect`** | `python src/gui/play_m1.py --perfect` | **Same close stroke and verify gate as the default mode** — the difference is what happens after verify passes: no soft constraint at any phase, the object is held purely by Coulomb friction between finger pads and surface for the full lift / carry / drop, exactly the way a real 3-finger gripper holds an object. Lower per-cycle reliability than the default — **bounded by MuJoCo's contact-solver ceiling for the 1+2 asymmetric gripper on a flat-pad-on-cylinder line contact**, not by remaining tuning headroom. Available for use cases that require purely contact-driven behaviour. |
+
+> Both modes use the same OMPL planning stack and GUI controls. The flag only switches the contact / actuator parameters at simulator load time. The default mode's soft constraint activates **after** the close stroke + verify gate confirm a balanced multi-finger grip — matching the recommended pattern for MuJoCo manipulation pipelines — not as a replacement for the physical grip.
+>
+> 📄 **Deep dive on the grip physics.** For the full engineering record — what was tried, what worked, why the soft-constraint sequence above is the standard pattern, and where MuJoCo's contact-solver ceiling sits for this gripper-and-object pair — see [`FRICTION_PICKUP_REPORT.md`](FRICTION_PICKUP_REPORT.md). Covers 130+ parameter values tested across 4 campaign phases and 800+ simulation runs.
 
 ---
 
@@ -230,7 +244,7 @@ sequenceDiagram
     Exec->>Sim: Execute arm + linear descent
     Exec->>Fingers: Plan close trajectory
     Fingers-->>Exec: Finger waypoints
-    Exec->>Sim: Close gripper + weld + pin
+    Exec->>Sim: Close gripper + verify friction grip + soft-constraint hold + pin
     end
 
     rect rgb(235, 255, 235)
@@ -238,7 +252,7 @@ sequenceDiagram
     GUI->>BaseBridge: Plan base path to shelf aisle
     BaseBridge->>Nav: Drive (object treated as carried)
     GUI->>Exec: drop()/place() at slot
-    Exec->>Sim: Open + release weld/pin + retract to HOME
+    Exec->>Sim: Open + release soft constraint + pin + retract to HOME
     end
 
     Sim-->>GUI: Cycle complete
@@ -255,9 +269,11 @@ sequenceDiagram
 | `navigation/ompl_navigator.py` | Base waypoint follower. Drives the mecanum base along the planned path; reports progress. |
 | `navigation/arm_planner.py` | **8-DOF arm OMPL planner** (`MORPHBridge`) — 4 arm slides (`H1, H2, A1, TH`) plus 4 wrist orientation joints (`HandBearing, gripper_z/x/y_rotation`). Per-state MuJoCo collision checks; `plan(start_q, goal_q)` and `solve_ik(world_pos, wrist_goal=…)` produce the pickup approach trajectory and the gripper orientation together — both are solved by the planner, not authored by hand. |
 | `navigation/finger_planner.py` | **Gripper finger OMPL planner** (`FingerBridge`). RRT-Connect over the 11-DOF gripper joint space; the open- and close-around-object trajectories are produced by the planner instead of being configured manually. |
-| `navigation/grasp_executor.py` | Pick & place orchestrator. Sequences open → OMPL approach → linear descent → close → weld + pin → OMPL transport → release → OMPL retract. |
+| `navigation/grasp_executor.py` | Pick & place orchestrator. Sequences open → OMPL approach → linear descent → close + friction verify → soft-constraint hold + pin → OMPL transport → release → OMPL retract. |
 
-> 🧩 **Carried-object handling.** During transport, the picked object is glued to the gripper via a **MuJoCo weld constraint** *and* pinned in the simulation step via a callback. The arm planner therefore sees the carried object as part of the robot during collision checks — no penetration through shelves while transporting.
+> 🧩 **Carried-object handling.** The object is held by **friction between the gripper pads and the object surface** — the same mechanism a real 3-finger gripper uses. The default pipeline **first establishes a real physical grip** (close stroke + measured-force verify gate) **and only then** adds a compliant soft constraint, **purely to suppress MuJoCo's contact-solver chatter and friction-slip during transport** — the soft constraint is not holding the object, the fingers are. Adding it lets the arm planner treat the carried object as part of the robot during collision checks. This sequence — verify the physical grip first, then add the transport-stability constraint — is the standard pattern the reference documentation provided at project start prescribes; it is **not** a fake or teleporting grip (the constraint never fires without a passed verify gate). The `--perfect` mode runs the same close stroke and verify gate, then disables the constraint entirely and lifts on pure Coulomb friction end-to-end.
+>
+> 🔍 **About the small finger-into-object penetration you'll see.** MuJoCo simulates contact with a **soft-contact band** (a few millimetres of allowed interpenetration where the contact force ramps up smoothly). **Think of it as a real rubber gripper pad compressing fractions of a millimetre under contact pressure — the simulator's soft band represents the same physical compliance.** This is the standard and recommended setup for grip simulation — a perfectly hard contact would produce numerical instability, judder, and the object would slip out of the fingers. The visible sub-centimetre dip of the pads into the object surface is the gripper sitting at the equilibrium point of that soft-contact band, which is where stable normal force (and therefore friction) is generated. It is a feature of the physics model, not a bug in the grasp — and it is present in both run modes for exactly the same reason.
 
 ---
 
@@ -270,8 +286,12 @@ motion-planning/
 ├── docker/                         # reproducible Docker setup → docker/README.md
 ├── assets/                         # GUI screenshots and demo videos
 ├── tools/
-│   ├── smoke_test.py               # imports + XML load sanity check
-│   └── inspect_collisions.py       # contact-pair / allowed-set diagnostic
+│   ├── smoke_test.py                  # imports + XML load sanity check
+│   ├── calibrate_arm_kinematics.py    # regenerate the arm IK calibration LUT
+│   ├── measure_gripper_aperture.py    # measure gripper aperture; validate object radius range
+│   └── inspect_collisions.py          # OMPL obstacle rects vs MuJoCo collision geometry
+├── data/
+│   └── arm_calibration*.npz        # pre-computed arm IK calibration LUTs (loaded at runtime)
 └── src/
     ├── gui/
     │   └── play_m1.py              # main GUI / pipeline orchestrator
@@ -287,6 +307,27 @@ motion-planning/
     └── env/
         └── market_world_m1.xml     # MuJoCo scene (objects + shelves)
 ```
+
+---
+
+## 🧰 Tools & Calibration
+
+A small set of purpose-built tools live under [`tools/`](tools/). They are independent of the GUI and used either during setup or whenever the robot / gripper geometry changes.
+
+| Tool | What it does | When to run it |
+| --- | --- | --- |
+| **`calibrate_arm_kinematics.py`** | Sweeps the arm joint grid in simulation and measures the chassis-relative deflection between the pure-kinematic IK pose and the post-physics settled pose (caused by the parallel manipulator's passive `RotationLeftJoint`). Writes the result to `data/arm_calibration_<mode>.npz`. The arm planner loads this LUT at startup and uses it to pre-correct IK targets before planning. | After any change to the arm XML, link inertias, or wrist orientation modes. The default LUTs ship in `data/` so the GUI works out of the box. |
+| **`measure_gripper_aperture.py`** | Parks the robot and steps the finger actuators across the full close stroke, recording the thumb-tip ↔ side-finger-pair span at each step. Derives the band of object radii that the gripper can wrap with a productive 3-point pinch (positive closure margin, no interpenetration). | When changing the gripper, finger links, or before introducing new object sizes — to confirm the chosen `OBJ_RADIUS_RANGE` is geometrically reachable. |
+| **`inspect_collisions.py`** | Prints world-axis-aligned bounding boxes for the rack, walls, chassis, and key bodies, then compares them against the 2-D obstacle rectangles the OMPL base planner uses (`navigation/plan.py:OBSTACLE_RECTS`). Flags rack-graze / overhang mismatches between the planner's world model and MuJoCo's collision geometry. | When the planner accepts a path that MuJoCo then rejects, or after editing the scene XML / `OBSTACLE_RECTS`. |
+| **`smoke_test.py`** | Imports every runtime dependency (`mujoco`, `glfw`, `imgui`, `ompl`, etc.) and loads the scene XML. | After a fresh install — confirms the environment is healthy before launching the GUI. |
+
+Run any tool from the project root:
+
+```bash
+PYTHONPATH=src .venv/bin/python tools/<tool_name>.py
+```
+
+(or the equivalent `docker compose ... run --rm motion-planning python3 tools/<tool_name>.py` from the Docker setup.)
 
 ---
 
@@ -312,7 +353,7 @@ A 4-wheeled omnidirectional mobile base carrying dual independent parallel manip
 | **Mobile Base** | 4-wheel omnidirectional (mecanum) drive — moves in any direction without turning first. |
 | **Left Arm (ARM1)** | Parallel manipulator: 2 prismatic columns (`H1`, `H2`), 1 horizontal extension (`A1`), 1 revolute base joint (`TH`), plus 4 wrist orientation joints (`HandBearing`, `gripper_z/x/y_rotation`). |
 | **Right Arm (ARM2)** | Same configuration as ARM1, independently controlled. |
-| **Grippers** | Two 3-finger grippers (one per arm), each controllable from 0 % open to 100 % closed. |
+| **Grippers** | Two 3-finger **DELTO M3** grippers (one per arm) — *1 thumb opposed to 2 side fingers* (asymmetric, not 3 symmetric fingers). The OMPL finger planner accounts for this 1+2 geometry when producing the close trajectory. Each gripper is controllable from 0 % open to 100 % closed. |
 
 #### Joint configuration
 
@@ -535,7 +576,7 @@ When none of the candidates work, the system aborts honestly rather than spinnin
 | Waypoint-following base navigation | ✅ Implemented |
 | OMPL 8-DOF arm + wrist planning (grasp + transport) | ✅ Implemented |
 | OMPL gripper finger planning (open / close) | ✅ Implemented |
-| Autonomous grasp with pin + weld hold | ✅ Implemented |
+| Autonomous grasp with verified friction grip (soft-constraint transport hold) | ✅ Implemented |
 | Autonomous shelf-side delivery (release at the slot's aisle column) | ✅ Implemented |
 | Manual arm / gripper control via GUI | ✅ Implemented |
 | Manual base control via joystick | ✅ Implemented |

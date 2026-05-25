@@ -109,10 +109,11 @@
             <geom group="3" condim="6" solmix="3"/>
         </default>
         <default class="pad_box1">
-            <geom mass="0" type="box" friction="15 15 15"  solimp="0.9 0.95 0.001 0.5 2" solref="0.0001 1" solmix="3" priority="1" condim="6" rgba="1 0 0 0"/>
+            
+            <geom mass="0" type="box" friction="5 5 5"  solimp="0.9 0.95 0.010 0.5 2" solref="0.005 1" margin="0.005" solmix="3" priority="1" condim="6" rgba="1 0 0 0"/>
         </default>
         <default class="pad_box2">
-            <geom mass="0" type="box" friction="15 15 15" solimp="0.9 0.95 0.001 0.5 2" solref="0.0001 1" solmix="3" priority="1" condim="6" rgba="1 0 0 0"/>
+            <geom mass="0" type="box" friction="5 5 5" solimp="0.9 0.95 0.010 0.5 2" solref="0.005 1" margin="0.005" solmix="3" priority="1" condim="6" rgba="1 0 0 0"/>
         </default>
     </default>
 

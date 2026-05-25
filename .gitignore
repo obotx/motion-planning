@@ -10,5 +10,6 @@ output_videos/
 *.mp4.tmp
 RUN_LOG.txt
 MUJOCO_LOG.TXT
+tune_grip_lift_results*.csv
 
 .env

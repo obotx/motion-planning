@@ -16,12 +16,7 @@
     <include file='robot/assets/arm_obotx_actuator_V2.xml' />
     <include file='robot/assets/gripper_actuator_V2.xml' />
 
-    <!--
-        MILESTONE 1: Asset definitions for 10 pickup objects.
-        Simple colored cylinders represent products on the floor.
-        Each object is ~8cm diameter, 15cm tall (approximate product size).
-        Colors allow visual identification before IDs are shown in UI.
-    -->
+    <!--  MILESTONE 1: Asset definitions for 10 pickup objects. Simple colored cylinders represent products on the floor. Each object is ~8cm diameter, 15cm tall (approximate product size). Colors allow visual identification before IDs are shown in UI. -->
 
     <worldbody>
         <light name="main_light" pos="4 -4 20" dir="0 0 -1"
@@ -31,7 +26,7 @@
         <site name='xaxis' pos='0.333 0 0' size='0.0033 0.333' type='capsule' rgba='1 0 0 .25' euler='0 1.57 0' group='3'/>
         <site name='yaxis' pos='0 0.333 0' size='0.0033 0.333' type='capsule' rgba='0 1 0 .25' euler='1.57 0 0' group='3'/>
 
-        <!-- ===================== STATIC SHOP ENVIRONMENT ===================== -->
+        <!--  ===================== STATIC SHOP ENVIRONMENT ===================== -->
         <body name="minimarket_racks" pos="4 -4 0">
             <include file="minimarket/racks/racks.xml"/>
         </body>
@@ -81,7 +76,7 @@
             <include file="minimarket/vans_cereal/vans_cereal.xml"/>
         </body>
 
-        <!-- ===================== ROBOT ===================== -->
+        <!--  ===================== ROBOT ===================== -->
         <body name="robot" pos="3 -6 0" euler="0 0 0">
             <joint type="free" stiffness="0" damping="0" frictionloss="0" armature="0"/>
             <include file="robot/obotx_V2_OBJs.xml"/>
@@ -91,90 +86,71 @@
             <camera name="top_view" fovy="60"/>
         </body>
 
-        <!-- ===================== 10 PICKUP OBJECTS (FREE JOINTS) ===================== -->
-        <!--
-            These are the 10 pickable objects.
-            Positions are initialized here but will be overridden by play_m1.py
-            on startup with random floor positions.
-            Each object is a labeled cylinder with a distinct color.
-            Cylinder half-height 0.13 (= 26 cm tall) matches the wrist Z
-            envelope of the MORPH-I arm: with the wrist parked near
-            z = 0.38 m, a 26 cm cylinder has its top at ≈ 0.26 m so the
-            fingers reach the cylinder body cleanly without over-extending
-            h1/h2 (which would fight the passive RotationLeftJoint and
-            blow the pre-close XY gate).  Body z = half_height so the
-            cylinder bottom rests on the floor at world z = 0.
-        -->
+        <!--  ===================== 10 PICKUP OBJECTS (FREE JOINTS) ===================== -->
+        <!--  These are the 10 pickable objects. Positions are initialized here but will be overridden by play_m1.py on startup with random floor positions. Each object is a labeled cylinder with a distinct color. Cylinder half-height 0.13 (= 26 cm tall) matches the wrist Z envelope of the MORPH-I arm: with the wrist parked near z = 0.38 m, a 26 cm cylinder has its top at ≈ 0.26 m so the fingers reach the cylinder body cleanly without over-extending h1/h2 (which would fight the passive RotationLeftJoint and blow the pre-close XY gate). Body z = half_height so the cylinder bottom rests on the floor at world z = 0. -->
 
-        <!-- Object 0: Red -->
-        <body name="pickup_obj_0" pos="3.0 -7.0 0.13">
+        <!--  Object 0: Red -->
+        <body name="pickup_obj_0" pos="3.0 -7.0 0.15">
             <joint type="free"/>
-            <geom type="cylinder" size="0.04 0.13" rgba="0.9 0.1 0.1 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
-            <geom type="cylinder" size="0.035 0.131" rgba="1.0 0.8 0.8 1" contype="0" conaffinity="0"/>
+            <geom type="cylinder" size="0.08 0.15" density="170" rgba="0.9 0.1 0.1 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
         </body>
 
-        <!-- Object 1: Orange -->
-        <body name="pickup_obj_1" pos="3.5 -7.0 0.13">
+        <!--  Object 1: Orange -->
+        <body name="pickup_obj_1" pos="3.5 -7.0 0.15">
             <joint type="free"/>
-            <geom type="cylinder" size="0.04 0.13" rgba="0.9 0.5 0.0 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
+            <geom type="cylinder" size="0.08 0.15" density="170" rgba="0.9 0.5 0.0 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
         </body>
 
-        <!-- Object 2: Yellow -->
-        <body name="pickup_obj_2" pos="4.0 -7.0 0.13">
+        <!--  Object 2: Yellow -->
+        <body name="pickup_obj_2" pos="4.0 -7.0 0.15">
             <joint type="free"/>
-            <geom type="cylinder" size="0.04 0.13" rgba="0.9 0.9 0.0 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
+            <geom type="cylinder" size="0.08 0.15" density="170" rgba="0.9 0.9 0.0 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
         </body>
 
-        <!-- Object 3: Green -->
-        <body name="pickup_obj_3" pos="4.5 -7.0 0.13">
+        <!--  Object 3: Green -->
+        <body name="pickup_obj_3" pos="4.5 -7.0 0.15">
             <joint type="free"/>
-            <geom type="cylinder" size="0.04 0.13" rgba="0.1 0.8 0.1 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
+            <geom type="cylinder" size="0.08 0.15" density="170" rgba="0.1 0.8 0.1 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
         </body>
 
-        <!-- Object 4: Cyan -->
-        <body name="pickup_obj_4" pos="5.0 -7.0 0.13">
+        <!--  Object 4: Cyan -->
+        <body name="pickup_obj_4" pos="5.0 -7.0 0.15">
             <joint type="free"/>
-            <geom type="cylinder" size="0.04 0.13" rgba="0.0 0.8 0.9 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
+            <geom type="cylinder" size="0.08 0.15" density="170" rgba="0.0 0.8 0.9 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
         </body>
 
-        <!-- Object 5: Blue -->
-        <body name="pickup_obj_5" pos="5.5 -7.0 0.13">
+        <!--  Object 5: Blue -->
+        <body name="pickup_obj_5" pos="5.5 -7.0 0.15">
             <joint type="free"/>
-            <geom type="cylinder" size="0.04 0.13" rgba="0.1 0.2 0.9 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
+            <geom type="cylinder" size="0.08 0.15" density="170" rgba="0.1 0.2 0.9 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
         </body>
 
-        <!-- Object 6: Purple -->
-        <body name="pickup_obj_6" pos="3.0 -6.5 0.13">
+        <!--  Object 6: Purple -->
+        <body name="pickup_obj_6" pos="3.0 -6.5 0.15">
             <joint type="free"/>
-            <geom type="cylinder" size="0.04 0.13" rgba="0.6 0.0 0.8 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
+            <geom type="cylinder" size="0.08 0.15" density="170" rgba="0.6 0.0 0.8 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
         </body>
 
-        <!-- Object 7: Pink -->
-        <body name="pickup_obj_7" pos="3.5 -6.5 0.13">
+        <!--  Object 7: Pink -->
+        <body name="pickup_obj_7" pos="3.5 -6.5 0.15">
             <joint type="free"/>
-            <geom type="cylinder" size="0.04 0.13" rgba="0.9 0.3 0.6 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
+            <geom type="cylinder" size="0.08 0.15" density="170" rgba="0.9 0.3 0.6 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
         </body>
 
-        <!-- Object 8: White -->
-        <body name="pickup_obj_8" pos="4.0 -6.5 0.13">
+        <!--  Object 8: White -->
+        <body name="pickup_obj_8" pos="4.0 -6.5 0.15">
             <joint type="free"/>
-            <geom type="cylinder" size="0.04 0.13" rgba="0.95 0.95 0.95 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
+            <geom type="cylinder" size="0.08 0.15" density="170" rgba="0.95 0.95 0.95 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
         </body>
 
-        <!-- Object 9: Brown -->
-        <body name="pickup_obj_9" pos="4.5 -6.5 0.13">
+        <!--  Object 9: Brown -->
+        <body name="pickup_obj_9" pos="4.5 -6.5 0.15">
             <joint type="free"/>
-            <geom type="cylinder" size="0.04 0.13" rgba="0.5 0.25 0.0 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
+            <geom type="cylinder" size="0.08 0.15" density="170" rgba="0.5 0.25 0.0 1" contype="1" conaffinity="1" friction="1 0.5 0.5"/>
         </body>
 
-        <!-- ===================== SHELF SLOT MARKERS (10 sites on racks) ===================== -->
-        <!--
-            10 shelf slot target positions distributed across rack shelves.
-            The racks body is at world pos (4, -4, 0).
-            Slots are at 3 heights: low ~0.5m, mid ~1.0m, high ~1.5m.
-            NOTE: Calibrate these positions once you view the actual rack geometry.
-            These are approximate starting values.
-        -->
+        <!--  ===================== SHELF SLOT MARKERS (10 sites on racks) ===================== -->
+        <!--  10 shelf slot target positions distributed across rack shelves. The racks body is at world pos (4, -4, 0). Slots are at 3 heights: low ~0.5m, mid ~1.0m, high ~1.5m. NOTE: Calibrate these positions once you view the actual rack geometry. These are approximate starting values. -->
         <site name="shelf_slot_0"  pos="2.5 -3.5 0.50" size="0.05" type="sphere" rgba="0.0 1.0 0.0 0.5" group="1"/>
         <site name="shelf_slot_1"  pos="3.0 -3.5 0.50" size="0.05" type="sphere" rgba="0.0 1.0 0.0 0.5" group="1"/>
         <site name="shelf_slot_2"  pos="3.5 -3.5 0.50" size="0.05" type="sphere" rgba="0.0 1.0 0.0 0.5" group="1"/>
@@ -189,7 +165,7 @@
     </worldbody>
 
     <contact>
-        <!-- Finger A exclusions for Arm1 -->
+        <!--  Finger A exclusions for Arm1 -->
         <exclude body1="Arm_1" body2="Arm_2"/>
         <exclude body1="Bearing_Column_Left_1" body2="Rotation_Link_Left_1"/>
         <exclude body1="Bearing_Column_Left_1" body2="Arm_Left_1"/>
@@ -225,19 +201,14 @@
         <exclude body1="Rotation_Link_Right_1" body2="Contact_Cylinder_1_2"/>
         <exclude body1="Hand_Bearing_1" body2="Contact_Cylinder_2_1"/>
         <exclude body1="Hand_Bearing_1" body2="base"/>
-        <!-- Side-grip thumb-vs-chassis excludes.  In a wide-open
-             pre-grasp pose the thumb (finger_a) projects back over
-             the chassis upper structure; excluding the pair removes
-             phantom contacts that would otherwise reject valid IK
-             solutions.  Arm-2 mirrors. -->
+        <!--  Side-grip thumb-vs-chassis excludes. In a wide-open pre-grasp pose the thumb (finger_a) projects back over the chassis upper structure; excluding the pair removes phantom contacts that would otherwise reject valid IK solutions. Arm-2 mirrors. -->
         <exclude body1="finger_a_link_1_1" body2="base"/>
         <exclude body1="finger_a_link_2_1" body2="base"/>
         <exclude body1="finger_a_link_3_1" body2="base"/>
         <exclude body1="finger_a_link_1_2" body2="base"/>
         <exclude body1="finger_a_link_2_2" body2="base"/>
         <exclude body1="finger_a_link_3_2" body2="base"/>
-        <!-- The side fingers (b, c) and palm can also enter chassis
-             envelope at extreme orientations — proactive excludes. -->
+        <!--  The side fingers (b, c) and palm can also enter chassis envelope at extreme orientations — proactive excludes. -->
         <exclude body1="finger_b_link_3_1" body2="base"/>
         <exclude body1="finger_c_link_3_1" body2="base"/>
         <exclude body1="finger_b_link_3_2" body2="base"/>
@@ -289,12 +260,7 @@
         <exclude body1="Bearing_Column_Right_2" body2="Rotation_Link_Right_2"/>
         <exclude body1="Bearing_Column_Right_2" body2="Contact_Cylinder_2_2"/>
         <exclude body1="Rotation_Link_Right_2" body2="Contact_Cylinder_2_2"/>
-        <!-- Targeted finger-vs-arm/palm excludes.  Without these,
-             persistent interpenetration between the palm body and
-             the side fingers' proximal links, and between the
-             Arm_Left structural link and each finger, prevents the
-             close phase from completing.  Each pair below was
-             validated against contact-scan data. -->
+        <!--  Targeted finger-vs-arm/palm excludes. Without these, persistent interpenetration between the palm body and the side fingers' proximal links, and between the Arm_Left structural link and each finger, prevents the close phase from completing. Each pair below was validated against contact-scan data. -->
         <exclude body1="Gripper_Link3_1" body2="finger_b_link_1_1"/>
         <exclude body1="Gripper_Link3_1" body2="finger_c_link_1_1"/>
         <exclude body1="Arm_Left_1" body2="finger_c_link_0_1"/>
@@ -304,15 +270,10 @@
         <exclude body1="Arm_Left_1" body2="finger_b_link_1_1"/>
         <exclude body1="Arm_Left_1" body2="finger_b_link_2_1"/>
         <exclude body1="Arm_Left_1" body2="finger_b_link_3_1"/>
-        <!-- Arm_Left_1 ↔ thumb link_1: exclude to prevent the arm
-             body from pushing the thumb past its commanded open
-             position during the close stroke. -->
+        <!--  Arm_Left_1 ↔ thumb link_1: exclude to prevent the arm body from pushing the thumb past its commanded open position during the close stroke. -->
         <exclude body1="Arm_Left_1" body2="finger_a_link_1_1"/>
         <exclude body1="Arm_Left_1" body2="finger_a_link_1_2"/>
-        <!-- Thumb-vs-arm/palm excludes for the wide-open thumb pose.
-             At deep open angles the thumb links clip through the palm
-             bodies and the arm link; these excludes let the joints
-             follow the commanded ctrl cleanly. -->
+        <!--  Thumb-vs-arm/palm excludes for the wide-open thumb pose. At deep open angles the thumb links clip through the palm bodies and the arm link; these excludes let the joints follow the commanded ctrl cleanly. -->
         <exclude body1="Arm_Left_1" body2="finger_a_link_2_1"/>
         <exclude body1="Arm_Left_1" body2="finger_a_link_2_2"/>
         <exclude body1="Arm_Left_1" body2="finger_a_link_3_1"/>
@@ -331,11 +292,7 @@
         <exclude body1="Gripper_Link3_2" body2="finger_a_link_3_2"/>
         <exclude body1="finger_a_link_1_1" body2="finger_a_link_3_1"/>
         <exclude body1="finger_a_link_1_2" body2="finger_a_link_3_2"/>
-        <!-- Thumb-vs-side-finger excludes.  In the wide-open thumb
-             pose, thumb link_2/3 can clip the side fingers' link_2/3;
-             the close stroke then pushes the side fingers' joints
-             past their declared ranges.  Excluding the pairs avoids
-             the cascade. -->
+        <!--  Thumb-vs-side-finger excludes. In the wide-open thumb pose, thumb link_2/3 can clip the side fingers' link_2/3; the close stroke then pushes the side fingers' joints past their declared ranges. Excluding the pairs avoids the cascade. -->
         <exclude body1="finger_a_link_2_1" body2="finger_b_link_2_1"/>
         <exclude body1="finger_a_link_2_2" body2="finger_b_link_2_2"/>
         <exclude body1="finger_a_link_2_1" body2="finger_b_link_3_1"/>
@@ -352,11 +309,8 @@
         <exclude body1="finger_a_link_3_2" body2="finger_c_link_2_2"/>
         <exclude body1="finger_a_link_3_1" body2="finger_c_link_3_1"/>
         <exclude body1="finger_a_link_3_2" body2="finger_c_link_3_2"/>
-        <!-- Additional thumb-vs-side-finger and palm-vs-finger
-             excludes — same rationale as above, defensive coverage
-             for poses that would otherwise push joints past their
-             declared ranges. -->
-        <!-- Thumb link_2/3 ↔ side fingers' link_1 -->
+        <!--  Additional thumb-vs-side-finger and palm-vs-finger excludes — same rationale as above, defensive coverage for poses that would otherwise push joints past their declared ranges. -->
+        <!--  Thumb link_2/3 ↔ side fingers' link_1 -->
         <exclude body1="finger_a_link_2_1" body2="finger_b_link_1_1"/>
         <exclude body1="finger_a_link_2_2" body2="finger_b_link_1_2"/>
         <exclude body1="finger_a_link_2_1" body2="finger_c_link_1_1"/>
@@ -365,10 +319,10 @@
         <exclude body1="finger_a_link_3_2" body2="finger_b_link_1_2"/>
         <exclude body1="finger_a_link_3_1" body2="finger_c_link_1_1"/>
         <exclude body1="finger_a_link_3_2" body2="finger_c_link_1_2"/>
-        <!-- Palm Gripper_Link2 ↔ thumb link_1 (Arm_Left already done) -->
+        <!--  Palm Gripper_Link2 ↔ thumb link_1 (Arm_Left already done) -->
         <exclude body1="Gripper_Link2_1" body2="finger_a_link_1_1"/>
         <exclude body1="Gripper_Link2_2" body2="finger_a_link_1_2"/>
-        <!-- Palm Gripper_Link3 ↔ side fingers' link_2 and link_3 -->
+        <!--  Palm Gripper_Link3 ↔ side fingers' link_2 and link_3 -->
         <exclude body1="Gripper_Link3_1" body2="finger_b_link_2_1"/>
         <exclude body1="Gripper_Link3_2" body2="finger_b_link_2_2"/>
         <exclude body1="Gripper_Link3_1" body2="finger_b_link_3_1"/>
@@ -382,9 +336,29 @@
     <equality>
         <connect name="weld_contact_arm_sites_1" site1="cyl_weld_site_1_1" site2="arm_weld_site_1" solimp="0.95 0.9 0.9 0.5 100" solref="0.00000001 1"/>
         <connect name="weld_contact_arm_sites_2" site1="cyl_weld_site_1_2" site2="arm_weld_site_2" solimp="0.95 0.9 0.9 0.5 100" solref="0.00000001 1"/>
-        <!-- OMPL transport planning: single weld re-pointed at held object via eq_obj2id at runtime.
-             active="false" by default — only enabled in plan_data, never in sim_data. -->
-        <weld name="grasp_left" body1="Gripper_Link1_1" body2="pickup_obj_0"
+        <!--  OMPL transport planning + per-obj sim-weld bundle. grasp_left = legacy alias used by plan_data activation (eq_obj2id repointed at runtime for OMPL transport). grasp_left_<N> = per-obj static welds enabled in sim.data at grasp time (relpose overwritten at activation with current body2-in-body1 pose). Statically binding each weld to its pickup_obj_<N> keeps the constraint Jacobian chain stable — repointing eq_obj2id mid-sim previously triggered `mj_jacSparse: dof index 5 not found in chain`. -->
+        <!--  Weld solref="0.001 1" (1 ms compliance) and solimp width 0.5 mm keep the obj rigidly tracking the grip during lift acceleration (softer values let the obj fall behind by up to 44 mm).  1 ms matches the arm-attachment connects' regime — well tested in this scene without blowups. -->
+        <weld name="grasp_left"   body1="Gripper_Link1_1" body2="pickup_obj_0"
+              active="false" relpose="0 0 0 1 0 0 0" solref="0.005 1"/>
+        <weld name="grasp_left_0" body1="Gripper_Link1_1" body2="pickup_obj_0"
+              active="false" relpose="0 0 0 1 0 0 0" solref="0.005 1"/>
+        <weld name="grasp_left_1" body1="Gripper_Link1_1" body2="pickup_obj_1"
+              active="false" relpose="0 0 0 1 0 0 0" solref="0.005 1"/>
+        <weld name="grasp_left_2" body1="Gripper_Link1_1" body2="pickup_obj_2"
+              active="false" relpose="0 0 0 1 0 0 0" solref="0.005 1"/>
+        <weld name="grasp_left_3" body1="Gripper_Link1_1" body2="pickup_obj_3"
+              active="false" relpose="0 0 0 1 0 0 0" solref="0.005 1"/>
+        <weld name="grasp_left_4" body1="Gripper_Link1_1" body2="pickup_obj_4"
+              active="false" relpose="0 0 0 1 0 0 0" solref="0.005 1"/>
+        <weld name="grasp_left_5" body1="Gripper_Link1_1" body2="pickup_obj_5"
+              active="false" relpose="0 0 0 1 0 0 0" solref="0.005 1"/>
+        <weld name="grasp_left_6" body1="Gripper_Link1_1" body2="pickup_obj_6"
+              active="false" relpose="0 0 0 1 0 0 0" solref="0.005 1"/>
+        <weld name="grasp_left_7" body1="Gripper_Link1_1" body2="pickup_obj_7"
+              active="false" relpose="0 0 0 1 0 0 0" solref="0.005 1"/>
+        <weld name="grasp_left_8" body1="Gripper_Link1_1" body2="pickup_obj_8"
+              active="false" relpose="0 0 0 1 0 0 0" solref="0.005 1"/>
+        <weld name="grasp_left_9" body1="Gripper_Link1_1" body2="pickup_obj_9"
               active="false" relpose="0 0 0 1 0 0 0" solref="0.005 1"/>
     </equality>
 
