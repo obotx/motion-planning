@@ -12,9 +12,15 @@
   <img alt="Docker" src="https://img.shields.io/badge/docker-supported-2496ED?logo=docker&logoColor=white">
 </p>
 
-https://github.com/user-attachments/assets/42763aa0-9ef5-449a-b3e7-d32c80e5af17
+https://github.com/user-attachments/assets/a2c1c6dd-4c68-42ca-986e-820fc142f36f
 
 <p align="center"><em>▶ Full GUI walkthrough — object selection, MOVE button, OMPL base navigation, OMPL arm grasp, and shelf-side delivery.</em></p>
+
+
+
+https://github.com/user-attachments/assets/0befbb4a-f20f-412c-9db9-f3a04d1e065a
+
+<p align="center"><em>▶ Close-up For Pickup.</em></p>
 
 ---
 
@@ -196,15 +202,6 @@ https://github.com/user-attachments/assets/034b1e6d-49c2-4bee-a92e-144ae6dffd88
 | **1. Select object & slot** | <img src="assets/m1_object_selection.png" alt="M1 object selection controls" width="280"> | Object highlighted yellow, slot ring green, dropdowns visible in the PICK & PLACE panel. |
 | **2. Navigate** | <img src="assets/m1_ompl_object_navigation.png" alt="M1 OMPL navigation scene" width="280"> | Base drives along the OMPL path to a validated stand-off pose next to the object. Status: `MOVING`. |
 | **3. Grasp & deliver** | <img src="assets/m1_grasp_prototype_status.png" alt="M1 grasp status" width="280"> | ARM1 follows its OMPL-planned approach, the OMPL-planned finger trajectory closes the gripper around the object (`● Holding Obj-X`), then the base drives to the shelf-side aisle to release. |
-
-### Additional pickup runs
-
-Independent end-to-end pickup cycles across different objects and spawn layouts:
-
-- [`assets/demo_m1_pickup_run_1.mp4`](assets/demo_m1_pickup_run_1.mp4)
-- [`assets/demo_m1_pickup_run_2.mp4`](assets/demo_m1_pickup_run_2.mp4)
-- [`assets/demo_m1_pickup_run_3.mp4`](assets/demo_m1_pickup_run_3.mp4)
-- [`assets/demo_m1_pickup_with_retry.mp4`](assets/demo_m1_pickup_with_retry.mp4) — first grasp attempt is rejected by the pre-close gate; the retry chain (closed-loop base correction → next candidate) recovers and the cycle completes successfully. Useful illustration of the retry behaviour described in the [FAQ](#how-does-the-retry-strategy-work).
 
 ---
 
