@@ -12,15 +12,9 @@
   <img alt="Docker" src="https://img.shields.io/badge/docker-supported-2496ED?logo=docker&logoColor=white">
 </p>
 
-https://github.com/user-attachments/assets/a2c1c6dd-4c68-42ca-986e-820fc142f36f
+https://github.com/user-attachments/assets/7697af3e-2ede-4206-9fe3-4ccee74171d1
 
 <p align="center"><em>▶ Full GUI walkthrough — object selection, MOVE button, OMPL base navigation, OMPL arm grasp, and shelf-side delivery.</em></p>
-
-
-
-https://github.com/user-attachments/assets/0befbb4a-f20f-412c-9db9-f3a04d1e065a
-
-<p align="center"><em>▶ Close-up For Pickup.</em></p>
 
 ---
 
@@ -191,17 +185,11 @@ Once the GUI is open, follow this exact sequence to see the autonomous cycle end
 
 ## 🎥 Video Demos
 
-### 1. Perspective view (GUI)
+### Perspective view (GUI)
 
-https://github.com/user-attachments/assets/dde71c04-72fd-4ab9-8e5d-97656738ded6
+https://github.com/user-attachments/assets/695057d8-ac5d-4d04-b23c-6d7fcb487292
 
 *Full recording: navigate, grasp, transport, deliver.*
-
-### 2. Top-down view
-
-https://github.com/user-attachments/assets/034b1e6d-49c2-4bee-a92e-144ae6dffd88
-
-*Clear view of the planned path through obstacles.*
 
 ### Step-by-step preview
 
