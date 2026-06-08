@@ -279,30 +279,47 @@ sequenceDiagram
 ```
 motion-planning/
 ├── README.md                       # this file
+├── FRICTION_PICKUP_REPORT.md       # engineering report on the grasp/lift tuning campaign
+├── play.py                         # one-line entry script → wraps src/gui/play_m1.py with defaults
 ├── requirements.txt                # Python deps (native install)
 ├── docker/                         # reproducible Docker setup → docker/README.md
 ├── assets/                         # GUI screenshots and demo videos
+├── ROS/                            # placeholder for future ROS integration
 ├── tools/
-│   ├── smoke_test.py                  # imports + XML load sanity check
-│   ├── calibrate_arm_kinematics.py    # regenerate the arm IK calibration LUT
-│   ├── measure_gripper_aperture.py    # measure gripper aperture; validate object radius range
-│   └── inspect_collisions.py          # OMPL obstacle rects vs MuJoCo collision geometry
+│   ├── smoke_test.py                   # imports + XML load sanity check
+│   ├── calibrate_arm_kinematics.py     # regenerate the top-down arm IK calibration LUT
+│   ├── build_reachability_lut.py       # build the reachability LUT for arm-led fine alignment
+│   ├── measure_gripper_aperture.py     # measure gripper aperture; validate object radius range
+│   ├── inspect_collisions.py           # OMPL obstacle rects vs MuJoCo collision geometry
+│   ├── m2_view_scene.py                # inspect the M2 placement scene (shelves + slot layout)
+│   ├── sweep_m2_placements.py          # batch test of placement candidates across all slots
+│   └── sweep_slot_reachability.py      # reachability check across all shelf slots
 ├── data/
-│   └── arm_calibration*.npz        # pre-computed arm IK calibration LUTs (loaded at runtime)
+│   ├── arm_calibration.npz                  # top-down arm IK calibration LUT
+│   ├── arm_calibration_sidegrip.npz         # side-grip arm IK calibration LUT
+│   ├── arm_calibration_sidegrip_5d.npz      # 5-DOF side-grip variant LUT
+│   ├── arm_calibration_sidegrip_dynamic.npz # dynamic-load-compensated side-grip LUT
+│   └── arm_reachability_sidegrip.npz        # reachability LUT for arm-led fine alignment
 └── src/
     ├── gui/
-    │   └── play_m1.py              # main GUI / pipeline orchestrator
+    │   ├── play_m1.py              # main GUI / pipeline orchestrator
+    │   └── screen_recorder.py      # screen-capture helper for demo videos
     ├── navigation/
     │   ├── plan.py                 # base OMPL planner
-    │   ├── ompl_windows_bridge.py  # native + WSL bridge
+    │   ├── ompl_windows_bridge.py  # OMPL native + WSL bridge
     │   ├── ompl_navigator.py       # base waypoint follower
     │   ├── arm_planner.py          # 8-DOF arm + wrist OMPL planner
     │   ├── finger_planner.py       # gripper finger OMPL planner
-    │   └── grasp_executor.py       # pick & place orchestrator
+    │   ├── grasp_controller.py     # low-level grasp control (close / verify / release)
+    │   └── grasp_executor.py       # pick & place orchestrator (M1 pickup + M2 placement)
     ├── simulations/
     │   └── morph_i_free_move.py    # core MORPH-I simulation engine
     └── env/
-        └── market_world_m1.xml     # MuJoCo scene (objects + shelves)
+        ├── market_world_m1.xml         # MuJoCo scene (objects + shelves, M1 pickup)
+        ├── m2_environment_shelves.xml  # M2 placement scene (shelf slots)
+        ├── env_assets.xml              # shared environment assets include
+        └── robot/
+            └── obotx_V2_OBJs.xml       # MORPH-I robot model (8-DOF arm + 1+2 DELTO gripper)
 ```
 
 ---
