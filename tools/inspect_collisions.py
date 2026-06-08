@@ -1,25 +1,3 @@
-"""inspect_collisions.py — print actual MuJoCo collision geometry for the scene.
-
-Prints world-axis-aligned bounding boxes (AABBs) for the rack, walls,
-chassis, and other key bodies, then compares them to the 2D obstacle
-bounding boxes the OMPL base planner uses (`navigation/plan.py:OBSTACLE_RECTS`).
-
-Why this matters: OMPL plans paths assuming the obstacles are exactly
-the rectangles in `OBSTACLE_RECTS`, inflated by `ROBOT_RADIUS`.  But
-MuJoCo's collision check uses the actual geom geometry, which can
-extend past those rectangles (overhangs, structural members).  When
-the two disagree, OMPL plans paths that MuJoCo then rejects — exactly
-the rack-graze rejection failure mode we hit in M1.
-
-Run from the project root:
-
-    docker compose -f docker/docker-compose.yml run --rm motion-planning \
-        python3 tools/inspect_collisions.py
-
-Or natively (Python 3.10 venv with mujoco + numpy):
-
-    PYTHONPATH=src python3 tools/inspect_collisions.py
-"""
 
 import os
 import sys
@@ -31,14 +9,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(ROOT, "src"))
 
-# Same constants the OMPL base planner uses.
 from navigation.plan import OBSTACLE_RECTS, ROBOT_RADIUS
 
 
-# ---------------------------------------------------------------------------
-
 def _box_corners(half):
-    """8 corners of a box with half-extents `half` in local frame."""
     return np.array([
         [s * half[0], t * half[1], u * half[2]]
         for s in (-1.0, 1.0)
@@ -48,8 +22,6 @@ def _box_corners(half):
 
 
 def geom_world_aabb(model, data, gid):
-    """Return (min_xyz, max_xyz) world AABB for geom gid, or (None, None)
-    if the geom type isn't supported (e.g. plane, hfield)."""
     gtype = model.geom_type[gid]
     pos = data.geom_xpos[gid].copy()
     R = data.geom_xmat[gid].reshape(3, 3)
@@ -71,8 +43,6 @@ def geom_world_aabb(model, data, gid):
         return np.minimum(ep1, ep2) - r, np.maximum(ep1, ep2) + r
 
     if gtype == mujoco.mjtGeom.mjGEOM_CYLINDER:
-        # AABB approximated as the bounding box of an oriented cylinder
-        # treated as a box (2r, 2r, 2h).  Conservative.
         r = float(model.geom_size[gid, 0])
         h = float(model.geom_size[gid, 1])
         corners = _box_corners(np.array([r, r, h])) @ R.T + pos
@@ -82,11 +52,9 @@ def geom_world_aabb(model, data, gid):
         mesh_id = int(model.geom_dataid[gid])
         if mesh_id < 0:
             return None, None
-        # mesh_aabb format: (center_x, center_y, center_z, half_x, half_y, half_z)
         aabb = model.mesh_aabb[mesh_id]
         center = np.asarray(aabb[:3], dtype=float)
         half = np.asarray(aabb[3:], dtype=float)
-        # 8 mesh-local corners → world
         corners_local = _box_corners(half) + center
         corners_world = corners_local @ R.T + pos
         return corners_world.min(axis=0), corners_world.max(axis=0)
@@ -95,10 +63,8 @@ def geom_world_aabb(model, data, gid):
 
 
 def body_world_aabb(model, data, body_id, include_descendants=True):
-    """Union AABB over all geoms attached to body_id (and descendants if asked)."""
     body_ids = [body_id]
     if include_descendants:
-        # Recursively collect descendant body IDs
         i = 0
         while i < len(body_ids):
             bid = body_ids[i]
@@ -114,7 +80,6 @@ def body_world_aabb(model, data, body_id, include_descendants=True):
         for gid in range(model.ngeom):
             if int(model.geom_bodyid[gid]) != bid:
                 continue
-            # Skip non-collision geoms (visual-only, contype=0 AND conaffinity=0)
             if int(model.geom_contype[gid]) == 0 and int(model.geom_conaffinity[gid]) == 0:
                 continue
             mn, mx = geom_world_aabb(model, data, gid)
@@ -145,8 +110,6 @@ def _bid(model, name):
     return bid if bid >= 0 else None
 
 
-# ---------------------------------------------------------------------------
-
 def main(xml_path):
     print(f"Loading model: {xml_path}")
     model = mujoco.MjModel.from_xml_path(xml_path)
@@ -155,7 +118,6 @@ def main(xml_path):
 
     print(f"Model: {model.nbody} bodies, {model.ngeom} geoms\n")
 
-    # ---- Section 1: rack body, full breakdown ----
     print("=" * 72)
     print("RACK COLLISION GEOMETRY")
     print("=" * 72)
@@ -164,7 +126,6 @@ def main(xml_path):
         print("[WARN] body 'minimarket_racks' not found")
     else:
         print(f"Body: minimarket_racks (id={rack_bid})")
-        # Per-geom breakdown for the rack and descendants
         per_geom = []
         body_ids_under_rack = [rack_bid]
         i = 0
@@ -197,11 +158,9 @@ def main(xml_path):
             print(f"  {len(per_geom)} collision geoms:")
             for gid, gname, type_name, mn, mx in per_geom:
                 print(f"    geom {gid:3d}  {type_name:8s}  '{gname}'  {_fmt_aabb(mn, mx)}")
-        # Union
         rmn, rmx, n = body_world_aabb(model, data, rack_bid)
         print(f"\n  Union AABB ({n} geoms):  {_fmt_aabb(rmn, rmx)}")
 
-    # ---- Section 2: OMPL OBSTACLE_RECTS comparison ----
     print()
     print("=" * 72)
     print("OMPL PLAN.PY OBSTACLE_RECTS (what the planner thinks the world is)")
@@ -210,13 +169,11 @@ def main(xml_path):
     for i, (x0, x1, y0, y1) in enumerate(OBSTACLE_RECTS):
         print(f"  rect[{i}]:  X=[{x0:+.3f}, {x1:+.3f}]  Y=[{y0:+.3f}, {y1:+.3f}]")
 
-    # ---- Section 3: rack mismatch report ----
     if rack_bid is not None and rmn is not None:
         print()
         print("=" * 72)
         print("RACK: ACTUAL vs OMPL")
         print("=" * 72)
-        # Find the OMPL rect that best matches the rack (largest XY overlap)
         rack_xy_actual = (rmn[0], rmx[0], rmn[1], rmx[1])
         rack_rect_idx = None
         best_overlap = -1
@@ -274,7 +231,6 @@ def main(xml_path):
             else:
                 print("\n  [OK] OMPL box matches actual rack within 0.5cm. No change needed.")
 
-    # ---- Section 4: chassis (robot body) AABB ----
     print()
     print("=" * 72)
     print("CHASSIS COLLISION GEOMETRY")
@@ -283,9 +239,6 @@ def main(xml_path):
     if robot_bid is None:
         print("[WARN] body 'robot' not found")
     else:
-        # The robot body's direct geoms only (NOT descendants — those are
-        # the arm chain, which the validator handles via allowed-pairs).
-        # We want the chassis footprint specifically.
         cmn = np.array([np.inf, np.inf, np.inf])
         cmx = np.array([-np.inf, -np.inf, -np.inf])
         n = 0
@@ -312,7 +265,6 @@ def main(xml_path):
         else:
             print("[WARN] no direct collision geoms on body 'robot'")
 
-    # ---- Section 5: pickup objects (Z range) ----
     print()
     print("=" * 72)
     print("PICKUP OBJECT GEOMETRY (height range across spawned objects)")

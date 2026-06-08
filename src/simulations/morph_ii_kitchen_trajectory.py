@@ -157,7 +157,6 @@ class ParallelRobot:
             self.viewport = mujoco.MjrRect(0, 0, 1200, 900)
             self.camera = mujoco.MjvCamera()
             self.scene = mujoco.MjvScene(self.model, maxgeom=500)
-            # self.scene.flags = mujoco.mjtRndFlag.mjRND_SHADOW #disable shadow
 
             self.opt = mujoco.MjvOption()
         
@@ -863,7 +862,7 @@ class ParallelRobot:
         if self.control_mode == "trajectory":
             self.control_arm_trajectory()
             self.control_base_trajectory()
-        else:  # keyboard
+        else:
             self.control_arm(self.mocap_arm_id)
             self.control_base(self.target_base_id)
         mujoco.mj_step(self.model, self.data, nstep=5)
@@ -1177,5 +1176,5 @@ if __name__ == "__main__":
     sim = ParallelRobot(xml_path, args.run, args.control, args.record)
     if args.run == "glfw":
         sim.run_glfw()
-    else:  # cv
+    else:
         sim.run_cv()

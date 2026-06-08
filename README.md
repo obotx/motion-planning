@@ -45,7 +45,13 @@ https://github.com/user-attachments/assets/0befbb4a-f20f-412c-9db9-f3a04d1e065a
 
 > **Every motion stage is motion-planned.** Base navigation, arm pickup, and finger open/close are each solved by OMPL with their own collision-aware state space. No stage is hand-tuned, scripted, or manually configured.
 
-> **One press, full cycle.** Pick an object → pick a shelf slot → press **MOVE**. The robot drives to the object, the arm plans and executes a real grasp (the gripper visibly closes around the object), the held object is transported to the assigned shelf-side aisle, released, and the arm returns to `HOME`.
+> **One press, full cycle.** Pick an object → pick a shelf slot → press **MOVE**. The robot drives to the object, the arm plans and executes a real grasp (the gripper visibly closes around the object), the held object is transported to the assigned shelf, **placed onto the slot surface**, and the arm returns to `HOME`.
+
+> **Finest actuator first — whole-body motion economy.** The robot reaches and aligns with the **least-disruptive joint that can do the job**, in priority order: the **wrist** for fine gripper alignment, then the **arm** (columns, extension, base-yaw) for reach and approach, and the **mobile base** only when neither can close the gap. It doesn't drive the whole chassis when a wrist or arm motion suffices — the same whole-body-motion economy a real mobile manipulator relies on to stay precise and avoid unnecessary base travel.
+
+> **Closed-loop, not blind.** The robot doesn't replay a fixed trajectory — it **measures the real physics and corrects**: the grip is confirmed by **measured per-finger contact forces**, the on-shelf placement runs a **position-feedback servo** against the slot target, and a missed reach triggers a **closed-loop base correction** computed from the measured residual. Together with the IK calibration that pre-corrects each target, the system stays accurate against a compliant arm and live contact dynamics instead of assuming an idealized model.
+
+> **Predictable, honest failure.** The pipeline never forces an unsafe grasp. When a spawn is genuinely boxed in — a corner against the rack, or a floor so crowded that no safe base pose exists even after the relaxed-clearance fallback — it **aborts cleanly with a clear log** rather than looping or executing a risky motion. Failure is bounded and explainable, never a crash.
 
 ---
 
@@ -81,6 +87,8 @@ You can run this project two ways. **Docker is recommended** because it bundles 
 | 🅱 [Native install](#option-b--native-install) | You already have Python 3.10 and want full control over the environment. |
 
 Both paths launch the same `src/gui/play_m1.py` GUI.
+
+> **Reproducible + scriptable.** Beyond the interactive GUI, the same pipeline runs **headless and scripted** — pass `--auto-move-obj M --auto-move-slot N` (optionally `--auto-move-attempts K`) to run full autonomous pick-&-place cycles without clicking, ideal for batch evaluation or CI. The Docker image pins every system and Python dependency, so a run on one machine reproduces on another.
 
 ### Option A — Docker (recommended)
 
@@ -174,7 +182,7 @@ Once the GUI is open, follow this exact sequence to see the autonomous cycle end
 | **4** | **Select shelf slot** — open the `Shelf Slot ID` dropdown | Slot ring lights up green — this is the delivery target |
 | **5** | **Press `MOVE ▶`** (the green button) | Button turns yellow ("Moving…"); terminal prints `[OMPL]` planning logs |
 | **6** | **Watch the cycle** | Status walks through `● Navigating…` → `● Grasping…` → `● Holding Obj-X` → `● Delivering…` |
-| **7** | **Cycle complete** | Object released near the assigned slot; arm retracts to `HOME`; status returns to `IDLE` |
+| **7** | **Cycle complete** | Object placed onto the assigned slot surface; arm retracts to `HOME`; status returns to `IDLE` |
 | **8** | **Try again** — click `Respawn Objects`, pick a new (object, slot), press MOVE | Layout randomizes; whole cycle repeats |
 
 > 💡 **Tip:** Keep the camera stable during the cycle so you can watch the planned base path and the arm descent clearly.
@@ -245,11 +253,11 @@ sequenceDiagram
     end
 
     rect rgb(235, 255, 235)
-    Note over GUI,Sim: Phase 3 — Transport & deliver
-    GUI->>BaseBridge: Plan base path to shelf aisle
+    Note over GUI,Sim: Phase 3 — Transport & place
+    GUI->>BaseBridge: Plan base path to shelf stand-off
     BaseBridge->>Nav: Drive (object treated as carried)
-    GUI->>Exec: drop()/place() at slot
-    Exec->>Sim: Open + release soft constraint + pin + retract to HOME
+    GUI->>Exec: place() at slot
+    Exec->>Sim: Lift to shelf height → closed-loop slide onto slot surface → release + retract to HOME
     end
 
     Sim-->>GUI: Cycle complete
@@ -266,11 +274,15 @@ sequenceDiagram
 | `navigation/ompl_navigator.py` | Base waypoint follower. Drives the mecanum base along the planned path; reports progress. |
 | `navigation/arm_planner.py` | **8-DOF arm OMPL planner** (`MORPHBridge`) — 4 arm slides (`H1, H2, A1, TH`) plus 4 wrist orientation joints (`HandBearing, gripper_z/x/y_rotation`). Per-state MuJoCo collision checks; `plan(start_q, goal_q)` and `solve_ik(world_pos, wrist_goal=…)` produce the pickup approach trajectory and the gripper orientation together — both are solved by the planner, not authored by hand. |
 | `navigation/finger_planner.py` | **Gripper finger OMPL planner** (`FingerBridge`). RRT-Connect over the 11-DOF gripper joint space; the open- and close-around-object trajectories are produced by the planner instead of being configured manually. |
-| `navigation/grasp_executor.py` | Pick & place orchestrator. Sequences open → OMPL approach → linear descent → close + friction verify → soft-constraint hold + pin → OMPL transport → release → OMPL retract. |
+| `navigation/grasp_executor.py` | Pick & place orchestrator. Sequences open → OMPL approach → linear descent → close + friction verify → soft-constraint hold + pin → OMPL transport → **lift-to-shelf-height + closed-loop slide onto the slot surface** → release → OMPL retract. |
 
 > 🧩 **Carried-object handling.** The object is held by **friction between the gripper pads and the object surface** — the same mechanism a real 3-finger gripper uses. The default pipeline **first establishes a real physical grip** (close stroke + measured-force verify gate) **and only then** adds a compliant soft constraint, **purely to suppress MuJoCo's contact-solver chatter and friction-slip during transport** — the soft constraint is not holding the object, the fingers are. Adding it lets the arm planner treat the carried object as part of the robot during collision checks. This sequence — verify the physical grip first, then add the transport-stability constraint — is the standard pattern the reference documentation provided at project start prescribes; it is **not** a fake or teleporting grip (the constraint never fires without a passed verify gate). The `--perfect` mode runs the same close stroke and verify gate, then disables the constraint entirely and lifts on pure Coulomb friction end-to-end.
 >
 > 🔍 **About the small finger-into-object penetration you'll see.** MuJoCo simulates contact with a **soft-contact band** (a few millimetres of allowed interpenetration where the contact force ramps up smoothly). **Think of it as a real rubber gripper pad compressing fractions of a millimetre under contact pressure — the simulator's soft band represents the same physical compliance.** This is the standard and recommended setup for grip simulation — a perfectly hard contact would produce numerical instability, judder, and the object would slip out of the fingers. The visible sub-centimetre dip of the pads into the object surface is the gripper sitting at the equilibrium point of that soft-contact band, which is where stable normal force (and therefore friction) is generated. It is a feature of the physics model, not a bug in the grasp — and it is present in both run modes for exactly the same reason.
+>
+> 🎯 **First-attempt accuracy — the IK calibration table (one of the highest-leverage pieces of the pipeline).** The parallel manipulator's columns deflect under load, so a pure-kinematic IK pose settles off the commanded one — up to a few centimetres at the reach extremes, which on a single-shot grasp is the difference between a clean pick and a miss. Before planning each grasp, the arm planner reads a **pre-computed calibration table (LUT)** — `data/arm_calibration_*.npz`, generated once by [`tools/calibrate_arm_kinematics.py`](tools/calibrate_arm_kinematics.py) — that maps every arm configuration to its measured settling deflection, and **pre-corrects the IK target** before the planner runs. The insight: this deflection is **systematic and pose-dependent**, so rather than fight it online every cycle, the system measures it **once** and the planner simply subtracts it — turning a compliant, hard-to-control arm into one that **lands the grasp accurately on the first attempt across the full reach range, with no per-object tuning**. The tables ship in `data/`, so the system is accurate **out of the box**; you only regenerate them if the arm geometry changes (see [Tools & Calibration](#-tools--calibration)).
+>
+> 📥 **Precise on-shelf placement.** Delivery is not a blind open-over-the-slot. After transport, a **closed-loop placement servo** first lifts the held object to the target shelf height, then slides it horizontally onto the assigned slot surface — measuring the object's actual position against the slot target on every step and correcting until it is seated. The same lift-then-slide logic serves the low, mid, and high shelf tiers, and the placement falls back gracefully (a clean, logged outcome) if a slot is genuinely out of reach rather than forcing an unsafe move.
 
 ---
 
@@ -322,6 +334,16 @@ Run any tool from the project root:
 
 ```bash
 PYTHONPATH=src .venv/bin/python tools/<tool_name>.py
+```
+
+**Regenerating the IK calibration LUT** (only needed if you change the arm geometry — the default tables already ship in `data/`):
+
+```bash
+# Calibrate for the default side-grip pickup wrist mode
+PYTHONPATH=src .venv/bin/python tools/calibrate_arm_kinematics.py --wrist-mode sidegrip
+# → writes data/arm_calibration_sidegrip.npz, which the arm planner loads at startup
+
+# Other options: --wrist-mode {sidegrip,topdown,…}   --out <path>   --xml <world.xml>
 ```
 
 (or the equivalent `docker compose ... run --rm motion-planning python3 tools/<tool_name>.py` from the Docker setup.)
@@ -519,7 +541,9 @@ Sampled at runtime, using **RRT-Connect** with MuJoCo as the state validity chec
 
 Typical planning times: ~50–500 ms per arm plan, ~50–200 ms per finger plan.
 
-A discretized valid-state library — coarse offline pre-sampling followed by runtime filtering — is a valid additive optimization for use cases that need very fast planning across many objects in sequence. It can sit on top of the existing pipeline as a warm-start cache without restructuring anything.
+A discretized valid-state **planning** library — coarse offline pre-sampling of planner configurations followed by runtime filtering — is a valid additive optimization for use cases that need very fast planning across many objects in sequence. It can sit on top of the existing pipeline as a warm-start cache without restructuring anything.
+
+> **Distinct from the IK calibration LUT.** The planning-state cache above is a *future optional* speed-up and is **not** used — planning states are sampled fresh at runtime, as described. The system **does**, however, load one small pre-computed table at startup: the **IK calibration LUT** (`data/arm_calibration_*.npz`). That table stores the parallel arm's per-configuration settling deflection so the planner can **pre-correct each IK target** before solving — a calibration table, *not* a library of planning states. (See *🎯 First-attempt accuracy* under **How It Works**.)
 
 ### Can the available states be visualized?
 
@@ -537,16 +561,17 @@ In testing across randomized spawn layouts, roughly **70–80 % of pick attempts
 
 Residual failures are typically a function of spawn geometry rather than the planner: the object lands in a tight corner against the rack/keepout zones, or the chassis-clearance check refuses every base candidate because the floor is crowded with other objects. The relaxed-clearance fallback (see retry strategy) handles most of the crowded-floor case; the genuinely unreachable spawns abort cleanly with a "no feasible candidate" log instead of executing an unsafe grasp.
 
-You may sometimes see the **first grasp attempt show a larger-than-expected gripper-to-object distance** before the system retries. This is the pre-close gate firing — not a bad grasp executing. The parallel manipulator has a passive `RotationLeftJoint` that deflects under load, so the IK solver (which works against a static model) under-predicts the runtime pose by a few cm, especially at low column heights. The gate catches the discrepancy and a closed-loop base correction is applied before the next attempt.
+You may sometimes see the **first grasp attempt show a larger-than-expected gripper-to-object distance** before the system retries. This is the pre-close gate firing — not a bad grasp executing. The parallel manipulator has a passive `RotationLeftJoint` that deflects under load, so a naive static-model IK would under-predict the runtime pose by a few centimetres, especially at low column heights. **The IK calibration LUT is built precisely to remove this** — it pre-shifts each IK target by the measured per-configuration deflection, so the planned grasp lands accurately. At the most extreme (lowest-column) poses a small residual can remain beyond what the table captures; the pre-close gate catches that residual and a closed-loop base correction cleans it up before the next attempt.
 
 ### How does the retry strategy work?
 
-Four layers, in order from cheapest to most expensive:
+Layered, in order from cheapest (finest actuator, no base motion) to most expensive (whole re-navigation) — the same **finest-actuator-first** priority the system applies everywhere:
 
-1. **Closed-loop base correction** — when the pre-close gate rejects, the executor reports the residual XY error between the gripper and the IK target. The base translates by exactly that error vector (yaw held fixed) and the close is retried, up to **5 attempts per cycle**. Because the arm pose is rigid in the base frame and yaw is locked, translating the base by the residual translates the gripper by the same amount. The closed-loop converges quickly when the IK error is geometric.
-2. **Next pre-screened candidate** — at the start of each pick, the system generates up to **5 base-pose candidates** ranked by arm-quality score (tilt, reach) and palm-orientation alignment. If candidate 1 fails grasp, candidate 2 is tried, etc. Each attempt computes a fresh OMPL plan from the current arm/base state.
-3. **Re-scan from the current pose** — if all initial candidates fail, candidate generation is re-run from the current robot position rather than the original starting pose, which often yields a different valid set.
-4. **Relaxed-clearance navigation fallback** — if every candidate has been refused by the strict floor-object clearance check (dense object spawns can box the robot in), the validator switches to a relaxed mode that exempts all non-selected floor objects. **The selected pick target stays protected, and rack/walls remain hard obstacles** in both modes — only the chassis-vs-other-floor-object distance check is relaxed. The system retries the same candidates with the loosened clearance.
+1. **Arm-only in-place re-attempt** — the first and cheapest correction: the arm re-attempts the grasp from its current pose **without moving the base at all**, keeping the correction on the arm before the chassis is asked to do anything (one re-attempt per stand-off candidate).
+2. **Closed-loop base correction** — if the arm alone can't close the gap, the executor reports the residual XY error between the gripper and the IK target, and the base translates by exactly that error vector (yaw held fixed); the close is retried, up to **5 attempts per cycle** (3 in `--perfect`). Because the arm pose is rigid in the base frame and yaw is locked, translating the base by the residual translates the gripper by the same amount — the closed-loop converges quickly when the IK error is geometric.
+3. **Next pre-screened candidate** — the system generates up to **5 base-pose candidates** ranked by arm-quality score (tilt, reach) and palm-orientation alignment. If candidate 1 fails, candidate 2 is tried, etc. — each with a fresh OMPL plan from the current arm/base state.
+4. **Re-scan from the current pose** — if all initial candidates fail, candidate generation is re-run from the current robot position rather than the original starting pose, which often yields a different valid set.
+5. **Relaxed-clearance navigation fallback** — if every candidate has been refused by the strict floor-object clearance check (dense object spawns can box the robot in), the validator switches to a relaxed mode that exempts all non-selected floor objects. **The selected pick target stays protected, and rack/walls remain hard obstacles** in both modes — only the chassis-vs-other-floor-object distance check is relaxed. The system retries the same candidates with the loosened clearance.
 
 After the retry chain is exhausted, the pick is abandoned with a clear log instead of looping forever.
 
@@ -574,11 +599,13 @@ When none of the candidates work, the system aborts honestly rather than spinnin
 | OMPL 8-DOF arm + wrist planning (grasp + transport) | ✅ Implemented |
 | OMPL gripper finger planning (open / close) | ✅ Implemented |
 | Autonomous grasp with verified friction grip (soft-constraint transport hold) | ✅ Implemented |
-| Autonomous shelf-side delivery (release at the slot's aisle column) | ✅ Implemented |
+| Autonomous shelf-side delivery onto the assigned slot | ✅ Implemented |
 | Manual arm / gripper control via GUI | ✅ Implemented |
 | Manual base control via joystick | ✅ Implemented |
-| Precise on-shelf placement onto the slot surface | 🔶 In progress — current cycle releases at the slot's aisle column |
+| Precise on-shelf placement onto the slot surface | ✅ Implemented |
 | ROS 2 / MoveIt2 integration | ❌ Out of scope for this repository |
+
+> **Solid foundation, ongoing refinement.** Every stage above runs end-to-end today, on a complete pipeline — OMPL planning, IK calibration, verified grip, and closed-loop correction. Accuracy on the hardest cases (the tightest spawn corners and the most extreme reach poses on the compliant arm) keeps improving through additional per-configuration calibration and parameter tuning on top of that foundation — incremental refinement, the normal path from a working system to a hardened one.
 
 > **What is OMPL?** *Open Motion Planning Library* — a widely-used open-source library for computing collision-free paths for robots. This project uses OMPL at three levels: the mobile base, the 8-DOF arm + wrist, and the gripper fingers — each with its own collision-aware state space.
 

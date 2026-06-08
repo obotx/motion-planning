@@ -177,7 +177,6 @@ class ParallelRobot:
             self.viewport = mujoco.MjrRect(0, 0, 1200, 900)
             self.camera = mujoco.MjvCamera()
             self.scene = mujoco.MjvScene(self.model, maxgeom=500)
-            # self.scene.flags = mujoco.mjtRndFlag.mjRND_SHADOW #disable shadow
 
             self.opt = mujoco.MjvOption()
         
@@ -302,7 +301,7 @@ class ParallelRobot:
 
         site_pos_world  = self.data.site_xpos[site_id]
         body_pos_world  = self.data.xpos[body_id]
-        body_quat_world = self.data.xquat[body_id]  # (w, x, y, z)
+        body_quat_world = self.data.xquat[body_id]
 
         vec_world = site_pos_world - body_pos_world
 
@@ -402,10 +401,10 @@ class ParallelRobot:
             return alpha_deg * alpha_deg - alpha_min_deg * alpha_min_deg
 
         cons = ({'type': 'ineq', 'fun': angle_ineq},)
-        b = [(bounds_h[0], bounds_h[1]),  # h1
-            (bounds_h[0], bounds_h[1]),  # h2
-            (bounds_a[0], bounds_a[1]),  # a1
-            (-np.pi, np.pi)]            # theta
+        b = [(bounds_h[0], bounds_h[1]),
+            (bounds_h[0], bounds_h[1]),
+            (bounds_a[0], bounds_a[1]),
+            (-np.pi, np.pi)]
 
         if arm == "left":
             x0, _ = self.get_encoder()
@@ -565,7 +564,7 @@ class ParallelRobot:
             self.prev_delta_x = self.prev_delta_y = self.prev_delta_yaw = 0.0
             self.deriv_x = self.deriv_y = self.deriv_yaw = 0.0
 
-        current_pos = self.localization()  # [x, y, yaw]
+        current_pos = self.localization()
         x_curr, y_curr, yaw_curr = current_pos
         x_ref, y_ref, yaw_ref = target
 
@@ -656,11 +655,8 @@ class ParallelRobot:
     def step_simulation(self):
         current_time = self.data.time
 
-        # ==============================
-        # PHASE 1: Initial Base Trajectory (to pick area)
-        # ==============================
         if not hasattr(self, 'base_trajectory_planned'):
-            current = self.localization()  # [x, y, yaw]
+            current = self.localization()
             print("Planning BASE trajectory to pick area:", current)
             x0, y0, yaw0 = current
             waypoints = np.array([
@@ -680,9 +676,6 @@ class ParallelRobot:
             self.base_trajectory_end_time = times[-1]
             self.base_trajectory_planned = True
 
-        # ==============================
-        # PHASE 2: Arm Pick & Return
-        # ==============================
         target_left = self.target_left[:3]
         roll_arm = 0.0
         pitch_arm = 0.0
@@ -771,9 +764,6 @@ class ParallelRobot:
                         roll_arm = self.arm_traj_roll[-1]
                         self.arm_full_return_done = True
                 
-        # ==============================
-        # PHASE 3: Final Base Trajectory (to drop zone)
-        # ==============================
         if hasattr(self, 'arm_full_return_done') and not hasattr(self, 'final_base_planned'):
             print("Planning FINAL BASE trajectory to drop zone [3.0, -6.7, -pi/2]...")
             current = self.localization()
@@ -792,9 +782,6 @@ class ParallelRobot:
             self.final_base_end_time = current_time + final_times[-1]
             self.final_base_planned = True
 
-        # ==============================
-        # PHASE 4: Arm moves while base is driving to drop zone
-        # ==============================
         if hasattr(self, 'final_base_planned') and not hasattr(self, 'arm_drive_trajectory_planned'):
             print("Planning ARM DRIVE trajectory while base moves to drop zone")
 
@@ -839,9 +826,6 @@ class ParallelRobot:
             target_left = [x_arm, y_arm, z_arm]
 
 
-        # ==============================
-        # PHASE 5: ARRIVED — drop + open gripper
-        # ==============================
         if hasattr(self, 'arm_drive_trajectory_planned') and current_time > self.arm_drive_end_time:
             target_left = [-0.6, 0.0, 1.27]
             roll_arm = self.arm_drive_roll[-1]
@@ -865,9 +849,6 @@ class ParallelRobot:
             if elapsed >= self.gripper_open_duration:
                 self.drop_complete = True
 
-        # ==============================
-        # BASE TRAJECTORY REFERENCE
-        # ==============================
         if hasattr(self, 'final_base_planned') and current_time >= self.final_base_end_time:
             x_ref, y_ref, yaw_ref = (
                 self.final_traj_x[-1], self.final_traj_y[-1], self.final_traj_yaw[-1]
@@ -887,9 +868,6 @@ class ParallelRobot:
                     self.traj_x[-1], self.traj_y[-1], self.traj_yaw[-1]
                 )
 
-        # ==============================
-        # SEND CONTROL COMMANDS
-        # ==============================
         self.control_mobile_robot(target=[x_ref, y_ref, yaw_ref], alpha=0.1)
         self.control_arms(target_left, self.target_right)
 
@@ -898,15 +876,7 @@ class ParallelRobot:
             self.data.ctrl[self.gripper_ids_left[14]] = roll_arm
             self.data.ctrl[self.gripper_ids_left[13]] = pitch_arm  
 
-        # ==============================
-        # Physics & Rendering
-        # ==============================
         mujoco.mj_step(self.model, self.data, nstep=5)
-
-        # if not hasattr(self, 'blink_index'):
-        #     self.blink_index = 0
-        #     self.blink_speed = 0.08 
-        #     self.last_blink_time = time.time()
 
         if self.run_mode == "cv":
             self.camera_display()
@@ -914,8 +884,6 @@ class ParallelRobot:
             mujoco.mjv_updateScene(
                 self.model, self.data, self.opt, None, self.camera, 0xFFFF, self.scene
             )
-            # if hasattr(self, 'traj_x'):
-            #     self.draw_blinking_trajectory(self.traj_x, self.traj_y, z=0.05)
             mujoco.mjr_render(self.viewport, self.scene, self.ctx)
             glfw.swap_buffers(self.window)
             glfw.poll_events()
@@ -1054,20 +1022,18 @@ class ParallelRobot:
             GRIPPER_INCREMENT = 0.01
             
             if key in (glfw.KEY_Z, glfw.KEY_X):
-                # LEFT: Z → Close | X → Open
                 act_ids = [
-                    self.gripper_ids_left[0],  # finger_c_joint_1_1
-                    self.gripper_ids_left[3],  # finger_b_joint_1_1
-                    self.gripper_ids_left[6]   # finger_a_joint_1_1
+                    self.gripper_ids_left[0],
+                    self.gripper_ids_left[3],
+                    self.gripper_ids_left[6]
                 ]
                 increment = GRIPPER_INCREMENT if key == glfw.KEY_Z else -GRIPPER_INCREMENT
 
             elif key in (glfw.KEY_C, glfw.KEY_V):
-                # RIGHT: C → Close | V → Open
                 act_ids = [
-                    self.gripper_ids_right[0],  # finger_c_joint_1_2
-                    self.gripper_ids_right[3],  # finger_b_joint_1_2
-                    self.gripper_ids_right[6]   # finger_a_joint_1_2
+                    self.gripper_ids_right[0],
+                    self.gripper_ids_right[3],
+                    self.gripper_ids_right[6]
                 ]
                 increment = GRIPPER_INCREMENT if key == glfw.KEY_C else -GRIPPER_INCREMENT
 
@@ -1086,27 +1052,23 @@ class ParallelRobot:
             BEARING_MAX = 1.57        
 
             if key == glfw.KEY_W:
-                # LEFT: W → increase
                 current = self.data.ctrl[self.gripper_ids_left[14]]
                 new_val = np.clip(current + BEARING_INCREMENT, BEARING_MIN, BEARING_MAX)
                 self.data.ctrl[self.gripper_ids_left[14]] = new_val
                 print(f"EE BEARING : {new_val}")
 
             elif key == glfw.KEY_S:
-                # LEFT: S → decrease
                 current = self.data.ctrl[self.gripper_ids_left[14]]
                 new_val = np.clip(current - BEARING_INCREMENT, BEARING_MIN, BEARING_MAX)
                 self.data.ctrl[self.gripper_ids_left[14]] = new_val
                 print(f"EE BEARING : {new_val}")
 
             elif key == glfw.KEY_UP:
-                # RIGHT: UP → increase
                 current = self.data.ctrl[self.gripper_ids_right[14]]
                 new_val = np.clip(current + BEARING_INCREMENT, BEARING_MIN, BEARING_MAX)
                 self.data.ctrl[self.gripper_ids_right[14]] = new_val
 
             elif key == glfw.KEY_DOWN:
-                # RIGHT: DOWN → decrease
                 current = self.data.ctrl[self.gripper_ids_right[14]]
                 new_val = np.clip(current - BEARING_INCREMENT, BEARING_MIN, BEARING_MAX)
                 self.data.ctrl[self.gripper_ids_right[14]] = new_val
@@ -1117,25 +1079,21 @@ class ParallelRobot:
             WRIST_Z_MAX = 3.14159
 
             if key == glfw.KEY_A:
-                # LEFT: A → increase (counter-clockwise)
                 current = self.data.ctrl[self.gripper_ids_left[13]]
                 new_val = np.clip(current + WRIST_Z_INCREMENT, WRIST_Z_MIN, WRIST_Z_MAX)
                 self.data.ctrl[self.gripper_ids_left[13]] = new_val
 
             elif key == glfw.KEY_D:
-                # LEFT: D → decrease (clockwise)
                 current = self.data.ctrl[self.gripper_ids_left[13]]
                 new_val = np.clip(current - WRIST_Z_INCREMENT, WRIST_Z_MIN, WRIST_Z_MAX)
                 self.data.ctrl[self.gripper_ids_left[13]] = new_val
 
             elif key == glfw.KEY_LEFT:
-                # RIGHT: LEFT ARROW → increase (counter-clockwise)
                 current = self.data.ctrl[self.gripper_ids_right[13]]
                 new_val = np.clip(current + WRIST_Z_INCREMENT, WRIST_Z_MIN, WRIST_Z_MAX)
                 self.data.ctrl[self.gripper_ids_right[13]] = new_val
 
             elif key == glfw.KEY_RIGHT:
-                # RIGHT: RIGHT ARROW → decrease (clockwise)
                 current = self.data.ctrl[self.gripper_ids_right[13]]
                 new_val = np.clip(current - WRIST_Z_INCREMENT, WRIST_Z_MIN, WRIST_Z_MAX)
                 self.data.ctrl[self.gripper_ids_right[13]] = new_val
@@ -1144,32 +1102,30 @@ class ParallelRobot:
             glfw.KEY_R, glfw.KEY_T, glfw.KEY_Y, glfw.KEY_F, glfw.KEY_G, glfw.KEY_H,
             glfw.KEY_U, glfw.KEY_I, glfw.KEY_O, glfw.KEY_J, glfw.KEY_K, glfw.KEY_L
         ):
-            EE_INCREMENT = 0.01  # 2 cm per press — tune as needed
-            # === LEFT ARM ===
-            if key == glfw.KEY_R:      # +x
+            EE_INCREMENT = 0.01
+            if key == glfw.KEY_R:
                 self.target_left[0] += EE_INCREMENT
-            elif key == glfw.KEY_T:    # -x
+            elif key == glfw.KEY_T:
                 self.target_left[0] -= EE_INCREMENT
-            elif key == glfw.KEY_F:    # +y
+            elif key == glfw.KEY_F:
                 self.target_left[1] += EE_INCREMENT
-            elif key == glfw.KEY_G:    # -y
+            elif key == glfw.KEY_G:
                 self.target_left[1] -= EE_INCREMENT
-            elif key == glfw.KEY_Y:    # +z
+            elif key == glfw.KEY_Y:
                 self.target_left[2] += EE_INCREMENT
-            elif key == glfw.KEY_H:    # -z
+            elif key == glfw.KEY_H:
                 self.target_left[2] -= EE_INCREMENT
-            # === RIGHT ARM ===
-            elif key == glfw.KEY_U:    # +x
+            elif key == glfw.KEY_U:
                 self.target_right[0] += EE_INCREMENT
-            elif key == glfw.KEY_I:    # -x
+            elif key == glfw.KEY_I:
                 self.target_right[0] -= EE_INCREMENT
-            elif key == glfw.KEY_J:    # +y
+            elif key == glfw.KEY_J:
                 self.target_right[1] += EE_INCREMENT
-            elif key == glfw.KEY_K:    # -y
+            elif key == glfw.KEY_K:
                 self.target_right[1] -= EE_INCREMENT
-            elif key == glfw.KEY_O:    # +z
+            elif key == glfw.KEY_O:
                 self.target_right[2] += EE_INCREMENT
-            elif key == glfw.KEY_L:    # -z
+            elif key == glfw.KEY_L:
                 self.target_right[2] -= EE_INCREMENT
             print(f"Left target: {self.target_left}")
             print(f"Right target: {self.target_right}")
@@ -1238,5 +1194,5 @@ if __name__ == "__main__":
     sim = ParallelRobot(xml_path, args.run, args.control, args.record)
     if args.run == "glfw":
         sim.run_glfw()
-    else:  # cv
+    else:
         sim.run_cv()

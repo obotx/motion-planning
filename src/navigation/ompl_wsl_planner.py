@@ -5,13 +5,11 @@ import mujoco
 from ompl import base as ob
 from ompl import geometric as og
 
-# --- Parse arguments ---
 start_x = float(sys.argv[1])
 start_y = float(sys.argv[2])
 goal_x = float(sys.argv[3])
 goal_y = float(sys.argv[4])
 
-# --- Load MuJoCo model ---
 model = mujoco.MjModel.from_xml_path(
     "/mnt/c/Users/User1/Downloads/milestone1/base-motion/assets/scene.xml"
 )
@@ -31,7 +29,6 @@ def is_state_valid(state):
 
     return data.ncon == 0
 
-# --- Define state space ---
 space = ob.RealVectorStateSpace(2)
 bounds = ob.RealVectorBounds(2)
 bounds.setLow(-5)

@@ -16,6 +16,11 @@
     <include file='robot/assets/arm_obotx_actuator_V2.xml' />
     <include file='robot/assets/gripper_actuator_V2.xml' />
 
+    <!--  M2 Round 2: shelf-board collision in every OTHER visible rack row (south /
+          middle-back / middle-front-rest / north).  Same 4 Z heights as the M2
+          target rack.  See m2_environment_shelves.xml header for layout + naming. -->
+    <include file="m2_environment_shelves.xml"/>
+
     <!--  MILESTONE 1: Asset definitions for 10 pickup objects. Simple colored cylinders represent products on the floor. Each object is ~8cm diameter, 15cm tall (approximate product size). Colors allow visual identification before IDs are shown in UI. -->
 
     <worldbody>
@@ -60,7 +65,17 @@
         <body name="minimarket_nestle_cirnation" pos="4 -4 0">
             <include file="minimarket/nestle_cirnation/nestle_cirnation.xml"/>
         </body>
-        <body name="minimarket_pepsi_cerry" pos="4 -4 0">
+        <!--  M2 (2026-05-30): pepsi_cerry / pepsi_diet / pepsi_max removed — these 3
+              product meshes are the only ones whose visual geometry sits inside the
+              M2 placement target slot zone (front-middle rack, one per level: cerry
+              @low Z=0.25, max @mid Z=0.69, diet @high Z=1.19).  Each is a single
+              store-spanning merged mesh, so they can't be cropped per-slot — removing
+              the whole body is the only XML-level option.  Effect: those slots are now
+              visually EMPTY (the restocking robot's target = out-of-stock slots), at the
+              cost of these 3 Pepsi products being gone store-wide.  All products are
+              visual-only (collision commented out in each asset), so this changes
+              nothing physical / nothing the planner sees.  Re-enable by uncommenting. -->
+        <!-- <body name="minimarket_pepsi_cerry" pos="4 -4 0">
             <include file="minimarket/pepsi_cerry/pepsi_cerry.xml"/>
         </body>
         <body name="minimarket_pepsi_diet" pos="4 -4 0">
@@ -68,7 +83,7 @@
         </body>
         <body name="minimarket_pepsi_max" pos="4 -4 0">
             <include file="minimarket/pepsi_max/pepsi_max.xml"/>
-        </body>
+        </body> -->
         <body name="minimarket_skinny_cow" pos="4 -4 0">
             <include file="minimarket/skinny_cow/skinny_cow.xml"/>
         </body>
@@ -150,17 +165,50 @@
         </body>
 
         <!--  ===================== SHELF SLOT MARKERS (10 sites on racks) ===================== -->
-        <!--  10 shelf slot target positions distributed across rack shelves. The racks body is at world pos (4, -4, 0). Slots are at 3 heights: low ~0.5m, mid ~1.0m, high ~1.5m. NOTE: Calibrate these positions once you view the actual rack geometry. These are approximate starting values. -->
-        <site name="shelf_slot_0"  pos="2.5 -3.5 0.50" size="0.05" type="sphere" rgba="0.0 1.0 0.0 0.5" group="1"/>
-        <site name="shelf_slot_1"  pos="3.0 -3.5 0.50" size="0.05" type="sphere" rgba="0.0 1.0 0.0 0.5" group="1"/>
-        <site name="shelf_slot_2"  pos="3.5 -3.5 0.50" size="0.05" type="sphere" rgba="0.0 1.0 0.0 0.5" group="1"/>
-        <site name="shelf_slot_3"  pos="4.0 -3.5 0.50" size="0.05" type="sphere" rgba="0.0 1.0 0.0 0.5" group="1"/>
-        <site name="shelf_slot_4"  pos="4.5 -3.5 0.50" size="0.05" type="sphere" rgba="0.0 1.0 0.0 0.5" group="1"/>
-        <site name="shelf_slot_5"  pos="2.5 -3.5 1.00" size="0.05" type="sphere" rgba="0.0 0.8 1.0 0.5" group="1"/>
-        <site name="shelf_slot_6"  pos="3.0 -3.5 1.00" size="0.05" type="sphere" rgba="0.0 0.8 1.0 0.5" group="1"/>
-        <site name="shelf_slot_7"  pos="3.5 -3.5 1.00" size="0.05" type="sphere" rgba="0.0 0.8 1.0 0.5" group="1"/>
-        <site name="shelf_slot_8"  pos="4.0 -3.5 1.50" size="0.05" type="sphere" rgba="1.0 0.8 0.0 0.5" group="1"/>
-        <site name="shelf_slot_9"  pos="4.5 -3.5 1.50" size="0.05" type="sphere" rgba="1.0 0.8 0.0 0.5" group="1"/>
+        <!--  10 placement target sites on the M2 shelf-collision boards (see m2_shelf_collision body below). -->
+        <!--  Z values = visible-mesh shelf-board surfaces (measured from racks mesh up-facing triangles): -->
+        <!--    low shelf surface  Z = 0.247 m  (board centre 0.242 + half-thickness 0.005) -->
+        <!--    mid-low  surface   Z = 0.687 m  (board centre 0.682 + half-thickness 0.005) -->
+        <!--    mid-high surface   Z = 1.190 m  (board centre 1.185 + half-thickness 0.005) -->
+        <!--  High shelf (Z=1.681) skipped — borderline reach (palm ~1.83 m near limit). -->
+        <!--  Y = -3.72: 16 cm BEHIND the visible shelf front (Y≈-3.56), 24 cm from back -->
+        <!--             wall (Y≈-3.96).  (Earlier histogram showed two racks back-to-back -->
+        <!--             — this is the SOUTH-facing front rack only, 40 cm deep.) -->
+        <!--  Slot X redistributed to land inside the 2 compartments between the         -->
+        <!--  visible posts (post X positions: ~2.6 / 3.4 / 4.35).  Left compartment       -->
+        <!--  spans X[2.65, 3.34]; right compartment spans X[3.52, 4.23].  Slot Xs all    -->
+        <!--  sit in compartments and avoid posts.                                          -->
+        <site name="shelf_slot_0"  pos="2.80 -3.60 0.247" size="0.05" type="sphere" rgba="0.0 1.0 0.0 0.5" group="1"/>
+        <site name="shelf_slot_1"  pos="3.15 -3.60 0.247" size="0.05" type="sphere" rgba="0.0 1.0 0.0 0.5" group="1"/>
+        <site name="shelf_slot_2"  pos="3.70 -3.60 0.247" size="0.05" type="sphere" rgba="0.0 1.0 0.0 0.5" group="1"/>
+        <site name="shelf_slot_3"  pos="4.05 -3.60 0.247" size="0.05" type="sphere" rgba="0.0 1.0 0.0 0.5" group="1"/>
+        <site name="shelf_slot_4"  pos="2.85 -3.60 0.687" size="0.05" type="sphere" rgba="0.0 0.8 1.0 0.5" group="1"/>
+        <site name="shelf_slot_5"  pos="3.70 -3.60 0.687" size="0.05" type="sphere" rgba="0.0 0.8 1.0 0.5" group="1"/>
+        <site name="shelf_slot_6"  pos="4.05 -3.60 0.687" size="0.05" type="sphere" rgba="0.0 0.8 1.0 0.5" group="1"/>
+        <site name="shelf_slot_7"  pos="2.85 -3.60 1.190" size="0.05" type="sphere" rgba="1.0 0.8 0.0 0.5" group="1"/>
+        <site name="shelf_slot_8"  pos="3.70 -3.60 1.190" size="0.05" type="sphere" rgba="1.0 0.8 0.0 0.5" group="1"/>
+        <site name="shelf_slot_9"  pos="4.05 -3.60 1.190" size="0.05" type="sphere" rgba="1.0 0.8 0.0 0.5" group="1"/>
+
+        <!--  ===================== M2 SHELF COLLISION (Round 1.4) ===================== -->
+        <!--  Collision boards at the visible-rack shelf heights:
+                Z = 0.242, 0.682, 1.185, 1.681 m  (board centres; 1 cm thick)
+                (high shelf 1.681 included for completeness; reach is borderline so
+                 no slot sites are placed on it for M2 placement targets.)
+              Y range matches the SOUTH-facing visible shelf depth, front edge taken
+              from the southernmost rack vertex:
+                Y[-3.96, -3.41]  (centre Y = -3.685, half-Y = 0.275 — 55 cm deep)
+              X range matches the visible rack X dense-vertex extent (tightened in
+              Round 1.6 — left trimmed to dense-post start, right trimmed 10 cm
+              further to clear the gap toward the neighbouring rack at X≈5.2;
+              visible posts at X≈2.6 / 3.4 / 4.35):
+                X[2.55, 4.34]   (centre X = 3.445, half-X = 0.895 — 179 cm wide)
+              Class primitive_collision => group 3.  Open front (no Y=-3.41 wall). -->
+        <body name="m2_shelf_collision" pos="0 0 0">
+            <geom name="m2_shelf_low"      type="box" size="0.895 0.275 0.005" pos="3.445 -3.685 0.242" class="primitive_collision" rgba="0.2 0.7 0.2 0.45"/>
+            <geom name="m2_shelf_mid_low"  type="box" size="0.895 0.275 0.005" pos="3.445 -3.685 0.682" class="primitive_collision" rgba="0.2 0.7 0.2 0.45"/>
+            <geom name="m2_shelf_mid_high" type="box" size="0.895 0.275 0.005" pos="3.445 -3.685 1.185" class="primitive_collision" rgba="0.2 0.7 0.2 0.45"/>
+            <geom name="m2_shelf_high"     type="box" size="0.895 0.275 0.005" pos="3.445 -3.685 1.681" class="primitive_collision" rgba="0.2 0.7 0.2 0.45"/>
+        </body>
 
     </worldbody>
 

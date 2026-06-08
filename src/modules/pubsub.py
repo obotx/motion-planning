@@ -7,12 +7,12 @@ class IPCPubSub:
     def __init__(self, port=5555):
         self.context = zmq.Context()
         self.port = port
-        self._publisher = None          # cached — only one bind per port
+        self._publisher = None
 
     def create_publisher(self):
         if self._publisher is None:
             self._publisher = IPCPublisher(self.context, self.port)
-        return self._publisher          # always return the same instance
+        return self._publisher
 
     def create_subscriber(self):
         return IPCSubscriber(self.context, self.port)
