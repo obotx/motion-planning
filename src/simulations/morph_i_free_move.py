@@ -172,10 +172,11 @@ class ParallelRobot:
                                                    self.data.ctrl[self.actuator_ids[4:7]]/100,
                                                    [0]])
 
-        # Pin callbacks: list of fn(data) invoked before each mj_step to pin
-        # object freejoints during pre-grasp/transport phases.
         self._pin_callbacks = []
         self._pin_lock = threading.Lock()
+        self._pin_substep = False
+        self._jump_diag = os.environ.get("AH_JUMP_DIAG", "0") == "1"
+        self._prev_base_xy = None
 
         if self.run_mode == "glfw":
             if not glfw.init():
@@ -189,26 +190,15 @@ class ParallelRobot:
             self.viewport = mujoco.MjrRect(0, 0, 1200, 900)
             self.scene = mujoco.MjvScene(self.model, maxgeom=500)
             self.opt = mujoco.MjvOption()
-            # Contact-point visualization off by default — most contacts
-            # at runtime are wheels and object-floor pairs, which is
-            # visual noise.  Press `C` at runtime to toggle on for
-            # debugging.  Other viz flags: F (forces), T (transparency),
-            # J (joints), 1..5 (toggle geom groups).
             self.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT] = False
-            # Shrink contact-point discs (default 0.3 is enormous for
-            # finger-scale geoms — yields huge yellow disks that obscure
-            # the gripper).  Set to ~5mm so contacts read as small dots.
             self.model.vis.scale.contactwidth  = 0.01
             self.model.vis.scale.contactheight = 0.005
             self.model.vis.scale.forcewidth    = 0.01
 
             glfw.set_key_callback(self.window, self.on_key)
-            # glfw.set_cursor_pos_callback(self.window, self._cursor_pos_callback)
-            # glfw.set_mouse_button_callback(self.window, self._mouse_button_callback)
             glfw.set_scroll_callback(self.window, self._scroll_callback)
 
-            # self.scene.flags = mujoco.mjtRndFlag.mjRND_SHADOW #disable shadow
-        
+
             self._last_mouse_x = 0
             self._last_mouse_y = 0
             self._mouse_left_pressed = False
@@ -395,8 +385,6 @@ class ParallelRobot:
         yaw = np.arctan2(2 * (w * zq + xq * yq), 1 - 2 * (yq**2 + zq**2))
         return np.array([x, y, yaw])
 
-    # Pin callback API: register fn(data) to be invoked inside step_simulation
-    # right before mj_step to pin object freejoints at a target world position.
     def add_pin_callback(self, fn):
         with self._pin_lock:
             if fn not in self._pin_callbacks:
@@ -492,10 +480,10 @@ class ParallelRobot:
             return alpha_deg * alpha_deg - alpha_min_deg * alpha_min_deg
 
         cons = ({'type': 'ineq', 'fun': angle_ineq},)
-        b = [(bounds_h[0], bounds_h[1]),  # h1
-            (bounds_h[0], bounds_h[1]),  # h2
-            (bounds_a[0], bounds_a[1]),  # a1
-            (-np.pi, np.pi)]            # theta
+        b = [(bounds_h[0], bounds_h[1]),
+            (bounds_h[0], bounds_h[1]),
+            (bounds_a[0], bounds_a[1]),
+            (-np.pi, np.pi)]
 
         if arm == "left":
             x0, _ = self.get_encoder()
@@ -521,8 +509,9 @@ class ParallelRobot:
         return result
             
     def pid_base_joints(self, target_angle_1, target_angle_2, kp=10, ki=0.0, kd=7):
-        # Use elapsed simulation time as dt, since control_arms() runs once per
-        # step_simulation() while mj_step advances nstep=10 internal ticks.
+        kp = getattr(self, '_base_kp_override', kp)
+        kd = getattr(self, '_base_kd_override', kd)
+        ki = getattr(self, '_base_ki_override', ki)
         now = float(self.data.time)
         last = getattr(self, "_base_pid_last_time", None)
         if last is None:
@@ -558,9 +547,9 @@ class ParallelRobot:
         k_i = 0.1
         k_d = 0.8
 
-        k_p_theta = 8.0
-        k_i_theta = 0.1
-        k_d_theta = 0.8
+        k_p_theta = float(getattr(self, "_base_kp_theta_override", 8.0))
+        k_i_theta = float(getattr(self, "_base_ki_theta_override", 0.1))
+        k_d_theta = float(getattr(self, "_base_kd_theta_override", 0.8))
 
         self.mobile_dot[0] = self.data.qvel[19]
         self.mobile_dot[1] = self.data.qvel[6] 
@@ -600,13 +589,52 @@ class ParallelRobot:
         v_y_local = k_p * delta_y_local + k_i * self.integral_y + k_d * self.deriv_y
         omega = k_p_theta * delta_yaw + k_i_theta * self.integral_yaw + k_d_theta * self.deriv_yaw
 
+        _omega_max = float(getattr(self, "_base_omega_max_override", 1e9))
+        if abs(omega) > _omega_max:
+            omega = float(np.clip(omega, -_omega_max, _omega_max))
+
+        if (getattr(self, "_base_near_goal_vel", None) is not None
+                and getattr(self, "_dock_pos_phase", False)):
+            _perr = float(np.hypot(delta_x_local, delta_y_local))
+            _bspeed = float(np.max(np.abs(self.mobile_dot)))
+            if _perr > 0.06 and _bspeed < 2.0:
+                _vmag = float(np.hypot(v_x_local, v_y_local))
+                _floor = float(os.environ.get("AH_STICTION_FLOOR", "1.2"))
+                if 1e-3 < _vmag < _floor:
+                    _sc = _floor / _vmag
+                    v_x_local *= _sc
+                    v_y_local *= _sc
+
         self.target_vel[0] = (v_x_local - v_y_local - omega * self.D) / self.r
         self.target_vel[1] = (v_x_local + v_y_local + omega * self.D) / self.r
         self.target_vel[2] = (v_x_local + v_y_local - omega * self.D) / self.r
         self.target_vel[3] = (v_x_local - v_y_local + omega * self.D) / self.r
 
-        MAX_VEL = 15.0
-        self.target_vel = np.clip(self.target_vel, -MAX_VEL, MAX_VEL)    
+        MAX_VEL = float(getattr(self, "_base_max_vel_override", 15.0))
+        _near_vel = getattr(self, "_base_near_goal_vel", None)
+        _goal_xy = getattr(self, "_nav_goal_xy", None)
+        if _near_vel is not None and _goal_xy is not None:
+            _gd = float(np.hypot(current_x - _goal_xy[0], current_y - _goal_xy[1]))
+            _FAR = float(os.environ.get("AH_DOCK_RAMP_FAR", "2.5"))
+            _NEAR = float(os.environ.get("AH_DOCK_RAMP_NEAR", "1.0"))
+            _nv = float(_near_vel)
+            if _gd <= _NEAR:
+                MAX_VEL = min(MAX_VEL, _nv)
+            elif _gd < _FAR:
+                _f = (_gd - _NEAR) / (_FAR - _NEAR)
+                MAX_VEL = min(MAX_VEL, _nv + _f * (MAX_VEL - _nv))
+        _mx = float(np.max(np.abs(self.target_vel)))
+        if _mx > MAX_VEL:
+            self.target_vel = self.target_vel * (MAX_VEL / _mx)
+
+        _slew = float(getattr(self, "_base_cmd_slew_override", 1e9))
+        _prev = getattr(self, "_prev_target_vel", None)
+        if _prev is not None and _slew < 1e8:
+            _d = self.target_vel - _prev
+            _dm = float(np.max(np.abs(_d)))
+            if _dm > _slew:
+                self.target_vel = _prev + _d * (_slew / _dm)
+        self._prev_target_vel = self.target_vel.copy()
 
         self.command = self.target_vel - self.mobile_dot
         eps = 0.05
@@ -652,17 +680,52 @@ class ParallelRobot:
         self.control_base(target=self.target_base, alpha=0.1)
         self.control_arms()
 
-        # Run pin callbacks after ctrl is set but before physics integrates;
-        # each may set qpos for free joints to lock them at a target position.
         with self._pin_lock:
             cbs = list(self._pin_callbacks)
-        for cb in cbs:
-            try:
-                cb(self.data)
-            except Exception as e:
-                print(f"[Pin] callback error: {e}")
+        if cbs and self._pin_substep:
+            for _ in range(10):
+                for cb in cbs:
+                    try:
+                        cb(self.data)
+                    except Exception as e:
+                        print(f"[Pin] callback error: {e}")
+                mujoco.mj_step(self.model, self.data, nstep=1)
+        else:
+            for cb in cbs:
+                try:
+                    cb(self.data)
+                except Exception as e:
+                    print(f"[Pin] callback error: {e}")
+            mujoco.mj_step(self.model, self.data, nstep=10)
 
-        mujoco.mj_step(self.model, self.data, nstep=10)
+        if getattr(self, "_jump_diag", False):
+            try:
+                _bid = int(getattr(self, "base_id", -1))
+                if _bid >= 0:
+                    _bx = float(self.data.xpos[_bid][0]); _by = float(self.data.xpos[_bid][1])
+                    _prev = getattr(self, "_prev_base_xy", None)
+                    _px, _py = _prev if _prev is not None else (_bx, _by)
+                    _jmp = ((_bx - _px) ** 2 + (_by - _py) ** 2) ** 0.5
+                    if _prev is not None and _jmp > 0.3:
+                        _qa = self.data.qacc
+                        _imax = int(np.argmax(np.abs(_qa)))
+                        _qn = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_JOINT,
+                                                int(self.model.dof_jntid[_imax])) or "?"
+                        _f6 = np.zeros(6); _bestf = 0.0; _bestc = "none"
+                        for _i in range(int(self.data.ncon)):
+                            mujoco.mj_contactForce(self.model, self.data, _i, _f6)
+                            _fm = float((_f6[0]**2+_f6[1]**2+_f6[2]**2)**0.5)
+                            if _fm > _bestf:
+                                _c = self.data.contact[_i]
+                                _n1 = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_BODY, int(self.model.geom_bodyid[_c.geom1])) or "?"
+                                _n2 = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_BODY, int(self.model.geom_bodyid[_c.geom2])) or "?"
+                                _bestf = _fm; _bestc = f"{_n1}<->{_n2}"
+                        print(f"[JUMP] base ({_px:.2f},{_py:.2f})->({_bx:.2f},{_by:.2f}) "
+                              f"d={_jmp:.2f}m | max|QACC|={float(np.abs(_qa[_imax])):.1e} @dof{_imax}({_qn}) "
+                              f"| ncon={self.data.ncon} maxF={_bestf:.0f}N {_bestc}")
+                    self._prev_base_xy = (_bx, _by)
+            except Exception as _je:
+                print(f"[JUMP] diag err: {_je}")
 
         if self.run_mode == "glfw" and render:
             mujoco.mjv_updateScene(
@@ -748,28 +811,26 @@ class ParallelRobot:
             self.gripper_ctrl = 0.0
             return
 
-        # Visualization toggles — each key flips a MjvOption flag.
-        if key == glfw.KEY_C:           # contact points
+        if key == glfw.KEY_C:
             i = mujoco.mjtVisFlag.mjVIS_CONTACTPOINT
             self.opt.flags[i] = not self.opt.flags[i]
             print(f"[viz] contact points = {bool(self.opt.flags[i])}")
             return
-        if key == glfw.KEY_F:           # contact force arrows
+        if key == glfw.KEY_F:
             i = mujoco.mjtVisFlag.mjVIS_CONTACTFORCE
             self.opt.flags[i] = not self.opt.flags[i]
             print(f"[viz] contact forces = {bool(self.opt.flags[i])}")
             return
-        if key == glfw.KEY_T:           # transparency (see through meshes)
+        if key == glfw.KEY_T:
             i = mujoco.mjtVisFlag.mjVIS_TRANSPARENT
             self.opt.flags[i] = not self.opt.flags[i]
             print(f"[viz] transparency = {bool(self.opt.flags[i])}")
             return
-        if key == glfw.KEY_J:           # joint frames
+        if key == glfw.KEY_J:
             i = mujoco.mjtVisFlag.mjVIS_JOINT
             self.opt.flags[i] = not self.opt.flags[i]
             print(f"[viz] joints = {bool(self.opt.flags[i])}")
             return
-        # Number keys 1..5 toggle geom groups
         for digit, gk in enumerate((glfw.KEY_1, glfw.KEY_2, glfw.KEY_3,
                                      glfw.KEY_4, glfw.KEY_5), start=1):
             if key == gk:
@@ -839,5 +900,5 @@ if __name__ == "__main__":
     sim = ParallelRobot(xml_path, args.run, args.record)
     if args.run == "glfw":
         sim.run_glfw()
-    else:  # cv
+    else:
         sim.run_cv()

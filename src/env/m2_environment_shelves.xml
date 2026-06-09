@@ -1,0 +1,85 @@
+<mujoco model="m2_environment_shelves">
+    <!--
+    M2 environment shelf-board collision geometry.
+
+    Adds the SAME 4-level shelf-board collision (Z = 0.242, 0.682, 1.185, 1.681 m,
+    1 cm thick, class="primitive_collision" => group 3) into every other visible
+    rack row in market_world_m1.xml, so the chassis nav avoids them and any
+    future placement target on those rows already has a surface to rest on.
+
+    Conventions:
+      * One <body> per rack row (Y band).  Bodies group their 4 shelf boards.
+      * Geom name pattern: m2_shelf_<band>_<level>
+      * Y bands measured from the visible 'racks' mesh (up-facing triangle clusters
+        + vertex AABB at the slot column).
+      * X bands measured from the visible mesh vertex distribution per Y band.
+      * The middle-front row's M2 placement target (X[2.55, 4.34] with slot sites)
+        stays inline in market_world_m1.xml; this file covers ONLY the rest of
+        that row (X[4.34, 7.96]) plus the other 3 rows in full.
+      * Half-thickness = 0.005 m (1 cm board).  Half-Y from band depth measurement.
+      * primitive_collision class is defined in env_assets.xml.
+
+    To replicate elsewhere or refine:
+      * Measure: tools/m2_view_scene.py (forces group 3 visible) or rerun the
+        vertex-histogram measurements documented in m2_devlog.md Round 2.
+    -->
+
+    <worldbody>
+        <!--  ===================== SOUTH RACK ROW =====================
+              X[0.72, 7.97]  (725 cm wide)   Y[-7.96, -7.42]  (54 cm deep)
+              centre X = 4.345  centre Y = -7.69  half-X = 3.625  half-Y = 0.27
+              Spans the full workspace south edge — the long row of products at
+              the bottom of the GUI.  Previously OMPL only knew about the small
+              rack_box / rack_box2 collisions (X[2.59, 4.28]); this provides
+              the full visible row.  -->
+        <body name="m2_shelves_south" pos="0 0 0">
+            <geom name="m2_shelf_south_low"      type="box" size="3.625 0.27 0.005" pos="4.345 -7.69 0.242" class="primitive_collision" rgba="0.2 0.7 0.2 0.45"/>
+            <geom name="m2_shelf_south_mid_low"  type="box" size="3.625 0.27 0.005" pos="4.345 -7.69 0.682" class="primitive_collision" rgba="0.2 0.7 0.2 0.45"/>
+            <geom name="m2_shelf_south_mid_high" type="box" size="3.625 0.27 0.005" pos="4.345 -7.69 1.185" class="primitive_collision" rgba="0.2 0.7 0.2 0.45"/>
+            <geom name="m2_shelf_south_high"     type="box" size="3.625 0.27 0.005" pos="4.345 -7.69 1.681" class="primitive_collision" rgba="0.2 0.7 0.2 0.45"/>
+        </body>
+
+        <!--  ===================== MIDDLE-BACK RACK ROW =====================
+              Back-to-back behind the M2 placement target.  X[2.54, 7.96]
+              Y[-4.55, -3.97]  (58 cm).  Y_max set to -3.97 (1 cm BELOW the
+              front rack's back wall at Y=-3.96) so the two OBSTACLE_RECTS
+              don't share an edge nor overlap — they previously alpha-stacked
+              into a 'double' gold strip across the M2 target in the viewer.
+              centre Y = -4.26  half-Y = 0.29.
+              (Visible mesh actually extends to Y=-3.91; collision is 6 cm
+              south of that, but the chassis can't squeeze through 6 cm of
+              gap anyway, so the difference is functionally invisible.) -->
+        <body name="m2_shelves_middle_back" pos="0 0 0">
+            <geom name="m2_shelf_middle_back_low"      type="box" size="2.71 0.29 0.005" pos="5.25 -4.26 0.242" class="primitive_collision" rgba="0.2 0.7 0.2 0.45"/>
+            <geom name="m2_shelf_middle_back_mid_low"  type="box" size="2.71 0.29 0.005" pos="5.25 -4.26 0.682" class="primitive_collision" rgba="0.2 0.7 0.2 0.45"/>
+            <geom name="m2_shelf_middle_back_mid_high" type="box" size="2.71 0.29 0.005" pos="5.25 -4.26 1.185" class="primitive_collision" rgba="0.2 0.7 0.2 0.45"/>
+            <geom name="m2_shelf_middle_back_high"     type="box" size="2.71 0.29 0.005" pos="5.25 -4.26 1.681" class="primitive_collision" rgba="0.2 0.7 0.2 0.45"/>
+        </body>
+
+        <!--  ===================== MIDDLE-FRONT REST =====================
+              The 2 rack units east of the M2 placement target on the same row.
+              X[4.34, 7.96]  (362 cm)   Y[-3.96, -3.41]  (55 cm) — same Y as
+              the M2 target body in market_world_m1.xml so the surface elevations
+              and depth line up exactly.
+              centre X = 6.15  centre Y = -3.685  half-X = 1.81  half-Y = 0.275
+              Future placement targets on these rack units can be added by
+              dropping new shelf_slot_* sites at the desired X (slot Y stays
+              -3.60, slot Z stays 0.247/0.687/1.190).  -->
+        <body name="m2_shelves_middle_front_rest" pos="0 0 0">
+            <geom name="m2_shelf_middle_front_rest_low"      type="box" size="1.81 0.275 0.005" pos="6.15 -3.685 0.242" class="primitive_collision" rgba="0.2 0.7 0.2 0.45"/>
+            <geom name="m2_shelf_middle_front_rest_mid_low"  type="box" size="1.81 0.275 0.005" pos="6.15 -3.685 0.682" class="primitive_collision" rgba="0.2 0.7 0.2 0.45"/>
+            <geom name="m2_shelf_middle_front_rest_mid_high" type="box" size="1.81 0.275 0.005" pos="6.15 -3.685 1.185" class="primitive_collision" rgba="0.2 0.7 0.2 0.45"/>
+            <geom name="m2_shelf_middle_front_rest_high"     type="box" size="1.81 0.275 0.005" pos="6.15 -3.685 1.681" class="primitive_collision" rgba="0.2 0.7 0.2 0.45"/>
+        </body>
+
+        <!--  ===================== NORTH RACK ROW =====================
+              X[2.54, 7.96]  (542 cm)   Y[-0.66, -0.04]  (62 cm)
+              centre X = 5.25  centre Y = -0.35  half-X = 2.71  half-Y = 0.31  -->
+        <body name="m2_shelves_north" pos="0 0 0">
+            <geom name="m2_shelf_north_low"      type="box" size="2.71 0.31 0.005" pos="5.25 -0.35 0.242" class="primitive_collision" rgba="0.2 0.7 0.2 0.45"/>
+            <geom name="m2_shelf_north_mid_low"  type="box" size="2.71 0.31 0.005" pos="5.25 -0.35 0.682" class="primitive_collision" rgba="0.2 0.7 0.2 0.45"/>
+            <geom name="m2_shelf_north_mid_high" type="box" size="2.71 0.31 0.005" pos="5.25 -0.35 1.185" class="primitive_collision" rgba="0.2 0.7 0.2 0.45"/>
+            <geom name="m2_shelf_north_high"     type="box" size="2.71 0.31 0.005" pos="5.25 -0.35 1.681" class="primitive_collision" rgba="0.2 0.7 0.2 0.45"/>
+        </body>
+    </worldbody>
+</mujoco>

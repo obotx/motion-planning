@@ -4,14 +4,6 @@ from cvxopt import matrix, solvers
 
 class TrajectoryOptimizer:
     def __init__(self, n_coeffs:list, derivatives:list, times:list):
-        """
-        Initialize the TrajectoryOptimizer class.
-
-        Parameters:
-        - n_coeffs (list[int]): List of polynomial coefficients for each segment.
-        - derivatives (list[int]): List of derivative orders for each segment.
-        - times (list[float]): List of time durations for each segment.
-        """
         self.n_coeffs = n_coeffs
         self.derivatives = derivatives
         self.times = times
@@ -19,9 +11,6 @@ class TrajectoryOptimizer:
 
     @staticmethod
     def poly_coeff(n, d, t):
-        """
-        Compute the polynomial coefficients for the derivative constraints.
-        """
         assert n > 0 and d >= 0
         D = n - 1 - np.arange(n)
         j = np.arange(d)[:, None]
@@ -32,9 +21,6 @@ class TrajectoryOptimizer:
         return cc[::-1].astype(float)
 
     def hessian(self, n, d, t):
-        """
-        Compute the cost function matrix Q for a polynomial trajectory optimization problem.
-        """
         num_t = len(t)
         Q_size = num_t * n
         Qi = np.zeros((Q_size, Q_size))
@@ -53,9 +39,6 @@ class TrajectoryOptimizer:
         return Qi
 
     def q_block(self):
-        """
-        Generate a block-diagonal matrix of Hessian matrices for polynomial trajectory optimization.
-        """
         size = sum(self.n_coeffs) * len(self.T)
         Q_block = np.zeros((size, size))
         cum_idx = 0
@@ -69,9 +52,6 @@ class TrajectoryOptimizer:
         return Q_block
 
     def constraint(self):
-        """
-        Generate a constraint matrix for quadratic programming.
-        """
         n_T = len(self.T)
         n_segments = n_T - 1
         n_axes = len(self.n_coeffs)
@@ -82,7 +62,6 @@ class TrajectoryOptimizer:
 
         start_idx = 0
         
-        # Start & end position constraints
         for i in range(n_axes):
             for j in range(n_T):
                 idx = i * n_T + j
@@ -91,7 +70,6 @@ class TrajectoryOptimizer:
                 A[n_axes * n_T + idx, start_idx: end_idx] = self.poly_coeff(self.n_coeffs[i], 0, self.T[j])
                 start_idx = end_idx
 
-        # Continuous derivatives constraints
         num_pos_constraints = n_axes * n_T * 2
         cumulative_offset = 0
 
@@ -111,9 +89,6 @@ class TrajectoryOptimizer:
         return A, f    
 
     def target(self, waypoint):
-        """
-        Generate the target vector for the constraints.
-        """
         if waypoint.ndim == 1:
             waypoint = np.expand_dims(waypoint, axis=1)
         n_wp, n_axes = waypoint.shape
@@ -128,9 +103,6 @@ class TrajectoryOptimizer:
         return b
 
     def generate_trajectory(self, waypoint, num_points=100):
-        """
-        Solve the optimization problem and generate the trajectory.
-        """
         Q = matrix(self.q_block())
         A, f = self.constraint()
         f = matrix(f)
@@ -175,9 +147,6 @@ class TrajectoryOptimizer:
         return self.yaw,yawdot
     
     def solve(self, waypoint, t):
-        """
-        Evaluate the trajectory at a specific time t for the given waypoint.
-        """
         Q = matrix(self.q_block())
         A, f = self.constraint()
         f = matrix(f)
@@ -210,8 +179,8 @@ if __name__ == "__main__":
         [-0.37, -0.07, 0.1, 1.12],
     ])
 
-    n_coeffs = [2, 2, 2, 2]       # Polynomial order for x, y, yaw
-    derivatives = [2, 2, 2, 2]    # C2 for x,y; C1 for yaw (smooth turn)
+    n_coeffs = [2, 2, 2, 2]
+    derivatives = [2, 2, 2, 2]
     times = [0.0, 5, 10.0]
 
     optimizer = TrajectoryOptimizer(n_coeffs, derivatives, times)
@@ -221,10 +190,8 @@ if __name__ == "__main__":
     x, y, yaw = states[0][0], states[1][0], states[2][0]
     yaw_unwrapped = np.unwrap(yaw)
 
-    # Plotting
     plt.figure(figsize=(14, 6))
 
-    # Trajectory with orientation
     ax1 = plt.subplot(1, 2, 1)
     ax1.plot(x, y, 'b-', label='Trajectory')
     ax1.plot(waypoints[:, 0], waypoints[:, 1], 'ro', label='Waypoints', markersize=8)
@@ -239,7 +206,6 @@ if __name__ == "__main__":
     ax1.set_xlabel('X'); ax1.set_ylabel('Y')
     ax1.axis('equal'); ax1.grid(True); ax1.legend()
 
-    # Yaw over time
     ax2 = plt.subplot(1, 2, 2)
     ax2.plot(t, yaw_unwrapped, 'g-', label='Generated Yaw')
     ax2.plot(times, waypoints[:, 2], 'ro', label='Target Yaw', markersize=8)

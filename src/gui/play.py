@@ -165,7 +165,6 @@ def main():
     sim._last_mouse_y = ypos
 
     while not glfw.window_should_close(sim.window):
-        # sim.get_keyframe("home")
         glfw.poll_events()
         impl.process_inputs()
 
@@ -196,7 +195,6 @@ def main():
         actual_x, actual_y, actual_yaw = sim.localization()
         joystick.update_robot_yaw(actual_yaw)  
         
-        # SIMULATION STEP
         if not paused:
             (x_local, y_local), yaw_command = joystick.value
 
@@ -209,7 +207,7 @@ def main():
             world_vx =  cos_a * y_local + sin_a * x_local
             world_vy =  sin_a * y_local - cos_a * x_local  
 
-            speed = 1.0  # m/s
+            speed = 1.0
             target_x += world_vx * speed * dt
             target_y += world_vy * speed * dt
 
@@ -218,7 +216,6 @@ def main():
 
             sim.step_simulation(render=False)
 
-        # RENDERING
         fb_width, fb_height = glfw.get_framebuffer_size(sim.window)
         sim.viewport.width = fb_width
         sim.viewport.height = fb_height
@@ -258,7 +255,6 @@ def main():
                     sim.direct_arm_commands[0:4] = l_enc  
                     sim.direct_arm_commands[4:8] = r_enc
 
-        # ARM CONNTROLS
         imgui.separator()
         imgui.text("ARM1")
         if ik_enabled:
@@ -328,7 +324,6 @@ def main():
             with sim._target_lock:
                 sim.direct_arm_commands[4:8] = [h1_out, h2_out, a1_out, np.radians(th_deg)]
 
-        # GRIPPERS
         imgui.separator()
         imgui.text("Grippers")
         imgui.text_disabled("(0% = Open, 100% = Closed)")
@@ -366,7 +361,6 @@ def main():
             imgui.text("Right gripper not available")
         imgui.pop_item_width()
 
-        # WRISTS
         imgui.separator()
         
         WRIST_X_RANGE = (-0.8, 0.8)
@@ -429,12 +423,11 @@ def main():
             imgui.text("Right wrist not available")
         imgui.pop_item_width()
         
-        # HAND BEARINGS
         imgui.separator()
         imgui.text("Hand Bearings")
         imgui.text_disabled("(0% = -90°, 100% = +90°)")
 
-        BEARING_RANGE = (-1.57, 1.57)  # ≈ (-π/2, π/2)
+        BEARING_RANGE = (-1.57, 1.57)
         
         imgui.push_item_width(180)
         if len(sim.gripper_ids_left) > 14:

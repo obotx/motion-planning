@@ -1,10 +1,3 @@
-"""
-Windows-side OMPL navigator.
-
-1. Calls the OMPL RRT* planner (plan.py) via subprocess (native or WSL).
-2. Validates the returned path using MuJoCo collision detection.
-3. Executes the validated path in simulation.
-"""
 
 import os, sys
 import subprocess, json, threading, time, math
@@ -14,18 +7,14 @@ import mujoco
 WAYPOINT_REACH_DIST = 0.25
 GOAL_REACH_DIST     = 0.35
 WAYPOINT_TIMEOUT    = 180.0
-# Stall detection — when the chassis hasn't progressed within this
-# window the PID is saturated against an obstacle and additional
-# waiting will not help.
-WAYPOINT_STALL_TIMEOUT = 5.0
+WAYPOINT_STALL_TIMEOUT = float(os.environ.get("AH_STALL_TIMEOUT", "5.0"))
 WAYPOINT_STALL_MIN_IMPROVEMENT = 0.02
-# Stall recovery — back the chassis along the reverse-approach by this
-# distance so the next plan attempt sees a collision-free start pose.
-WAYPOINT_STALL_BACKUP_DIST = 0.50
+WAYPOINT_STALL_BACKUP_DIST = 0.25
 WAYPOINT_STALL_BACKUP_TIMEOUT = 4.0
 MIN_WAYPOINT_DIST   = 0.25
 STRICT_MAX_COLLISION_STITCH_GAP = 0.75
-FINAL_YAW_TOL       = 0.20   # rad (~11.5 deg) — final-waypoint yaw tolerance.
+DOCK_YAW_RATE = 0.6
+FINAL_YAW_TOL       = float(os.environ.get("AH_FINAL_YAW_TOL", "0.06"))
 
 BRIDGE_MODE = os.environ.get("OMPL_BRIDGE_MODE", "native").lower()
 WSL_PYTHON  = os.environ.get("OMPL_WSL_PYTHON", "/home/user1/ompl_clean/bin/python3")
@@ -37,16 +26,7 @@ LOCAL_PLAN_PY = os.environ.get(
 )
 
 
-# ---------------------------------------------------------------------------
-# MuJoCo collision validator
-# ---------------------------------------------------------------------------
 class MujocoValidator:
-    """
-    Validates waypoints using MuJoCo native collision detection.
-
-    Uses a dedicated MjData (never touches the main sim) and only checks
-    contacts involving the mobile-base body (arm/gripper contacts ignored).
-    """
 
     def __init__(self, model, sim_data, base_body_name="base_footprint"):
         self.model   = model
@@ -56,36 +36,27 @@ class MujocoValidator:
         self.base_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, base_body_name)
         self.base_qposadr = self._find_free_joint_adr()
 
-        # base_footprint itself has no geoms; chassis/wheels live under child
-        # bodies. Arms are also descendants and must be excluded.
         self.base_geom_ids = self._collect_base_geoms()
         self.last_removed = 0
         self.last_max_gap = 0.0
         self.last_goal_dropped = False
         self.last_segment_invalid = False
-        self.skip_segment_validation = False  # set by relaxed fallback
+        self.skip_segment_validation = False
 
-        # Per-floor-object clearance check: every pickup_obj_* body in the
-        # model is treated as a circular obstacle for the chassis during
-        # nav.  The selected pick target / held object are temporarily
-        # exempted via set_exempt_objects() so the chassis is allowed to
-        # approach to standoff or carry distance.
         self.pickup_obj_ids = self._collect_pickup_objects()
         self.exempt_obj_ids = set()
-        # Chassis-vs-floor-object clearance: rejection threshold is
-        # chassis_radius + obj_radius + margin.  Tight enough that
-        # dense object spawns still leave corridors for OMPL paths.
+        self.ignore_floor_objects = True
         self.chassis_clearance_radius = 0.20
         self.obj_clearance_margin     = 0.02
         if self.pickup_obj_ids:
+            _ign = " (IGNORED for nav — walls/shelf only)" if self.ignore_floor_objects else ""
             print(f"[MuJoCo Validator] Tracking {len(self.pickup_obj_ids)} "
-                  f"floor-object obstacles for nav clearance.")
+                  f"floor-object obstacles for nav clearance.{_ign}")
 
         print(f"[MuJoCo Validator] Ready. base_id={self.base_id}, "
               f"base_geoms={len(self.base_geom_ids)}, qposadr={self.base_qposadr}")
 
     def _collect_pickup_objects(self):
-        """Find all pickup_obj_* bodies in the model and return their body IDs."""
         ids = []
         for bid in range(self.model.nbody):
             name = mujoco.mj_id2name(
@@ -95,28 +66,18 @@ class MujocoValidator:
         return ids
 
     def set_exempt_objects(self, body_ids):
-        """
-        Exempt the given pickup-object body IDs from the nav-clearance
-        check (e.g. the selected pick target during approach, or the
-        held object during transport).  Pass an empty iterable to clear.
-        """
         if body_ids is None:
             self.exempt_obj_ids = set()
         else:
             self.exempt_obj_ids = set(int(b) for b in body_ids)
 
     def set_exempt_all_except(self, keep_obstacle_bid):
-        """Relaxed-clearance fallback: exempt every floor object except
-        the one passed (the selected pick target stays a hard obstacle
-        so the chassis cannot drive through it).
-        """
         keep = int(keep_obstacle_bid)
         self.exempt_obj_ids = {
             bid for bid in self.pickup_obj_ids if bid != keep
         }
 
     def _object_radius_xy(self, body_id):
-        """Best-effort outer radius of a pickup object's geoms (cylinder)."""
         max_r = 0.0
         for g in range(self.model.ngeom):
             if int(self.model.geom_bodyid[g]) == int(body_id):
@@ -126,7 +87,8 @@ class MujocoValidator:
         return max_r
 
     def _clear_of_floor_objects(self, x, y):
-        """True if (x, y) is far enough from every non-exempt pickup object."""
+        if self.ignore_floor_objects:
+            return True
         if not self.pickup_obj_ids:
             return True
         for bid in self.pickup_obj_ids:
@@ -153,7 +115,6 @@ class MujocoValidator:
         raise RuntimeError("No free joint found for base body")
 
     def _collect_base_geoms(self):
-        """Collect mobile-base geom IDs while excluding arm/gripper descendants."""
         arm_roots = {"Arm_1", "Arm_2"}
 
         def belongs_to_mobile_base(body_id):
@@ -194,29 +155,20 @@ class MujocoValidator:
         if geom_name == "floor":
             return True
         other_body = int(self.model.geom_bodyid[int(other_geom)])
+        if self.ignore_floor_objects and other_body in self.pickup_obj_ids:
+            return True
         return self._is_robot_descendant(other_body)
 
     def _set_base_pose(self, x, y, yaw=0.0):
-        """Place base at (x, y, yaw) — yaw is rotation about world Z."""
         adr = self.base_qposadr
         self.data.qpos[adr + 0] = x
         self.data.qpos[adr + 1] = y
-        # Quaternion for rotation about Z by yaw radians
         self.data.qpos[adr + 3] = math.cos(yaw / 2.0)
         self.data.qpos[adr + 4] = 0.0
         self.data.qpos[adr + 5] = 0.0
         self.data.qpos[adr + 6] = math.sin(yaw / 2.0)
 
     def is_valid(self, x, y, yaw=0.0):
-        """
-        Run mj_forward() and check contacts involving base geoms only.
-        Also enforce a chassis-radius clearance against every non-exempt
-        pickup object so curved nav paths cannot graze floor objects.
-
-        yaw: robot heading in radians. The chassis is asymmetric (arms extend
-        forward), so a configuration valid at yaw=0 may collide at the actual
-        heading; pass the heading the robot will have at this waypoint.
-        """
         self._set_base_pose(x, y, yaw)
         mujoco.mj_forward(self.model, self.data)
         for i in range(self.data.ncon):
@@ -228,10 +180,6 @@ class MujocoValidator:
                 if self._is_allowed_base_contact(other):
                     continue
                 return False
-        # Independent floor-object clearance: contact-based check above can
-        # miss objects that are close in XY but not yet AABB-overlapping
-        # at this yaw, so we additionally reject any pose within the
-        # chassis-clearance radius of any non-exempt pickup object.
         if not self._clear_of_floor_objects(x, y):
             return False
         return True
@@ -240,14 +188,8 @@ class MujocoValidator:
         self.data.qpos[:] = sim_data.qpos[:]
         self.data.qvel[:] = 0.0
 
-    def filter_path(self, path, final_yaw=None):
-        """
-        Remove waypoints where the base is in collision per MuJoCo.
-
-        Yaw at each waypoint is the heading toward the next waypoint (what
-        the navigator commands during motion); for the final waypoint, use
-        final_yaw if provided, else the heading-from-previous direction.
-        """
+    def filter_path(self, path, final_yaw=None, constant_yaw=False):
+        _cyaw = float(final_yaw) if (constant_yaw and final_yaw is not None) else None
         if not path:
             self.last_removed = 0
             self.last_max_gap = 0.0
@@ -258,7 +200,9 @@ class MujocoValidator:
         self.last_goal_dropped = False
         for i in range(1, len(path)):
             wx, wy = path[i]
-            if i < len(path) - 1:
+            if _cyaw is not None:
+                yaw = _cyaw
+            elif i < len(path) - 1:
                 nx, ny = path[i + 1]
                 yaw = math.atan2(ny - wy, nx - wx)
             elif final_yaw is not None:
@@ -273,12 +217,11 @@ class MujocoValidator:
         if removed > 0:
             print(f"[MuJoCo Validator] Removed {removed} waypoints in collision")
         self.last_removed = removed
-        # Re-append the original goal only if it differs from valid[-1] AND
-        # is itself reachable at the final yaw.
         if valid[-1] != path[-1]:
-            tail_yaw = float(final_yaw) if final_yaw is not None else (
-                math.atan2(path[-1][1] - path[-2][1],
-                           path[-1][0] - path[-2][0]) if len(path) >= 2 else 0.0)
+            tail_yaw = _cyaw if _cyaw is not None else (
+                float(final_yaw) if final_yaw is not None else (
+                    math.atan2(path[-1][1] - path[-2][1],
+                               path[-1][0] - path[-2][0]) if len(path) >= 2 else 0.0))
             if self.is_valid(path[-1][0], path[-1][1], yaw=tail_yaw):
                 valid.append(path[-1])
             else:
@@ -289,8 +232,6 @@ class MujocoValidator:
                                     for a, b in zip(valid[:-1], valid[1:]))
         else:
             self.last_max_gap = 0.0
-        # Segment validation: sample at 20cm spacing between consecutive
-        # kept waypoints.  Skipped in relaxed-clearance fallback.
         self.last_segment_invalid = False
         if self.skip_segment_validation:
             return valid
@@ -301,7 +242,7 @@ class MujocoValidator:
             seg_len = math.hypot(bx - ax, by - ay)
             if seg_len < SEG_SAMPLE_SPACING:
                 continue
-            seg_yaw = math.atan2(by - ay, bx - ax)
+            seg_yaw = _cyaw if _cyaw is not None else math.atan2(by - ay, bx - ax)
             n_samples = max(1, int(seg_len / SEG_SAMPLE_SPACING))
             for k in range(1, n_samples):
                 t = k / n_samples
@@ -315,9 +256,6 @@ class MujocoValidator:
         return valid
 
 
-# ---------------------------------------------------------------------------
-# Path post-processing
-# ---------------------------------------------------------------------------
 def decimate_path(path, min_dist=MIN_WAYPOINT_DIST):
     if not path:
         return path
@@ -358,17 +296,10 @@ def smooth_path(waypoints, passes=3):
     return pts
 
 
-# ---------------------------------------------------------------------------
-# InProcessNavigator
-# ---------------------------------------------------------------------------
 class InProcessNavigator:
     def __init__(self, sim):
         self.sim          = sim
         self.validator    = MujocoValidator(sim.model, sim.data)
-        # Generation token: every navigate_to() increments _nav_gen. Each
-        # background thread captures its own token and self-exits when it
-        # sees a newer token, making cancellation deterministic even when an
-        # old thread is blocked in subprocess.run().
         self._nav_gen     = 0
         self._gen_lock    = threading.Lock()
         if BRIDGE_MODE == "wsl":
@@ -384,18 +315,17 @@ class InProcessNavigator:
         return ["wsl", WSL_PYTHON, WSL_PLAN_PY]
 
     def navigate_to(self, goal_xy, on_complete=None, goal_tolerance=None,
-                    final_yaw=None, allow_goal_nudge=True):
+                    final_yaw=None, allow_goal_nudge=True, constant_yaw=False):
         with self._gen_lock:
             self._nav_gen += 1
             my_gen = self._nav_gen
         threading.Thread(
             target=self._run,
             args=(my_gen, goal_xy, on_complete, goal_tolerance, final_yaw,
-                  allow_goal_nudge),
+                  allow_goal_nudge, constant_yaw),
             daemon=True).start()
 
     def cancel(self):
-        # Bumping the generation token invalidates the running thread.
         with self._gen_lock:
             self._nav_gen += 1
 
@@ -404,8 +334,7 @@ class InProcessNavigator:
             return my_gen == self._nav_gen
 
     def _run(self, my_gen, goal_xy, on_complete, goal_tolerance, final_yaw,
-             allow_goal_nudge):
-        # Single-shot callback dispatcher (avoid double-fire in error paths).
+             allow_goal_nudge, constant_yaw=False):
         cb_fired = [False]
         def fire(ok):
             if cb_fired[0]:
@@ -419,7 +348,7 @@ class InProcessNavigator:
             payload = json.dumps({
                 "start":      [float(x), float(y)],
                 "goal":       [float(goal_xy[0]), float(goal_xy[1])],
-                "solve_time": 3.0
+                "solve_time": 1.5
             })
 
             print(
@@ -432,8 +361,6 @@ class InProcessNavigator:
                 self._planner_command(),
                 input=payload, capture_output=True, text=True, timeout=60)
 
-            # If a newer navigate_to was issued while we were blocked in OMPL,
-            # exit silently without firing the callback or driving the base.
             if not self._is_current(my_gen):
                 print(f"[Nav gen={my_gen}] superseded — exiting")
                 return
@@ -459,8 +386,6 @@ class InProcessNavigator:
             raw_path = [(float(pt[0]), float(pt[1])) for pt in data]
             print(f"[OMPL] {len(raw_path)} waypoints from OMPL")
             if raw_path:
-                # Refuse a path whose start was nudged: the robot is likely
-                # near a keepout and the nudge target may not be OMPL-safe.
                 start_nudge = math.hypot(raw_path[0][0] - float(x),
                                          raw_path[0][1] - float(y))
                 if start_nudge > 0.10:
@@ -470,8 +395,6 @@ class InProcessNavigator:
                           f"(Δ={start_nudge:.2f}m).")
                     fire(False)
                     return
-                # Pick candidates must be reached exactly because arm IK was
-                # pre-screened for the caller's pose.
                 goal_nudge = math.hypot(raw_path[-1][0] - float(goal_xy[0]),
                                         raw_path[-1][1] - float(goal_xy[1]))
                 if (not allow_goal_nudge) and goal_nudge > 0.10:
@@ -482,9 +405,9 @@ class InProcessNavigator:
                     fire(False)
                     return
 
-            # MuJoCo collision validation, with yaw inferred per waypoint.
             self.validator.sync(self.sim.data)
-            validated = self.validator.filter_path(raw_path, final_yaw=final_yaw)
+            validated = self.validator.filter_path(raw_path, final_yaw=final_yaw,
+                                                    constant_yaw=constant_yaw)
             if not allow_goal_nudge and self.validator.last_goal_dropped:
                 print("[Nav] REFUSING path: collision validation dropped the "
                       "exact pick/drop goal.")
@@ -499,13 +422,12 @@ class InProcessNavigator:
             print(f"[MuJoCo] {len(validated)} waypoints after collision validation "
                   f"(max_gap={self.validator.last_max_gap:.2f}m, segments_clear=True)")
 
-            # Prefer the smoothed path, but if smoothing creates a stitch gap
-            # that strict mode is trying to avoid, fall back to the densified
-            # raw-valid waypoints.
-            smooth_candidate = densify_path(smooth_path(validated))
+            _sm_passes = 9 if constant_yaw else 3
+            smooth_candidate = densify_path(smooth_path(validated, passes=_sm_passes))
             smooth_candidate = decimate_path(smooth_candidate)
             path = self.validator.filter_path(smooth_candidate,
-                                              final_yaw=final_yaw)
+                                              final_yaw=final_yaw,
+                                              constant_yaw=constant_yaw)
             if (not allow_goal_nudge and
                     (self.validator.last_goal_dropped or
                      self.validator.last_segment_invalid)):
@@ -516,7 +438,8 @@ class InProcessNavigator:
                 print(f"[Nav] Smoothed strict path invalid ({reason}); "
                       "falling back to raw collision-validated path")
                 fallback = decimate_path(densify_path(validated))
-                path = self.validator.filter_path(fallback, final_yaw=final_yaw)
+                path = self.validator.filter_path(fallback, final_yaw=final_yaw,
+                                                  constant_yaw=constant_yaw)
                 if not allow_goal_nudge and self.validator.last_goal_dropped:
                     print("[Nav] REFUSING path: fallback collision validation "
                           "dropped the exact pick/drop goal.")
@@ -536,10 +459,10 @@ class InProcessNavigator:
                 fire(False)
                 return
 
-            success = self._follow(my_gen, path, goal_xy, goal_tolerance, final_yaw)
+            success = self._follow(my_gen, path, goal_xy, goal_tolerance, final_yaw,
+                                   constant_yaw=constant_yaw)
             print(f"[Nav gen={my_gen}] Done — success={success}")
             if not self._is_current(my_gen):
-                # Superseded mid-_follow; do not invoke caller's callback.
                 return
             fire(success)
 
@@ -552,22 +475,33 @@ class InProcessNavigator:
             if self._is_current(my_gen):
                 fire(False)
 
-    def _follow(self, my_gen, path, final_goal, goal_tolerance=None, final_yaw=None):
-        # The path's last waypoint is what the robot is actually driven to.
-        # When plan.py nudges an invalid goal, path[-1] != final_goal — verify
-        # against path[-1] so we don't reject a nav that reached the path end.
+    def _follow(self, my_gen, path, final_goal, goal_tolerance=None, final_yaw=None,
+                constant_yaw=False):
         effective_goal = path[-1] if path else final_goal
+        try:
+            self.sim._nav_goal_xy = (float(effective_goal[0]),
+                                     float(effective_goal[1]))
+        except Exception:
+            pass
         for i, (wx, wy) in enumerate(path):
             if not self._is_current(my_gen):
                 return False
             nx, ny = path[i+1] if i+1 < len(path) else final_goal
             is_last = (i == len(path) - 1)
-            if is_last and final_yaw is not None:
+            if final_yaw is not None and (constant_yaw or is_last):
                 wp_yaw = float(final_yaw)
             else:
                 wp_yaw = math.atan2(ny - wy, nx - wx)
+            _dock = (is_last and final_yaw is not None
+                     and getattr(self.sim, "_base_near_goal_vel", None)
+                     is not None)
+            _dock_phase = "pos" if _dock else None
+            _dock_target_yaw = (float(self.sim.localization()[2])
+                                if _dock else wp_yaw)
+            _dock_last_t = time.time()
+            _wp_yaw_eff = _dock_target_yaw if _dock else wp_yaw
             with self.sim._target_lock:
-                self.sim.target_base = np.array([wx, wy, wp_yaw])
+                self.sim.target_base = np.array([wx, wy, _wp_yaw_eff])
             if is_last and goal_tolerance is not None:
                 tol = float(goal_tolerance)
             else:
@@ -581,18 +515,51 @@ class InProcessNavigator:
                 cx, cy, cyaw = self.sim.localization()
                 dist = math.hypot(cx - wx, cy - wy)
                 pos_ok = dist < tol
-                # On the last waypoint, additionally require yaw to converge
-                # within tolerance so we don't exit position-converged while
-                # the base PD is still rotating to final_yaw.
                 yaw_ok = True
                 if is_last and final_yaw is not None:
                     yaw_err = abs(((cyaw - float(final_yaw) + math.pi)
                                    % (2 * math.pi)) - math.pi)
-                    yaw_ok = yaw_err < FINAL_YAW_TOL
+                    _eff_yaw_tol = (FINAL_YAW_TOL if _dock
+                                    else float(os.environ.get(
+                                        "AH_PICKUP_YAW_TOL", "0.175")))
+                    yaw_ok = yaw_err < _eff_yaw_tol
+                if _dock:
+                    if _dock_phase == "pos":
+                        if pos_ok:
+                            _dock_phase = "yaw"
+                            _dock_last_t = now
+                            last_progress = now
+                            print(f"[Nav] dock: position reached "
+                                  f"(dist={dist:.2f}m) → gentle stationary "
+                                  f"in-place yaw to final_yaw "
+                                  f"({DOCK_YAW_RATE:.1f}rad/s)")
+                        else:
+                            yaw_ok = False
+                            if os.environ.get("AH_DOCK_YAW_PROG", "1") == "1":
+                                _e_yp = ((float(final_yaw) - _dock_target_yaw
+                                          + math.pi) % (2 * math.pi)) - math.pi
+                                _prog = max(0.0, 1.0 - dist / 1.0)
+                                _dt_yp = max(0.0, now - _dock_last_t)
+                                _dock_last_t = now
+                                _step = 0.3 * _dt_yp * _prog
+                                _dock_target_yaw += max(-_step, min(_step, _e_yp))
+                    if _dock_phase == "yaw":
+                        _dt = max(0.0, now - _dock_last_t)
+                        _dock_last_t = now
+                        _e = ((float(final_yaw) - _dock_target_yaw + math.pi)
+                              % (2 * math.pi)) - math.pi
+                        _mx = DOCK_YAW_RATE * _dt
+                        _dock_target_yaw += max(-_mx, min(_mx, _e))
+                    with self.sim._target_lock:
+                        self.sim.target_base = np.array(
+                            [wx, wy, _dock_target_yaw])
+                    if os.environ.get("AH_CARRY_LOW_IMPRATIO", "1") == "1":
+                        _drv_imp = float(os.environ.get("AH_IMPRATIO", "1.0"))
+                        _yaw_imp = float(os.environ.get("AH_YAW_IMPRATIO", "80.0"))
+                        self.sim.model.opt.impratio = (
+                            _yaw_imp if _dock_phase == "yaw" else _drv_imp)
                 progress = dist
                 if is_last and final_yaw is not None:
-                    # Count yaw convergence as progress so a valid in-place
-                    # rotation does not look like a position stall.
                     progress += 0.20 * min(float(yaw_err), math.pi)
                 if progress < best_progress - WAYPOINT_STALL_MIN_IMPROVEMENT:
                     best_progress = progress
@@ -604,7 +571,22 @@ class InProcessNavigator:
                     print(f"[Nav gen={my_gen}] wp{i+1}/{len(path)} dist={dist:.2f}m "
                           f"pos=({cx:.2f},{cy:.2f}) target=({wx:.2f},{wy:.2f}){extra}")
                     last_print = now
-                if pos_ok and yaw_ok:
+                passed = False
+                if (not is_last
+                        and getattr(self.sim, "_base_near_goal_vel", None)
+                        is not None):
+                    _dnext = math.hypot(cx - nx, cy - ny)
+                    if _dnext < dist:
+                        passed = True
+                    else:
+                        _dx, _dy = nx - wx, ny - wy
+                        _dn = math.hypot(_dx, _dy)
+                        if _dn > 1e-6:
+                            _ux, _uy = _dx / _dn, _dy / _dn
+                            _proj = (cx - wx) * _ux + (cy - wy) * _uy
+                            _lat = abs((cx - wx) * (-_uy) + (cy - wy) * _ux)
+                            passed = (_proj > 0.0 and _lat < 1.0)
+                if (pos_ok and yaw_ok) or passed:
                     break
                 if now - last_progress > WAYPOINT_STALL_TIMEOUT:
                     extra = ""
@@ -613,17 +595,70 @@ class InProcessNavigator:
                     print(f"[Nav] Waypoint {i+1} stalled at dist={dist:.2f}m"
                           f"{extra}; no progress for "
                           f"{WAYPOINT_STALL_TIMEOUT:.0f}s")
-                    # Stall rescue — drive the chassis back along the
-                    # reverse-approach direction so it exits any
-                    # constraint region it is wedged against.  Without
-                    # this the next plan attempt sees the chassis in a
-                    # clearance-violating pose and the planner refuses.
+                    if os.environ.get("AH_NAV_PUSH_THROUGH", "0") == "1":
+                        try:
+                            _pbx, _pby, _pyaw = self.sim.localization()
+                            if math.isfinite(_pbx) and math.isfinite(_pby):
+                                _psave = {}
+                                for _a, _v in (
+                                        ("_base_max_vel_override",
+                                         float(os.environ.get(
+                                             "AH_NAV_PUSH_VEL", "13.0"))),
+                                        ("_base_omega_max_override", 0.2),
+                                        ("_base_cmd_slew_override", 0.08)):
+                                    _psave[_a] = getattr(self.sim, _a, None)
+                                    setattr(self.sim, _a, _v)
+                                with self.sim._target_lock:
+                                    self.sim.target_base = np.array(
+                                        [wx, wy, _pyaw])
+                                _pt0 = time.time()
+                                _pdur = float(os.environ.get(
+                                    "AH_NAV_PUSH_SECS", "3.0"))
+                                while time.time() - _pt0 < _pdur:
+                                    if not self._is_current(my_gen):
+                                        break
+                                    time.sleep(0.05)
+                                for _a, _old in _psave.items():
+                                    if _old is None:
+                                        try:
+                                            delattr(self.sim, _a)
+                                        except Exception:
+                                            pass
+                                    else:
+                                        setattr(self.sim, _a, _old)
+                                _pfx, _pfy, _ = self.sim.localization()
+                                _pmoved = (math.hypot(_pfx - _pbx, _pfy - _pby)
+                                           if math.isfinite(_pfx) else 0.0)
+                                print(f"[Nav] PUSH-THROUGH: forward shove "
+                                      f"(wall-clear path = loose obj) moved "
+                                      f"{_pmoved*100:.0f}cm toward wp{i+1}")
+                                if _pmoved > 0.05:
+                                    last_progress = time.time()
+                                    best_progress = math.hypot(
+                                        _pfx - wx, _pfy - wy)
+                                    continue
+                        except Exception as _pe:
+                            print(f"[Nav] push-through skipped: {_pe}")
+                    _rescue_saved = {}
                     try:
                         _bx, _by, _byaw = self.sim.localization()
-                        # reverse-approach unit = from waypoint toward
-                        # current pos (= direction chassis was coming
-                        # from).  If degenerate (very small distance),
-                        # use chassis yaw to back straight rearward.
+                        if not (math.isfinite(_bx) and math.isfinite(_by)):
+                            print("[Nav] Stall rescue skipped: non-finite pose")
+                            return False
+                        for _a in ("integral_x", "integral_y", "integral_yaw"):
+                            if hasattr(self.sim, _a):
+                                setattr(self.sim, _a, 0.0)
+                        for _a in ("deriv_x", "deriv_y", "deriv_yaw",
+                                   "prev_delta_x", "prev_delta_y",
+                                   "prev_delta_yaw"):
+                            if hasattr(self.sim, _a):
+                                setattr(self.sim, _a, 0.0)
+                        self.sim._prev_target_vel = None
+                        for _a, _v in (("_base_max_vel_override", 1.5),
+                                       ("_base_omega_max_override", 0.4),
+                                       ("_base_cmd_slew_override", 0.05)):
+                            _rescue_saved[_a] = getattr(self.sim, _a, None)
+                            setattr(self.sim, _a, _v)
                         _vx = _bx - wx
                         _vy = _by - wy
                         _vn = math.hypot(_vx, _vy)
@@ -635,32 +670,46 @@ class InProcessNavigator:
                             _uy = _vy / _vn
                         _backup_x = _bx + _ux * WAYPOINT_STALL_BACKUP_DIST
                         _backup_y = _by + _uy * WAYPOINT_STALL_BACKUP_DIST
-                        print(f"[Nav] Stall rescue: backing chassis "
+                        print(f"[Nav] Stall rescue: GENTLE back "
                               f"{WAYPOINT_STALL_BACKUP_DIST*100:.0f}cm "
-                              f"along reverse-approach "
+                              f"(windup reset, vel-capped) "
                               f"({_bx:.2f},{_by:.2f}) → "
-                              f"({_backup_x:.2f},{_backup_y:.2f}) "
-                              f"to exit collision region before failing")
+                              f"({_backup_x:.2f},{_backup_y:.2f})")
                         with self.sim._target_lock:
                             self.sim.target_base = np.array(
                                 [_backup_x, _backup_y, _byaw])
                         _bk_t0 = time.time()
-                        _bk_tol = 0.10  # 10 cm — coarse, just need to escape
+                        _bk_tol = 0.10
                         while time.time() - _bk_t0 < WAYPOINT_STALL_BACKUP_TIMEOUT:
                             if not self._is_current(my_gen):
                                 break
                             _cx, _cy, _ = self.sim.localization()
+                            if not (math.isfinite(_cx) and math.isfinite(_cy)):
+                                print("[Nav] Stall rescue abort: pose went NaN")
+                                break
                             if math.hypot(_cx - _backup_x,
                                           _cy - _backup_y) <= _bk_tol:
                                 break
                             time.sleep(0.05)
                         _fx, _fy, _ = self.sim.localization()
+                        _moved = (math.hypot(_fx - _bx, _fy - _by) * 100
+                                  if math.isfinite(_fx) and math.isfinite(_fy)
+                                  else float("nan"))
                         print(f"[Nav] Stall rescue done: chassis at "
-                              f"({_fx:.2f},{_fy:.2f}) — moved "
-                              f"{math.hypot(_fx - _bx, _fy - _by)*100:.0f}cm "
+                              f"({_fx:.2f},{_fy:.2f}) — moved {_moved:.0f}cm "
                               f"in {time.time() - _bk_t0:.1f}s")
                     except Exception as _bk_e:
                         print(f"[Nav] Stall rescue skipped: {_bk_e}")
+                    finally:
+                        for _a, _old in _rescue_saved.items():
+                            if _old is None:
+                                if hasattr(self.sim, _a):
+                                    try:
+                                        delattr(self.sim, _a)
+                                    except Exception:
+                                        pass
+                            else:
+                                setattr(self.sim, _a, _old)
                     return False
                 if now - t0 > WAYPOINT_TIMEOUT:
                     print(f"[Nav] Waypoint {i+1} timed out at dist={dist:.2f}m")
@@ -668,9 +717,6 @@ class InProcessNavigator:
                 time.sleep(0.05)
         if not self._is_current(my_gen):
             return False
-        # Verify-on-success: confirm final pose against the path's effective
-        # goal (which may differ from final_goal when plan.py nudged an
-        # invalid goal).
         cx, cy, cyaw = self.sim.localization()
         dist = math.hypot(cx - effective_goal[0], cy - effective_goal[1])
         verify_tol = float(goal_tolerance) if goal_tolerance is not None else GOAL_REACH_DIST
@@ -681,15 +727,16 @@ class InProcessNavigator:
             return False
         if final_yaw is not None:
             yaw_err = abs(((cyaw - float(final_yaw) + math.pi) % (2 * math.pi)) - math.pi)
-            if yaw_err > FINAL_YAW_TOL:
+            _vtol = (FINAL_YAW_TOL if constant_yaw
+                     else float(os.environ.get("AH_PICKUP_YAW_TOL", "0.175")))
+            if yaw_err > _vtol:
                 print(f"[Nav] verify FAIL: yaw_err={math.degrees(yaw_err):.1f}deg "
-                      f"> {math.degrees(FINAL_YAW_TOL):.1f}deg")
+                      f"> {math.degrees(_vtol):.1f}deg")
                 return False
             print(f"[Nav] verify OK: final dist={dist:.3f}m  "
                   f"yaw_err={math.degrees(yaw_err):.1f}deg")
         else:
             print(f"[Nav] verify OK: final dist={dist:.3f}m")
-        # If the path was nudged (path[-1] != caller's final_goal), warn.
         nudge_dist = math.hypot(effective_goal[0] - final_goal[0],
                                 effective_goal[1] - final_goal[1])
         if nudge_dist > 0.10:

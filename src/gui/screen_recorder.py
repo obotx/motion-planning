@@ -1,9 +1,3 @@
-"""Optional GLFW framebuffer → mp4 capture used by `play_m1.py --record`.
-
-Writes a single mp4 of the simulation session (including the ImGui
-panel and MuJoCo scene) to `output_videos/`.  Uses opencv-python for
-mp4 encoding and PyOpenGL for framebuffer readback.
-"""
 
 import os
 import time
@@ -13,19 +7,6 @@ import glfw
 
 
 class ScreenRecorder:
-    """Captures the GLFW framebuffer to mp4 for the duration of a session.
-
-    Usage:
-        rec = ScreenRecorder(fps=30)
-        rec.start(label="play_m1_session")          # opens writer
-        # for each rendered frame:
-        rec.capture_frame(window)
-        # at exit:
-        rec.stop()
-
-    All methods are no-ops if recording has not been started or if the
-    optional dependencies (cv2 + PyOpenGL) are missing.
-    """
 
     def __init__(self, fps=30, output_dir=None):
         self.fps = fps
@@ -66,12 +47,9 @@ class ScreenRecorder:
         os.makedirs(self._output_dir, exist_ok=True)
         ts = time.strftime("%Y%m%d_%H%M%S")
         self._path = os.path.join(self._output_dir, f"{label}_{ts}.mp4")
-        # Defer writer creation until the first capture_frame so we know
-        # the framebuffer dimensions.
         self._frame_count = 0
         self._size = None
         print(f"[REC] Recording will be saved to {self._path}")
-        # Use a sentinel so `active` returns True before the first frame.
         self._writer = "pending"
 
     def _open_writer(self, w, h):
@@ -103,14 +81,10 @@ class ScreenRecorder:
                 if not self.active:
                     return
             if (w, h) != self._size:
-                # Window resized mid-recording; drop the frame so the
-                # encoder doesn't get a size mismatch.
                 return
             pixels = self._GL.glReadPixels(
                 0, 0, w, h, self._GL.GL_RGB, self._GL.GL_UNSIGNED_BYTE)
             frame = np.frombuffer(pixels, dtype=np.uint8).reshape(h, w, 3)
-            # OpenGL framebuffer is bottom-up; cv2 expects top-down.
-            # cv2 also expects BGR, not RGB.
             frame = np.flipud(frame)
             frame = self._cv2.cvtColor(frame, self._cv2.COLOR_RGB2BGR)
             self._writer.write(frame)

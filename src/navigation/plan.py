@@ -1,13 +1,17 @@
-import sys, json, math
+import sys, json, math, os
 from ompl import base as ob
 from ompl import geometric as og
 
 FLOOR_X      = (0.0, 8.0)
 FLOOR_Y      = (-8.0, 0.0)
-ROBOT_RADIUS = 0.65   # inflation radius; covers chassis's widest yaw profile
+ROBOT_RADIUS = 0.65
 
 OBSTACLE_RECTS = [
-    (2.5,  8.05, -5.2, -3.1),   # shelf
+    (2.55, 4.34, -3.96, -3.41),
+    (4.34, 7.96, -3.96, -3.41),
+    (2.54, 7.96, -4.55, -3.97),
+    (0.72, 7.97, -7.96, -7.42),
+    (2.54, 7.96, -0.66, -0.04),
     (-0.1, 0.1,  -8.0,  0.0),
     (7.9,  8.1,  -8.0,  0.0),
     (0.0,  8.0,  -0.1,  0.1),
@@ -26,17 +30,19 @@ class ValidityChecker(ob.StateValidityChecker):
                 return False
         return True
 
-def nudge(si, space, xy, radius=0.8, tries=24):
+def nudge(si, space, xy, radius=0.8, tries=24, steps=16):
     state = space.allocState()
-    for i in range(tries):
-        angle = 2 * math.pi * i / tries
-        state[0] = xy[0] + radius * math.cos(angle)
-        state[1] = xy[1] + radius * math.sin(angle)
-        if si.isValid(state):
-            return state
+    for ri in range(1, int(steps) + 1):
+        r = radius * ri / float(steps)
+        for i in range(tries):
+            angle = 2 * math.pi * i / tries
+            state[0] = xy[0] + r * math.cos(angle)
+            state[1] = xy[1] + r * math.sin(angle)
+            if si.isValid(state):
+                return state
     return None
 
-def plan(start_xy, goal_xy, solve_time=3.0):
+def plan(start_xy, goal_xy, solve_time=1.5, use_rrt_connect=True):
     space = ob.RealVectorStateSpace(2)
     bounds = ob.RealVectorBounds(2)
     bounds.setLow(0, FLOOR_X[0]);  bounds.setHigh(0, FLOOR_X[1])
@@ -65,7 +71,10 @@ def plan(start_xy, goal_xy, solve_time=3.0):
     pdef = ob.ProblemDefinition(si)
     pdef.setStartAndGoalStates(start, goal)
 
-    planner = og.RRTstar(si)
+    if use_rrt_connect:
+        planner = og.RRTConnect(si)
+    else:
+        planner = og.RRTstar(si)
     planner.setProblemDefinition(pdef)
     planner.setRange(0.5)
     planner.setup()
@@ -74,6 +83,18 @@ def plan(start_xy, goal_xy, solve_time=3.0):
         return None
 
     path = pdef.getSolutionPath()
+    if os.environ.get("AH_NAV_SIMPLIFY", "0") == "1":
+        try:
+            _raw_n = path.getStateCount()
+            og.PathSimplifier(si).simplifyMax(path)
+            if not path.check():
+                path = pdef.getSolutionPath()
+            else:
+                sys.stderr.write(
+                    f"[plan] path simplified {_raw_n}->{path.getStateCount()} states\n")
+        except Exception as _e:
+            sys.stderr.write(f"[plan] simplify skipped: {_e}\n")
+            path = pdef.getSolutionPath()
     path.interpolate(40)
     waypoints = [[path.getState(i)[0], path.getState(i)[1]]
                  for i in range(path.getStateCount())]
