@@ -84,6 +84,9 @@ _BAKED_COMMON = {
     "AH_PLACE_NO_OBJ_COL": "1", "AH_PLACE_SERVO": "1", "AH_PLACE_RUNTIME_REACH": "1",
     "AH_PLACE_RAM_FORCE": "250", "AH_PLACE_LAT_STRAFE": "1", "AH_PLACE_SERVO_ITERS": "40",
     "AH_PLACE_COL_STEP": "0.05", "AH_PLACE_Z_KP": "0.9",
+    "AH_PLACE_SMOOTH_LIFT": "1",
+    "AH_PLACE_ARM_ONLY": "1",
+    "AH_PLACE_A1_STEP_FAR": "0.015",
     "AH_PLACE_LOW_IMPRATIO": "1", "AH_PLACE_IMPRATIO": "3",
     "AH_SLOT_FWD_SHIFT": "0.11",
 }
@@ -485,6 +488,66 @@ def get_object_radius(model, obj_idx, default=0.05):
         if int(model.geom_bodyid[g]) == body_id
     ]
     return max(radii) if radii else default
+
+
+_SEL_OBJ_CHANNEL_BIT = 32
+_sel_obj_env_done = [False]
+
+
+def _body_is_under(model, bid, root_bid):
+    b = int(bid)
+    while b > 0:
+        if b == root_bid:
+            return True
+        b = int(model.body_parentid[b])
+    return False
+
+
+def _apply_selective_obj_collision(model, selected_idx):
+    if os.environ.get("AH_SELECTIVE_OBJ_COL", "0") != "1":
+        return
+    try:
+        robot_bid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "robot")
+        obj_bids = set()
+        for i in range(NUM_OBJECTS):
+            _b = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY,
+                                   f"pickup_obj_{i}")
+            if _b >= 0:
+                obj_bids.add(int(_b))
+        if not _sel_obj_env_done[0]:
+            for g in range(model.ngeom):
+                if int(model.geom_contype[g]) == 0 and \
+                        int(model.geom_conaffinity[g]) == 0:
+                    continue
+                bid = int(model.geom_bodyid[g])
+                if bid in obj_bids:
+                    continue
+                if robot_bid >= 0 and _body_is_under(model, bid, robot_bid):
+                    continue
+                model.geom_contype[g] = int(model.geom_contype[g]) \
+                    | _SEL_OBJ_CHANNEL_BIT
+                model.geom_conaffinity[g] = int(model.geom_conaffinity[g]) \
+                    | _SEL_OBJ_CHANNEL_BIT
+            _sel_obj_env_done[0] = True
+        for i in range(NUM_OBJECTS):
+            bid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY,
+                                    f"pickup_obj_{i}")
+            if bid < 0:
+                continue
+            sel = (i == int(selected_idx))
+            for g in range(model.ngeom):
+                if int(model.geom_bodyid[g]) != bid:
+                    continue
+                if sel:
+                    model.geom_contype[g] = 1
+                    model.geom_conaffinity[g] = 1
+                else:
+                    model.geom_contype[g] = _SEL_OBJ_CHANNEL_BIT
+                    model.geom_conaffinity[g] = _SEL_OBJ_CHANNEL_BIT
+        print(f"[SEL_OBJ_COL] selected=Obj-{selected_idx} collides robot; "
+              f"others floor/shelf-only (robot passes through)")
+    except Exception as _e:
+        print(f"[SEL_OBJ_COL] skipped ({_e})")
 
 
 
@@ -3043,7 +3106,8 @@ def main():
         _table_d = PLACE_LEVEL_D.get(_lvl, 0.70)
         _d = float(np.clip(_reach_d, _clear_min_d,
                            float(os.environ.get("AH_DOCK_D_MAX", "0.78"))))
-        standoff = (float(shelf_pos[0]), RACK_OPENING_Y + _d)
+        _lat_bias = float(os.environ.get("AH_DOCK_LAT_BIAS", "0.0"))
+        standoff = (float(shelf_pos[0]) - _lat_bias, RACK_OPENING_Y + _d)
         print(f"[NAV] reach-aware standoff: slot_Y={float(shelf_pos[1]):.2f} "
               f"arm_reach={_arm_reach:.2f} → _d={_d:.3f} "
               f"(reach_d={_reach_d:.3f}, table={_table_d:.2f}, "
@@ -3223,10 +3287,17 @@ def main():
         if not success:
             print("[SHELF] Navigation to shelf standoff failed; cancelling place")
             grasp_exec.cancel()
-            try:
-                grasp_exec._clear_held_state()
-            except Exception:
-                pass
+            if os.environ.get("AH_PLACE_KEEP_ON_CANCEL", "1") == "1":
+                try:
+                    sim._pin_substep = True
+                except Exception:
+                    pass
+                print("[SHELF] dock-fail: KEEPING obj held (firm pin re-armed, no drop)")
+            else:
+                try:
+                    grasp_exec._clear_held_state()
+                except Exception:
+                    pass
             return
         try:
             grasp_exec._enable_held_obj_contacts()
@@ -3703,6 +3774,7 @@ def main():
                     print(f"[AUTO_RUN] respawn/reset raised: {_e_respawn}")
             _current_obj_idx[0]   = selected_object
             _current_shelf_idx[0] = selected_shelf
+            _apply_selective_obj_collision(sim.model, selected_object)
             obj_world = get_object_world_pos(
                 sim.model, sim.data, selected_object)
             _pick_candidate_obj_xy[0] = obj_world[:2].copy()
@@ -3829,6 +3901,7 @@ def main():
             if not any_in_progress and not holding_object:
                 _current_obj_idx[0]   = selected_object
                 _current_shelf_idx[0] = selected_shelf
+                _apply_selective_obj_collision(sim.model, selected_object)
                 obj_world   = get_object_world_pos(sim.model, sim.data, selected_object)
                 _pick_candidate_obj_xy[0] = obj_world[:2].copy()
                 _pick_replan_count[0] = 0

@@ -43,9 +43,11 @@ PALM_ANCHOR_MAX_FAR      = 0.18
 
 WZ_REFINE_AXIS_ERR_THRESHOLD     = math.radians(5.0)
 WZ_RUNTIME_CORRECTION_SETTLE_S      = 0.35
-WZ_RUNTIME_CORRECTION_MAX_DELTA     = math.radians(60.0)
-WZ_RUNTIME_CORRECTION_MAX_ITERS     = 3
-WZ_RUNTIME_CORRECTION_MAX_INITIAL   = math.radians(10.0)
+WZ_RUNTIME_CORRECTION_MAX_DELTA     = math.radians(
+    float(os.environ.get("AH_WZ_MAX_DELTA", "60.0")))
+WZ_RUNTIME_CORRECTION_MAX_ITERS     = int(os.environ.get("AH_WZ_MAX_ITERS", "3"))
+WZ_RUNTIME_CORRECTION_MAX_INITIAL   = math.radians(
+    float(os.environ.get("AH_WZ_MAX_INITIAL", "10.0")))
 
 FAST_PICKUP_MODE   = False
 STRICT_PICKUP_MODE = False
@@ -1004,6 +1006,9 @@ class GraspExecutor:
             best_max_far = max_far_o
             best_carry = carry_o
             iters_applied = 0
+            _flip = 1.0
+            _flip_used = False
+            _flip_on = os.environ.get("AH_WZ_FLIP", "0") == "1"
 
             for iter_i in range(int(WZ_RUNTIME_CORRECTION_MAX_ITERS)):
                 step_err = max(
@@ -1012,7 +1017,7 @@ class GraspExecutor:
                 cur_ctrl = best_ctrl
                 cur_target = cur_ctrl / (
                     1.0 + WRIST_Z_PD_COMPENSATION_RATIO)
-                new_target = cur_target - step_err
+                new_target = cur_target - _flip * step_err
                 while new_target > math.pi:
                     new_target -= 2 * math.pi
                 while new_target < -math.pi:
@@ -1069,6 +1074,13 @@ class GraspExecutor:
                     data.ctrl[gids[GIDS_WRIST_Z]] = best_ctrl
                     _t.sleep(WZ_RUNTIME_CORRECTION_SETTLE_S * 0.5)
                     if not err_didnt_worsen:
+                        if _flip_on and not _flip_used:
+                            _flip_used = True
+                            _flip = -_flip
+                            print(f"[Exec] {tag} wz grew the axis "
+                                  f"(wrong direction) → FLIP + retry "
+                                  f"the other way")
+                            continue
                         reason = (
                             f"axis err drift "
                             f"{math.degrees(best_err):+.1f}°→"
@@ -3772,11 +3784,22 @@ class GraspExecutor:
         _ginv = np.zeros(4); mujoco.mju_negQuat(_ginv, _g0)
         _rel = np.zeros(4); mujoco.mju_mulQuat(_rel, _ginv, _o0)
         _anchor_pinch = bool(anchor_pinch_midpoint)
+        _rigid = os.environ.get("AH_PIN_RIGID_GRIPPER", "1") == "1"
+        _g0_pos = np.asarray(self.sim.data.xpos[_gid], float).copy()
+        _g0_mat = np.asarray(self.sim.data.xmat[_gid], float).reshape(3, 3).copy()
+        _o0_pos = np.asarray(self.sim.data.xpos[self._held_obj_bid], float).copy()
+        _local_pos = _g0_mat.T @ (_o0_pos - _g0_pos)
         def closure(data):
-            anchor = (self._pinch_midpoint_xyz(data) if _anchor_pinch
-                      else self._carry_anchor_xyz(data))
-            target = (anchor[0] + offset[0], anchor[1] + offset[1],
-                      anchor[2] + offset[2])
+            if _rigid:
+                _gp = np.asarray(data.xpos[_gid], float)
+                _gm = np.asarray(data.xmat[_gid], float).reshape(3, 3)
+                _t = _gp + _gm @ _local_pos
+                target = (float(_t[0]), float(_t[1]), float(_t[2]))
+            else:
+                anchor = (self._pinch_midpoint_xyz(data) if _anchor_pinch
+                          else self._carry_anchor_xyz(data))
+                target = (anchor[0] + offset[0], anchor[1] + offset[1],
+                          anchor[2] + offset[2])
             _gq = data.xquat[_gid]
             _oq = np.zeros(4); mujoco.mju_mulQuat(_oq, _gq, _rel)
             pin_freejoint(data, qpa, dofadr, target,
@@ -3861,18 +3884,29 @@ class GraspExecutor:
         _gid = mujoco.mj_name2id(self.sim.model, mujoco.mjtObj.mjOBJ_BODY,
                                  "Gripper_Link3_1")
         _track_quat = _gid >= 0
+        _rigid = (_gid >= 0) and os.environ.get("AH_PIN_RIGID_GRIPPER", "1") == "1"
         if _track_quat:
             _g0 = self.sim.data.xquat[_gid].copy()
             _o0 = self.sim.data.xquat[self._held_obj_bid].copy()
             _ginv = np.zeros(4); mujoco.mju_negQuat(_ginv, _g0)
             _rel = np.zeros(4); mujoco.mju_mulQuat(_rel, _ginv, _o0)
+            _g0p = np.asarray(self.sim.data.xpos[_gid], float).copy()
+            _g0m = np.asarray(self.sim.data.xmat[_gid], float).reshape(3, 3).copy()
+            _o0p = np.asarray(self.sim.data.xpos[self._held_obj_bid], float).copy()
+            _local_pos = _g0m.T @ (_o0p - _g0p)
         _anchor_pinch = bool(anchor_pinch_midpoint)
 
         def closure(data):
-            anchor = (self._pinch_midpoint_xyz(data) if _anchor_pinch
-                      else self._carry_anchor_xyz(data))
-            tgt = np.array([anchor[0] + offset[0], anchor[1] + offset[1],
-                            anchor[2] + offset[2]], dtype=float)
+            if _rigid:
+                _gp = np.asarray(data.xpos[_gid], float)
+                _gm = np.asarray(data.xmat[_gid], float).reshape(3, 3)
+                _rg = _gp + _gm @ _local_pos
+                tgt = np.array([_rg[0], _rg[1], _rg[2]], dtype=float)
+            else:
+                anchor = (self._pinch_midpoint_xyz(data) if _anchor_pinch
+                          else self._carry_anchor_xyz(data))
+                tgt = np.array([anchor[0] + offset[0], anchor[1] + offset[1],
+                                anchor[2] + offset[2]], dtype=float)
             cur = np.array([data.qpos[qpa], data.qpos[qpa + 1],
                             data.qpos[qpa + 2]], dtype=float)
             delta = tgt - cur
@@ -8656,7 +8690,9 @@ class GraspExecutor:
         for _sh in ("RotationLeftJoint_1", "RotationRightJoint_1"):
             _stiffen(_sh, PLACE_SHOULDER_STIFFNESS, PLACE_SHOULDER_DAMPING,
                      _curq(_sh) if _rigid else None)
-        if _rigid:
+        _arm_only = (for_place
+                     and os.environ.get("AH_PLACE_ARM_ONLY", "0") == "1")
+        if _rigid and not _arm_only:
             _stiffen("BaseJoint_1", PLACE_TH_STIFFNESS, PLACE_TH_DAMPING,
                      _curq("BaseJoint_1"))
         _stiffen("gripper_z_rotation_1", PLACE_WRIST_STIFFNESS, PLACE_WRIST_DAMPING,
@@ -9070,8 +9106,10 @@ class GraspExecutor:
                       f"(fwd {fwd_err*100:.1f}cm ≤ stop {_fwd_surface*100:.1f}cm, "
                       f"lat {lat_err*100:+.1f}cm) — STOP, no push (close wraps)")
                 break
+            _th_bal = os.environ.get("AH_PICK_TH_BALANCE", "1") == "1"
             if (not _gth_sign_locked and lat_prev is not None
-                    and abs(lat_err) > abs(lat_prev) + 0.002):
+                    and abs(lat_err) > abs(lat_prev) + 0.002
+                    and (not _th_bal or lat_err * lat_prev > 0.0)):
                 th_sign = -th_sign
                 _gth_sign_locked = True
             lat_prev = lat_err
@@ -9104,8 +9142,20 @@ class GraspExecutor:
                 h1 += 0.5 * s
                 h2 -= 0.5 * s
             if abs(lat_err) > 0.010 and abs(th_total) < th_total_cap:
-                dth = th_sign * th_kp * float(np.clip(abs(lat_err) / 0.65,
-                                                      0.0, 0.022))
+                if os.environ.get("AH_PICK_BOOM_AIM", "1") == "1":
+                    _bm = np.asarray(c[:2], float) - np.asarray(chx, float)
+                    _tg = np.asarray(target_xy, float) - np.asarray(chx, float)
+                    _ang = float(np.arctan2(
+                        _bm[0] * _tg[1] - _bm[1] * _tg[0],
+                        _bm[0] * _tg[0] + _bm[1] * _tg[1]))
+                    _bk = float(os.environ.get("AH_PICK_BOOM_K", "0.5"))
+                    dth = float(np.clip(_bk * _ang, -0.022, 0.022))
+                elif os.environ.get("AH_PICK_TH_BALANCE", "0") == "1":
+                    dth = th_sign * th_kp * float(np.clip(lat_err / 0.65,
+                                                          -0.022, 0.022))
+                else:
+                    dth = th_sign * th_kp * float(np.clip(abs(lat_err) / 0.65,
+                                                          0.0, 0.022))
                 if abs(th_total + dth) <= th_total_cap:
                     th += dth
                     th_total += dth
@@ -9125,6 +9175,31 @@ class GraspExecutor:
                       f"z_err={z_err*100:+.1f}cm a1={q[2]:.3f}→{a1:.3f} "
                       f"th={q[3]:+.3f}→{th:+.3f}(tot{th_total:+.3f}) "
                       f"tilt={tilt0:+.3f}")
+            if os.environ.get("AH_GRASP_DEBUG", "0") == "1":
+                try:
+                    _dd = self.sim.data
+                    _obj = np.asarray(target_xy, float)
+                    _pin = np.asarray(c[:2], float)
+                    _cab = self._carry_anchor_body_ids
+                    if len(_cab) == 3:
+                        _thp = np.asarray(_dd.xpos[_cab[0]][:2], float)
+                        _bcp = 0.5 * (np.asarray(_dd.xpos[_cab[1]][:2], float)
+                                      + np.asarray(_dd.xpos[_cab[2]][:2], float))
+                        _dth = float(np.linalg.norm(_thp - _obj)) * 100.0
+                        _dbc = float(np.linalg.norm(_bcp - _obj)) * 100.0
+                        _fstr = (f"thumb=({_thp[0]:.3f},{_thp[1]:.3f}) d_th={_dth:.1f}cm "
+                                 f"bc=({_bcp[0]:.3f},{_bcp[1]:.3f}) d_bc={_dbc:.1f}cm "
+                                 f"ASYM={_dth-_dbc:+.1f}cm")
+                    else:
+                        _fstr = "fingers:n/a"
+                    print(f"  [GDBG] it{it} obj=({_obj[0]:.3f},{_obj[1]:.3f}) "
+                          f"pinch=({_pin[0]:.3f},{_pin[1]:.3f}) "
+                          f"chassis=({chx[0]:.3f},{chx[1]:.3f}) | "
+                          f"gripObj fwd={fwd_err*100:+.1f} lat={lat_err*100:+.1f}cm | "
+                          f"{_fstr} | th={th:+.4f} th_sign={th_sign:+.0f} "
+                          f"th_tot={th_total:+.4f} hb={q[4]:+.3f} wy={_wy_dyn:+.3f}")
+                except Exception as _gde:
+                    print(f"  [GDBG] it{it} debug-log error: {_gde}")
             if not all(np.isfinite(q_new)):
                 break
             for i in range(len(q_new)):
@@ -9387,6 +9462,11 @@ class GraspExecutor:
     def _count_arm_shelf_contacts(self, force_thresh=None):
         if force_thresh is None:
             force_thresh = float(os.environ.get("AH_PLACE_RAM_FORCE", "250.0"))
+        """Path-B RUNTIME reachability: count live arm/gripper ↔ SHELF/RACK
+        contacts whose force exceeds `force_thresh` (N).  The place servo skips
+        the PLANNING is_valid (it rejects the un-sagged pose that would clip the
+        shelf ABOVE — but the runtime sags 0.2-0.4m clear), commands the pose,
+        then calls THIS on the live sim: a real ram (force > thresh) → revert."""
         data = self.sim.data
         model = self.sim.model
         try:
@@ -9567,7 +9647,9 @@ class GraspExecutor:
         th_sign = 1.0
         th_total = 0.0
         lat_prev = None
-        _th_aim_on = (os.environ.get("AH_PLACE_TH_AIM", "0") == "1") and _zfirst
+        _th_aim_on = ((os.environ.get("AH_PLACE_TH_AIM", "0") == "1"
+                       or os.environ.get("AH_PLACE_ARM_ONLY", "0") == "1")
+                      and _zfirst)
         _th_probed, _th_k, _use_strafe, _th_noconv = False, 0.0, False, 0
         xy_err, _ze, obj_now = self._held_obj_world_err(obj_centre_target)
         z_err = float(tgt[2] - obj_now[2])
@@ -9657,7 +9739,20 @@ class GraspExecutor:
                 h1 += d_col; h2 += d_col
             if _th_aim_on and not _use_strafe:
                 if _xy_ok and abs(lat_err) > 0.010:
-                    if not _th_probed:
+                    _arm_only_p = (os.environ.get("AH_PLACE_ARM_ONLY", "0") == "1")
+                    if _arm_only_p:
+                        _bm = np.asarray(obj_now[:2], float) - _bxy
+                        _tg = np.asarray(tgt[:2], float) - _bxy
+                        _pang = float(np.arctan2(
+                            _bm[0] * _tg[1] - _bm[1] * _tg[0],
+                            _bm[0] * _tg[0] + _bm[1] * _tg[1]))
+                        _pdth = float(np.clip(
+                            float(os.environ.get("AH_PLACE_BOOM_K", "0.5")) * _pang,
+                            -0.022, 0.022))
+                        if abs(th_total + _pdth) <= th_cap:
+                            th += _pdth
+                            th_total += _pdth
+                    if (not _arm_only_p) and not _th_probed:
                         _th_probed = True
                         _lat0 = lat_err
                         _th_b = float(self._current_arm_q()[3])
@@ -10199,8 +10294,11 @@ class GraspExecutor:
                 _park[0] = _ph; _park[1] = _ph
                 _park[2] = max(MIN_PICK_A1, 0.10)
                 _park[3] = 0.0
-                self._kinematic_descent(self._current_arm_q(), list(_park),
-                                        label="place-park-level", n_steps=30)
+                self._kinematic_descent(
+                    self._current_arm_q(), list(_park), label="place-park-level",
+                    n_steps=int(os.environ.get("AH_PLACE_PARK_STEPS", "55")),
+                    per_step_settle=float(os.environ.get(
+                        "AH_PLACE_PARK_SETTLE", "0.02")))
             else:
                 self._retract_arm_to_home()
             self._clear_held_state(deactivate_weld=True)

@@ -12,7 +12,7 @@
   <img alt="Docker" src="https://img.shields.io/badge/docker-supported-2496ED?logo=docker&logoColor=white">
 </p>
 
-https://github.com/user-attachments/assets/7697af3e-2ede-4206-9fe3-4ccee74171d1
+<https://github.com/user-attachments/assets/196432ce-8856-4e54-8062-9d49715e8fb8>
 
 <p align="center"><em>▶ Full GUI walkthrough — object selection, MOVE button, OMPL base navigation, OMPL arm grasp, and shelf-side delivery.</em></p>
 
@@ -127,6 +127,7 @@ python3.10 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip
 .venv/bin/python -m pip install -r requirements.txt
 ```
+
 </details>
 
 <details>
@@ -187,7 +188,7 @@ Once the GUI is open, follow this exact sequence to see the autonomous cycle end
 
 ### Perspective view (GUI)
 
-https://github.com/user-attachments/assets/695057d8-ac5d-4d04-b23c-6d7fcb487292
+<https://github.com/user-attachments/assets/22d4e677-5cf3-46bd-87fe-e26f13f37578>
 
 *Full recording: navigate, grasp, transport, deliver.*
 

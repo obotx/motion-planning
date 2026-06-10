@@ -198,7 +198,7 @@ class ParallelRobot:
             glfw.set_key_callback(self.window, self.on_key)
             glfw.set_scroll_callback(self.window, self._scroll_callback)
 
-
+        
             self._last_mouse_x = 0
             self._last_mouse_y = 0
             self._mouse_left_pressed = False

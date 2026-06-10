@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.join(ROOT, "src"))
 from navigation.plan import OBSTACLE_RECTS, ROBOT_RADIUS
 
 
+
 def _box_corners(half):
     return np.array([
         [s * half[0], t * half[1], u * half[2]]
@@ -108,6 +109,7 @@ def _name_of(model, kind, idx):
 def _bid(model, name):
     bid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, name)
     return bid if bid >= 0 else None
+
 
 
 def main(xml_path):
