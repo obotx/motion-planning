@@ -422,7 +422,8 @@ class InProcessNavigator:
             print(f"[MuJoCo] {len(validated)} waypoints after collision validation "
                   f"(max_gap={self.validator.last_max_gap:.2f}m, segments_clear=True)")
 
-            _sm_passes = 9 if constant_yaw else 3
+            _sm_passes = (int(os.environ.get("AH_NAV_SMOOTH_PASSES", "14"))
+                          if constant_yaw else 3)
             smooth_candidate = densify_path(smooth_path(validated, passes=_sm_passes))
             smooth_candidate = decimate_path(smooth_candidate)
             path = self.validator.filter_path(smooth_candidate,

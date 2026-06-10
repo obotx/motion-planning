@@ -878,6 +878,7 @@ class ParallelRobot:
 
         mujoco.mj_step(self.model, self.data, nstep=5)
 
+
         if self.run_mode == "cv":
             self.camera_display()
         elif self.run_mode == "glfw":
