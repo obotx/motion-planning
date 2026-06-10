@@ -1,4 +1,4 @@
-<h1 align="center">M1 OMPL Pick &amp; Place</h1>
+<h1 align="center">Universal Robot Motion Planning</h1>
 
 <p align="center">
   <strong>End-to-end autonomous pick &amp; place for the MORPH-I mobile manipulator using OMPL motion planning in MuJoCo.</strong>
